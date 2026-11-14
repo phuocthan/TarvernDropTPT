@@ -1,0 +1,75 @@
+import type {
+  Command,
+  GameTransport,
+  Outcome,
+  Snapshot,
+} from "./domain/contracts.ts";
+import { ApiError } from "./transport/http.ts";
+export type Phase = "loading" | "ready" | "pending" | "presenting" | "recovery";
+export class GameController {
+  state: Snapshot | null = null;
+  phase: Phase = "loading";
+  pending: Command | null = null;
+  private transport: GameTransport;
+  private storage: Storage;
+  private storageKey: string;
+  constructor(
+    transport: GameTransport,
+    storage: Storage,
+    storageKey = "slot.pending",
+  ) {
+    this.transport = transport;
+    this.storage = storage;
+    this.storageKey = storageKey;
+  }
+  async boot() {
+    this.state = await this.transport.session();
+    const saved = this.storage.getItem(this.storageKey);
+    try {
+      this.pending = saved ? JSON.parse(saved) : null;
+    } catch {
+      this.storage.removeItem(this.storageKey);
+      this.pending = null;
+    }
+    this.phase = this.pending ? "recovery" : "ready";
+  }
+  async execute(
+    input: Omit<Command, "requestId" | "expectedVersion">,
+  ): Promise<Outcome> {
+    if (this.phase !== "ready" || !this.state) throw Error("ROUND_BUSY");
+    this.pending = {
+      ...input,
+      requestId: crypto.randomUUID(),
+      expectedVersion: this.state.version,
+    };
+    this.storage.setItem(this.storageKey, JSON.stringify(this.pending));
+    return this.send();
+  }
+  async recover() {
+    if (!this.pending) throw Error("NO_PENDING_ROUND");
+    return this.send();
+  }
+  private async send() {
+    this.phase = "pending";
+    try {
+      const outcome = await this.transport.execute(this.pending!);
+      this.state = outcome.state;
+      this.pending = null;
+      this.storage.removeItem(this.storageKey);
+      this.phase = "presenting";
+      return outcome;
+    } catch (error) {
+      if (error instanceof ApiError && error.rejected) {
+        // A structured rejection confirms this command was not accepted. Reconcile the snapshot.
+        this.pending = null;
+        this.storage.removeItem(this.storageKey);
+        this.state = await this.transport.session();
+        this.phase = "ready";
+      } else this.phase = "recovery";
+      throw error;
+    }
+  }
+  completePresentation() {
+    if (this.phase === "presenting") this.phase = "ready";
+  }
+}

@@ -1,0 +1,98 @@
+/** Money is always an integer in demo minor units. Boards are column-major. */
+export type Mode = "base" | "tavern" | "drop";
+export type Chance = "standard" | "extra" | "super";
+export type Board = string[][];
+export type Position = { reel: number; row: number };
+export interface LineWin {
+  line: number;
+  symbol: string;
+  positions: Position[];
+  amount: number;
+}
+export interface Chest {
+  rows: number[];
+  unlocked: boolean;
+  multiplier: number | null;
+}
+export interface FeatureState {
+  mode: Exclude<Mode, "base">;
+  remaining: number;
+  played: number;
+  accumulated: number;
+  chests: Chest[];
+}
+export interface RoundState {
+  id: string;
+  bet: number;
+  baseWin: number;
+  cap: number;
+}
+export interface Snapshot {
+  version: number;
+  balance: number;
+  board: Board;
+  feature: FeatureState | null;
+  round: RoundState | null;
+}
+export interface Command {
+  requestId: string;
+  expectedVersion: number;
+  action: "spin" | "buy-tavern" | "buy-drop";
+  bet: number;
+  chance: Chance;
+}
+export interface Completion {
+  accumulated: number;
+  multipliers: number[];
+  product: number;
+  featureAward: number;
+  roundAward: number;
+  capped: boolean;
+}
+export interface Outcome {
+  requestId: string;
+  bet: number;
+  state: Snapshot;
+  wins: LineWin[];
+  spinWin: number;
+  entry: Mode | null;
+  retrigger: number;
+  collected: Position[];
+  completion: Completion | null;
+  finalFeature: FeatureState | null;
+  paidAward: number;
+  capped: boolean;
+}
+export interface SymbolDefinition {
+  id: string;
+  label: string;
+  kind: "royal" | "premium" | "wild" | "bonus";
+  color: string;
+  glyph: string;
+  pays: Record<number, number>;
+}
+export interface GameDefinition {
+  id: string;
+  title: string;
+  reels: number;
+  rows: number;
+  lines: number[][];
+  symbols: SymbolDefinition[];
+  bets: number[];
+  initialBoard: Board;
+  demo: {
+    initialBalance: number;
+    capMultiplier: number;
+    buyPrices: Record<"tavern" | "drop", number>;
+    chancePrices: Record<Chance, number>;
+    featureSpins: Record<"tavern" | "drop", number>;
+    retriggerSpins: number;
+    maxFeatureSpins: number;
+    chestMultipliers: number[];
+    winTiers: { label: string; multiplier: number }[];
+  };
+}
+export interface GameTransport {
+  session(): Promise<Snapshot>;
+  execute(command: Command): Promise<Outcome>;
+}

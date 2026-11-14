@@ -1,7 +1,32 @@
-# Tavern slot prototype
+# Slot template · Tavern first game
 
-Run `npm ci`, `npm run dev`, then open the local Vite address. `npm run build` type-checks and builds; `npm test` runs engine checks.
+PixiJS 8 + TypeScript with a Node HTTP mock backend, reusable board renderer and a separate Tavern skin. Reference-site access is still blocked; this is **not yet a verified recreation of Tavern Drop**. All rules and artwork are provisional.
 
-This is an early playable prototype, not a reproduction of the reference game or production gambling software. All symbols, paylines, awards, bonus entry, prices, chest multipliers, balance and probabilities are illustrative. No real money. The in-browser mock is not authoritative and must be replaced with a secure server before real use. The service interface separates results from presentation; production results must contain all outcomes, balances, bonus state and recovery identifiers from the server. Never generate outcomes or settle bets on the client in production.
+## Development
 
-Missing reference and math: reference screens and artwork; actual paytable/paylines; entry and retrigger conditions for both modes; chance options and costs; chest awards; cap and win thresholds; accounting, recovery, autoplay and sound behavior. The reference site was inaccessible during initial development. Obtain licensed art and Spine assets separately.
+Node >=22.18, npm:
+
+```sh
+npm ci
+npm run dev
+```
+
+Vite serves the client (normally port 5173) and proxies the fake API on port 4000. Production:
+
+```sh
+npm run build
+npm start
+```
+
+The Node server serves `dist` and `/api` on `$PORT` (default 4000). Railway configuration is included. This version requires a Node host; static GitHub Pages alone is insufficient.
+
+```sh
+npm test
+npm run test:browser
+```
+
+Browser tests use `/usr/bin/chromium` in the current cloud environment; set `CHROMIUM_PATH` or install Playwright Chromium on another machine.
+
+Read [reference audit and unresolved rules](docs/reference-analysis.md) before deciding game fidelity or final math. See [template architecture and extension guide](docs/template-architecture.md) for reuse boundaries.
+
+The fake server owns all demo outcomes and balances. It is not certified math; no real money. Sessions reset on server restart. Browser recovery retries the same command only within a live mock session. Artwork and audio are code-generated placeholders; original provider assets and Spine files have not been accessed or integrated.
