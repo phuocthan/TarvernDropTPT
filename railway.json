@@ -1,5 +1,11 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
-  "build": { "buildCommand": "npm ci && npm run build" },
-  "deploy": { "startCommand": "node server.js", "healthcheckPath": "/", "healthcheckTimeout": 100 }
+  "build": {
+    "buildCommand": "npm run build"
+  },
+  "deploy": {
+    "startCommand": "node server.js",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 100
+  }
 }
