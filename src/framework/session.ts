@@ -14,9 +14,21 @@ export function createSlotSession(
     game.id + ".pending",
   );
   const board = new BoardView(game, symbols);
+  const timing = game.presentation.feature;
   return {
     controller,
     board,
+    nextSpinDelay(baseDelayMs: number) {
+      const feature = controller.state?.feature;
+      return baseDelayMs +
+        (feature?.played === 0 && feature.remaining > 0
+          ? (timing?.startDelayMs ?? 0)
+          : 0);
+    },
+    async waitBeforeFeatureResult() {
+      if (timing?.endDelayMs)
+        await new Promise<void>((resolve) => setTimeout(resolve, timing.endDelayMs));
+    },
     async mount(host: HTMLElement) {
       await Promise.all([board.mount(host), controller.boot()]);
       board.setBoard(controller.state!.board);

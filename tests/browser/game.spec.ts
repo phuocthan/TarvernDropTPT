@@ -144,6 +144,28 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     page.getByRole("heading", { name: "DROP BONUS", exact: true }),
   ).toBeVisible();
   expect(requests).toHaveLength(0);
+  await page.evaluate(() => {
+    const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
+    const status = document.querySelector("#status")!;
+    const progress = document.querySelector("#feature-progress")!;
+    document.querySelector("#continue")!.addEventListener("click", () => {
+      performance.mark("feature-continue");
+    }, { once: true });
+    const finalPresentation = new MutationObserver(() => {
+      if (progress.textContent === "0" && status.textContent?.includes("WINNING")) {
+        performance.mark("final-spin-presented");
+        finalPresentation.disconnect();
+      }
+    });
+    finalPresentation.observe(status, { childList: true });
+    const resultPopup = new MutationObserver(() => {
+      if (dialog.open && dialog.querySelector(".reveal-chests")) {
+        performance.mark("feature-result-open");
+        resultPopup.disconnect();
+      }
+    });
+    resultPopup.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+  });
   await page.locator("#continue").click();
   await expect(page.locator(".game-shell")).toHaveAttribute(
     "data-mode",
@@ -155,8 +177,21 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   );
   expect(reelsAboveChests).toBe(true);
   await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({
-    timeout: 25000,
+    timeout: 35000,
   });
+  const delays = await page.evaluate(() => {
+    const mark = (name: string) => performance.getEntriesByName(name, "mark")[0].startTime;
+    const continueAt = mark("feature-continue");
+    const apiUrl = new URL("/api/command", location.href).href;
+    const firstSpin = performance.getEntriesByName(apiUrl, "resource")
+      .find((entry) => entry.startTime >= continueAt)!;
+    return {
+      start: firstSpin.startTime - continueAt,
+      end: mark("feature-result-open") - mark("final-spin-presented"),
+    };
+  });
+  expect(delays.start).toBeGreaterThanOrEqual(1400 + tavern.presentation.feature!.startDelayMs - 50);
+  expect(delays.end).toBeGreaterThanOrEqual(tavern.presentation.feature!.endDelayMs - 50);
   expect(requests).toHaveLength(3);
   expect(new Set(requests).size).toBe(3);
   const multipliers = page.locator(".reveal-chests .chest-multiplier");

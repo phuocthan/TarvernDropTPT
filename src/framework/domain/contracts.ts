@@ -82,6 +82,10 @@ export interface ReelPresentation {
   spinType: ReelMotion;
   cellSizePx: number;
   gapPx: number;
+  feature?: {
+    startDelayMs: number;
+    endDelayMs: number;
+  };
   normal: {
     speedPxPerSecond: number;
     turboSpeedPxPerSecond: number;

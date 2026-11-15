@@ -43,6 +43,7 @@ Hai game mẫu đều dùng [schema v1](../src/framework/game-config.schema.json
 | Bố cục reel | `presentation.cellSizePx` và `gapPx` dùng pixel logic của Pixi. |
 | Normal | `presentation.spinType: "normal"`. Cấu hình tốc độ thường và turbo bằng px/giây, khoảng chờ dừng giữa reel bằng ms, thời gian và độ nảy khi dừng. |
 | Drop | `presentation.spinType: "drop"`. Hai pha `exit` và `enter` có thời gian rơi, độ lệch theo reel và hàng, thời gian giữ pha. Có thể chỉnh hệ số turbo và độ nảy. |
+| Free Spins | `presentation.feature.startDelayMs` cộng vào khoảng nghỉ trước lượt Free Spin đầu. `endDelayMs` giữ màn chơi sau lượt cuối trước khi hiện kết quả. Cả hai tính bằng ms và mặc định là 0 khi bỏ khối `feature`. |
 | Mock backend | `demo` chứa số dư đầu, cap, tỷ lệ Scatter, giá và số lượt bonus, hệ số rương và ngưỡng win. Số free spins bằng 0 tắt mode bonus tương ứng. |
 
 ## Thêm game

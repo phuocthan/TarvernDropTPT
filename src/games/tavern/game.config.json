@@ -296,6 +296,10 @@
     "spinType": "drop",
     "cellSizePx": 102,
     "gapPx": 8,
+    "feature": {
+      "startDelayMs": 2000,
+      "endDelayMs": 2000
+    },
     "normal": {
       "speedPxPerSecond": 1700,
       "turboSpeedPxPerSecond": 1700,

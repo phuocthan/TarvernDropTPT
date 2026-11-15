@@ -192,14 +192,16 @@ flowchart TD
     Four --> Drop
     Tavern --> Intro["Diễn Scatter rồi mở intro"]
     Drop --> Intro
-    Intro -->|Continue một lần| Auto["Tự chạy Free Spin với bet của round"]
+    Intro -->|Continue một lần| StartDelay["Hiện scene bonus, chờ thêm 2 giây"]
+    StartDelay --> Auto["Tự chạy Free Spin với bet của round"]
     Auto --> Collect["Cộng win, lấy key ở các hàng thắng, cập nhật rương"]
     Collect --> Retrigger{"Có từ 3 Scatter?"}
     Retrigger -->|Có| Extra["Cộng tối đa 3 lượt trong giới hạn 40"]
     Retrigger -->|Không| Finish
     Extra --> Finish{"Hết lượt hoặc chạm cap?"}
     Finish -->|Chưa| Auto
-    Finish -->|Rồi| Total["Backend tính hệ số và trả thưởng<br/>UI hiện Total Win và các rương"]
+    Finish -->|Rồi| EndDelay["Backend chốt thưởng<br/>UI diễn lượt cuối và chờ thêm 2 giây"]
+    EndDelay --> Total["Hiện Total Win và các rương"]
     Total -->|Continue| Base
 ```
 

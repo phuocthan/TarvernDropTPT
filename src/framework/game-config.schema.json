@@ -129,6 +129,23 @@
           "type": "integer",
           "minimum": 0
         },
+        "feature": {
+          "type": "object",
+          "required": ["startDelayMs", "endDelayMs"],
+          "properties": {
+            "startDelayMs": {
+              "description": "Additional delay before the first free spin.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "endDelayMs": {
+              "description": "Delay after the last spin presentation and before the feature result.",
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
         "normal": {
           "type": "object",
           "required": [

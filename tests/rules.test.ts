@@ -42,6 +42,15 @@ test("config validation rejects invalid board geometry, symbol IDs and timing", 
   assert.equal(loadGameConfig(game).presentation.drop.turboMultiplier, 3.2);
   game.presentation.drop.turboMultiplier = 0.9;
   assert.throws(() => loadGameConfig(game), /presentation.drop/);
+  game.presentation.drop.turboMultiplier = reuse.presentation.drop.turboMultiplier;
+  assert.equal(loadGameConfig(game).presentation.feature, undefined);
+  game.presentation.feature = { startDelayMs: 2000, endDelayMs: 2000 };
+  assert.deepEqual(loadGameConfig(game).presentation.feature, {
+    startDelayMs: 2000,
+    endDelayMs: 2000,
+  });
+  game.presentation.feature.endDelayMs = -1;
+  assert.throws(() => loadGameConfig(game), /presentation.feature/);
 });
 test("the 3 by 3 config disables bonus purchases and higher chances", () => {
   const server = new MockGame(reuse);

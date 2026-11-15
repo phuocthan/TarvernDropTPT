@@ -89,6 +89,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
   const {
     controller,
     board: view,
+    nextSpinDelay,
+    waitBeforeFeatureResult,
     mount,
   } = createSlotSession(game, new HttpTransport(game.routing.apiBase), symbols, localStorage);
   if (matchMedia("(min-width: 800px)").matches)
@@ -248,7 +250,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
     autoTimer = setTimeout(() => {
       autoTimer = null;
       if (!dialog.open && controller.phase === "ready") void run("spin");
-    }, delay);
+    }, nextSpinDelay(delay));
   }
   async function present(outcome: Outcome) {
     presentingBet = outcome.bet;
@@ -337,9 +339,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
       sync();
     }
     if (outcome.completion) {
+      stopAuto();
+      await waitBeforeFeatureResult();
       if (outcome.finalFeature?.chests.some((chest) => chest.unlocked))
         audio.cue("chest");
-      stopAuto();
       const c = outcome.completion;
       modal(
         `<h2>${c.capped ? "Max Win" : artRegion("totalWin", "total-win-art") + '<span class="visually-hidden">Total Win</span>'}</h2>

@@ -88,7 +88,14 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     !nonNegativeInt(display.gapPx)
   )
     invalid("presentation");
-  const { normal, drop } = display;
+  const { normal, drop, feature } = display;
+  if (
+    feature !== undefined &&
+    (!feature ||
+      !nonNegativeInt(feature.startDelayMs) ||
+      !nonNegativeInt(feature.endDelayMs))
+  )
+    invalid("presentation.feature");
   if (
     !normal ||
     ![
