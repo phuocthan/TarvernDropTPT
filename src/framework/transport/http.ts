@@ -14,11 +14,12 @@ export class ApiError extends Error {
   }
 }
 export class HttpTransport implements GameTransport {
+  constructor(private readonly basePath = "/api") {}
   async session(): Promise<Snapshot> {
-    return this.request("/api/session");
+    return this.request(this.basePath + "/session");
   }
   async execute(command: Command): Promise<Outcome> {
-    return this.request("/api/command", command);
+    return this.request(this.basePath + "/command", command);
   }
   private async request<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(path, {

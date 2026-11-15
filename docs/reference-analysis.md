@@ -1,5 +1,7 @@
 # Tavern Drop: reference audit and implementation map
 
+> This audit records the initial mock build. See the [Tavern Drop reference walkthrough](tavern-drop-reference.md) for the subsequent Help review, play observations and comparison against the current client.
+
 ## Evidence and limits
 
 Reference URL: https://paperclipgaming.com/ko/games/tavern-drop

@@ -1,0 +1,378 @@
+{
+  "$schema": "../../framework/game-config.schema.json",
+  "schemaVersion": 1,
+  "id": "tavern-template",
+  "title": "Tavern Drop",
+  "reels": 5,
+  "rows": 5,
+  "lines": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    [
+      3,
+      3,
+      3,
+      3,
+      3
+    ],
+    [
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    [
+      0,
+      1,
+      2,
+      1,
+      0
+    ],
+    [
+      4,
+      3,
+      2,
+      3,
+      4
+    ],
+    [
+      1,
+      2,
+      3,
+      2,
+      1
+    ],
+    [
+      3,
+      2,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      4,
+      3,
+      2,
+      1,
+      0
+    ],
+    [
+      1,
+      1,
+      2,
+      3,
+      3
+    ],
+    [
+      3,
+      3,
+      2,
+      1,
+      1
+    ],
+    [
+      2,
+      1,
+      0,
+      1,
+      2
+    ],
+    [
+      2,
+      3,
+      4,
+      3,
+      2
+    ]
+  ],
+  "symbols": [
+    {
+      "id": "A",
+      "label": "A",
+      "kind": "royal",
+      "color": "#b94338",
+      "glyph": "A",
+      "pays": {
+        "3": 20,
+        "4": 50,
+        "5": 100
+      }
+    },
+    {
+      "id": "K",
+      "label": "K",
+      "kind": "royal",
+      "color": "#65a8b9",
+      "glyph": "K",
+      "pays": {
+        "3": 20,
+        "4": 50,
+        "5": 100
+      }
+    },
+    {
+      "id": "Q",
+      "label": "Q",
+      "kind": "royal",
+      "color": "#ad77b5",
+      "glyph": "Q",
+      "pays": {
+        "3": 20,
+        "4": 50,
+        "5": 100
+      }
+    },
+    {
+      "id": "J",
+      "label": "J",
+      "kind": "royal",
+      "color": "#6daa88",
+      "glyph": "J",
+      "pays": {
+        "3": 20,
+        "4": 50,
+        "5": 100
+      }
+    },
+    {
+      "id": "10",
+      "label": "10",
+      "kind": "royal",
+      "color": "#cba563",
+      "glyph": "10",
+      "pays": {
+        "3": 20,
+        "4": 50,
+        "5": 100
+      }
+    },
+    {
+      "id": "ale",
+      "label": "Ale",
+      "kind": "premium",
+      "color": "#e9b744",
+      "glyph": "🍺",
+      "pays": {
+        "3": 40,
+        "4": 100,
+        "5": 250
+      }
+    },
+    {
+      "id": "barrel",
+      "label": "Roast",
+      "kind": "premium",
+      "color": "#c98540",
+      "glyph": "🍖",
+      "pays": {
+        "3": 50,
+        "4": 125,
+        "5": 300
+      }
+    },
+    {
+      "id": "coin",
+      "label": "Potion",
+      "kind": "premium",
+      "color": "#f3cd67",
+      "glyph": "🧪",
+      "pays": {
+        "3": 60,
+        "4": 150,
+        "5": 400
+      }
+    },
+    {
+      "id": "crown",
+      "label": "Feast",
+      "kind": "premium",
+      "color": "#dbad50",
+      "glyph": "🍲",
+      "pays": {
+        "3": 75,
+        "4": 200,
+        "5": 500
+      }
+    },
+    {
+      "id": "wild",
+      "label": "Wild",
+      "kind": "wild",
+      "color": "#f1c35b",
+      "glyph": "W",
+      "pays": {
+        "3": 100,
+        "4": 300,
+        "5": 750
+      }
+    },
+    {
+      "id": "bonus",
+      "label": "Bonus",
+      "kind": "bonus",
+      "color": "#8ad4c5",
+      "glyph": "B",
+      "pays": {}
+    }
+  ],
+  "bets": [
+    20,
+    50,
+    100,
+    200,
+    500,
+    1000
+  ],
+  "initialBoard": [
+    [
+      "A",
+      "ale",
+      "K",
+      "coin",
+      "J"
+    ],
+    [
+      "barrel",
+      "Q",
+      "wild",
+      "J",
+      "A"
+    ],
+    [
+      "K",
+      "coin",
+      "bonus",
+      "ale",
+      "Q"
+    ],
+    [
+      "Q",
+      "ale",
+      "A",
+      "crown",
+      "K"
+    ],
+    [
+      "crown",
+      "J",
+      "coin",
+      "Q",
+      "barrel"
+    ]
+  ],
+  "routing": {
+    "query": "tavern",
+    "apiBase": "/api",
+    "skin": "tavern"
+  },
+  "presentation": {
+    "spinType": "drop",
+    "cellSizePx": 102,
+    "gapPx": 8,
+    "normal": {
+      "speedPxPerSecond": 1700,
+      "turboSpeedPxPerSecond": 2800,
+      "stopDelayMs": 130,
+      "turboStopDelayMs": 20,
+      "bounceMs": 170,
+      "bouncePx": 8
+    },
+    "drop": {
+      "exit": {
+        "fallMs": 250,
+        "reelStaggerMs": 18,
+        "rowStaggerMs": 24,
+        "holdMs": 140
+      },
+      "enter": {
+        "fallMs": 390,
+        "reelStaggerMs": 76,
+        "rowStaggerMs": 52,
+        "holdMs": 0
+      },
+      "bounceMs": 100,
+      "bouncePx": 8,
+      "turboMultiplier": 4
+    }
+  },
+  "demo": {
+    "initialBalance": 100000,
+    "capMultiplier": 5000,
+    "buyPrices": {
+      "tavern": 50,
+      "drop": 100
+    },
+    "chancePrices": {
+      "standard": 1,
+      "extra": 2,
+      "super": 5
+    },
+    "featureSpins": {
+      "tavern": 8,
+      "drop": 10
+    },
+    "retriggerSpins": 3,
+    "maxFeatureSpins": 40,
+    "chestMultipliers": {
+      "tavern": [
+        2,
+        3,
+        5
+      ],
+      "drop": [
+        5,
+        10,
+        25,
+        50,
+        100
+      ]
+    },
+    "winTiers": [
+      {
+        "label": "BIG WIN",
+        "multiplier": 10
+      },
+      {
+        "label": "MEGA WIN",
+        "multiplier": 25
+      },
+      {
+        "label": "EPIC WIN",
+        "multiplier": 50
+      }
+    ],
+    "scatterRates": {
+      "standard": 0.03,
+      "extra": 0.05,
+      "super": 0.07
+    }
+  },
+  "defaultBet": 100
+}

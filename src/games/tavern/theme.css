@@ -1,0 +1,792 @@
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-v11-latin_latin-ext-regular-BDXaL9-u.woff2")
+    format("woff2");
+  font-display: swap;
+}
+.tavern-shell,
+.tavern-dialog {
+  font-family: Outfit, sans-serif;
+}
+.tavern-shell {
+  position: relative;
+  max-width: none;
+  height: 100svh;
+  min-height: 350px;
+  isolation: isolate;
+  color: white;
+  background: #31211d;
+}
+.tavern-shell [hidden] {
+  display: none;
+}
+.tavern-top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 1px 3px #201915;
+}
+.tavern-top small {
+  color: #fff1d2;
+}
+.tavern-top .assets-link {
+  color: #fff8ec;
+  font-size: 12px;
+}
+.tavern-shell[data-mode] .stage {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  min-height: 0;
+  isolation: auto;
+  background: none;
+}
+.tavern-shell .stage::before {
+  content: none;
+}
+.atlas-art {
+  display: block;
+  aspect-ratio: var(--art-ratio);
+  background-image: var(--art-image);
+  background-size: var(--art-size);
+  background-position: var(--art-position);
+  background-repeat: no-repeat;
+}
+.scenery {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.scenery .backdrop {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 150svh);
+  transform: translate(-50%, -50%);
+}
+.scenery .barrel {
+  position: absolute;
+  top: 0;
+  right: -1%;
+  height: 87%;
+}
+.scenery .table {
+  position: absolute;
+  left: 50%;
+  bottom: -1%;
+  width: max(100%, 103svh);
+  transform: translateX(-50%);
+  z-index: 1;
+}
+.scenery .base-art,
+.scenery .bonus-art {
+  transition: opacity 540ms ease-in-out;
+}
+.tavern-shell[data-mode="base"] .bonus-art,
+.tavern-shell:not([data-mode="base"]) .base-art {
+  opacity: 0;
+}
+.tavern-logo {
+  position: absolute;
+  top: 24%;
+  right: calc(50% + min(25vw, 34svh, 355px));
+  width: min(16vw, 32svh, 250px);
+  margin: 0;
+  z-index: 1;
+}
+.tavern-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tavern-shell .machine {
+  --reel-top: 9.4%;
+  --reel-height: 83.75%;
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  width: min(68vw, 101svh, 960px);
+  max-width: none;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+.tavern-shell:not([data-mode="base"]) .machine {
+  top: 43%;
+}
+.tavern-shell .reel-frame {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: none;
+}
+.tavern-shell .reel-frame::before,
+.tavern-shell .reel-frame::after {
+  content: none;
+}
+.frame-art {
+  width: 100%;
+}
+.tavern-shell .board-loading,
+.tavern-shell .reel-host {
+  position: absolute;
+  inset: var(--reel-top) auto auto 14.15%;
+  width: 71.7%;
+  height: var(--reel-height);
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+.tavern-shell .reel-host {
+  background: transparent;
+}
+.tavern-shell .reel-host canvas {
+  position: relative;
+  z-index: 3;
+}
+.tavern-shell .board-loading {
+  background: #271b33;
+  color: white;
+}
+.reel-keys {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  pointer-events: none;
+}
+.key-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.key-cell.collected {
+  border: 1px solid #ffce65a0;
+  background: #ffb45432;
+  box-shadow: inset 0 0 9px #ffc34d55;
+}
+.key-art {
+  width: 58%;
+  transform: rotate(-90deg);
+  opacity: 0.26;
+}
+.collected .key-art {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px #ffb200);
+}
+.tavern-shell .chest-row {
+  position: absolute;
+  top: calc(var(--reel-top) + var(--reel-height) - 2.5%);
+  left: 14.15%;
+  width: 71.7%;
+  height: auto;
+  gap: 1%;
+  padding: 0;
+  margin: 0;
+  z-index: 2;
+}
+.tavern-shell .chest,
+.reveal-chests .chest {
+  position: relative;
+  display: block;
+  aspect-ratio: 1.2;
+  padding: 0;
+  filter: brightness(0.72);
+}
+.tavern-shell .chest.unlocked,
+.reveal-chests .chest.unlocked {
+  filter: brightness(1.14) drop-shadow(0 0 7px #ffdd64d9);
+}
+.tavern-chest-lid,
+.tavern-chest-front {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96%;
+}
+.tavern-chest-lid {
+  top: 0;
+}
+.tavern-chest-front {
+  top: 39%;
+  width: 89%;
+}
+.chest-multiplier {
+  position: absolute;
+  top: 8%;
+  inset-inline: 0;
+  text-align: center;
+  color: #fff191;
+  font-size: clamp(12px, 3vw, 34px);
+  font-weight: bold;
+  text-shadow: 0 2px 3px #38140d;
+}
+.mascot {
+  position: absolute;
+  right: -1%;
+  bottom: 9%;
+  width: min(40vw, 65svh, 570px);
+  z-index: 2;
+  pointer-events: none;
+}
+.mascot-animation,
+.mascot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.mascot[data-ready] img {
+  display: none;
+}
+.tavern-status {
+  position: absolute;
+  z-index: 4;
+  inset: auto 8px max(80px, 12svh);
+  margin: 0;
+  color: #fff8d6;
+  font-size: clamp(10px, 2vw, 14px);
+  text-align: center;
+  text-shadow:
+    0 1px 4px #16120e,
+    0 1px 3px #16120e;
+  pointer-events: none;
+}
+.tavern-hud {
+  position: absolute;
+  z-index: 6;
+  bottom: max(7px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  width: min(92vw, 870px);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(4px, 1vw, 12px);
+  color: white;
+}
+.hud-bar {
+  display: flex;
+  align-items: center;
+  min-height: clamp(46px, 8svh, 74px);
+  padding: 2px 6px;
+  gap: clamp(4px, 0.9vw, 13px);
+  border-radius: 10px;
+  background: #171c18e8;
+}
+.tavern-hud button {
+  color: white;
+  border: 0;
+  background: transparent;
+}
+.tavern-hud .feature-button {
+  display: grid;
+  place-items: center;
+  width: clamp(38px, 8vw, 85px);
+  aspect-ratio: 1;
+  padding: 3px;
+  background: #27cbe8;
+  color: #05151b;
+  border: 3px solid #12232c;
+  border-radius: 16%;
+  box-shadow: 0 0 0 2px #5bdcf0;
+  font-size: clamp(7px, 1.5vw, 13px);
+  font-weight: bold;
+}
+.feature-button img {
+  width: 78%;
+  height: auto;
+}
+.hud-menu {
+  font-size: clamp(16px, 3vw, 30px);
+  line-height: 1;
+  padding: 0;
+}
+.hud-money {
+  display: grid;
+  line-height: 1.06;
+  white-space: nowrap;
+}
+.hud-money span,
+#free-spins span {
+  color: #54d5ec;
+  font-size: clamp(7px, 1.25vw, 11px);
+  text-transform: uppercase;
+}
+.hud-money strong,
+#free-spins strong {
+  font-size: clamp(11px, 1.8vw, 20px);
+  font-variant-numeric: tabular-nums;
+}
+#free-spins {
+  white-space: nowrap;
+  text-align: center;
+  margin-left: auto;
+}
+.hud-bet {
+  display: flex;
+  align-items: center;
+  gap: clamp(2px, 0.6vw, 10px);
+  margin-left: auto;
+}
+.bet-arrows,
+.hud-quick,
+.hud-aux {
+  display: grid;
+  gap: 2px;
+}
+.bet-arrows button,
+.hud-quick button,
+.hud-aux button {
+  width: clamp(19px, 3vw, 33px);
+  min-height: clamp(19px, 3.1svh, 32px);
+  padding: 0;
+  font-size: clamp(14px, 2.5vw, 24px);
+  line-height: 1;
+}
+.tavern-hud .hud-quick button,
+.tavern-hud .hud-aux button {
+  border: 1px solid #eaffff47;
+  border-radius: 50%;
+  background: #1c231f;
+}
+.tavern-hud button[aria-pressed="true"] {
+  color: #25ddf5;
+  border-color: #25ddf5;
+}
+.tavern-hud .spin-button {
+  display: grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: clamp(48px, 9svh, 100px);
+  height: clamp(48px, 9svh, 100px);
+  color: #101310;
+  background: #fff;
+  border: 4px solid #151915;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #fff;
+  font-size: clamp(24px, 5svh, 59px);
+  line-height: 0.72;
+}
+.tavern-hud .spin-button small {
+  letter-spacing: 0;
+  font-size: 8px;
+  color: inherit;
+}
+.tavern-hud .spin-button.spinning {
+  animation: none;
+}
+.tavern-dialog::backdrop {
+  background: #110e0bbb;
+  backdrop-filter: blur(5px);
+}
+.tavern-dialog[data-look="shop"],
+.tavern-dialog[data-look="shop-confirm"],
+.tavern-dialog[data-look="bonus"] {
+  width: min(95vw, 1040px);
+  max-height: 96svh;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: white;
+}
+.tavern-dialog[data-look="shop"] .modal-inner,
+.tavern-dialog[data-look="shop-confirm"] .modal-inner {
+  padding: 42px 8px 8px;
+}
+.tavern-dialog[data-look^="shop"] .close-modal {
+  top: 0;
+  color: white;
+  font-size: 37px;
+  line-height: 1;
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(7px, 1.4vw, 17px);
+}
+.shop-card {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 0 0 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 13px;
+  background: #fff;
+  color: #111;
+  text-align: center;
+}
+.shop-card img {
+  width: 100%;
+  aspect-ratio: 2.05;
+  object-fit: cover;
+}
+.shop-card strong,
+.shop-card h2 {
+  font:
+    bold clamp(12px, 1.75vw, 20px) Outfit,
+    sans-serif;
+  color: #111;
+  text-transform: uppercase;
+  margin: 0;
+}
+.shop-card b {
+  font-size: clamp(18px, 2.55vw, 32px);
+}
+.shop-bolts {
+  color: #17bcd5;
+  font-weight: bold;
+  font-size: 18px;
+}
+.shop-bolts i {
+  color: #2e3535;
+  font-style: normal;
+}
+.shop-action {
+  display: block;
+  margin: 4px 7px 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: #26cbe3;
+  color: #081a20;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+.shop-card.chance .shop-action {
+  background: #ffae13;
+  color: #221606;
+}
+.shop-bet {
+  margin: 20px auto 0;
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #171c18ed;
+  color: white;
+}
+.shop-bet button {
+  border: 0;
+  background: transparent;
+  color: white;
+  font-size: 22px;
+}
+.shop-confirm {
+  max-width: 390px;
+  margin: auto;
+}
+.shop-confirm p {
+  color: #242420;
+  margin: 5px 16px;
+}
+.tavern-dialog[data-look="bonus"] .modal-inner {
+  padding: 20px 12px;
+  display: grid;
+  place-items: center;
+}
+.tavern-dialog[data-look="bonus"] h2,
+.free-spin-title {
+  color: #ffd062;
+  font-size: clamp(25px, 7vw, 70px);
+  font-weight: bold;
+  line-height: 1;
+  margin: 12px auto;
+  text-shadow:
+    0 3px #733b0d,
+    0 5px #27150e;
+  text-transform: uppercase;
+}
+.bonus-preview {
+  width: min(62vw, 420px);
+  display: block;
+  border-radius: 13px;
+}
+.scene-continue {
+  padding: 12px;
+  margin-top: 20px;
+  color: white;
+  background: #171c18a6;
+  border: 1px solid #fff8;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+.total-win-art {
+  width: min(69vw, 530px);
+}
+.reveal-chests {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  width: min(90%, 500px);
+  margin: 12px auto;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.reel-motion-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 20px 0;
+}
+.reel-motion-setting select {
+  min-height: 42px;
+  padding: 8px 12px;
+  background: #392945;
+  color: #fff;
+  font: inherit;
+}
+@media (max-width: 670px) and (orientation: portrait) {
+  .tavern-shell .machine {
+    width: min(125vw, 103svh);
+    top: 48%;
+  }
+  .tavern-shell:not([data-mode="base"]) .machine {
+    top: 45%;
+  }
+  .tavern-logo {
+    top: 9%;
+    left: 50%;
+    right: auto;
+    width: min(31vw, 17svh);
+    transform: translateX(-50%);
+  }
+  .mascot {
+    right: -15%;
+    bottom: 13%;
+    width: min(51vw, 40svh);
+  }
+  .scenery .barrel {
+    right: -36%;
+  }
+  .tavern-hud {
+    width: 96vw;
+    gap: 5px;
+  }
+  .hud-bar {
+    gap: 4px;
+  }
+  .tavern-status {
+    bottom: max(67px, 10svh);
+  }
+  .shop-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shop-bet {
+    margin-top: 12px;
+  }
+}
+@media (max-height: 490px) and (orientation: landscape) {
+  .tavern-hud {
+    width: min(76vw, 670px);
+  }
+  .tavern-shell .machine {
+    width: min(62vw, 101svh);
+    top: 45%;
+  }
+  .tavern-status {
+    bottom: 54px;
+  }
+}
+
+.tavern-shell:not([data-mode="base"]) .machine {
+  animation: bonus-frame-enter 710ms ease-out both;
+}
+.tavern-shell:not([data-mode="base"]) .stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: radial-gradient(ellipse, #ffd971ab, #fcb84500 68%);
+  pointer-events: none;
+  animation: tavern-flash 690ms ease-out both;
+}
+.key-cell {
+  animation: key-enter 270ms ease-out both;
+  animation-delay: calc(360ms + var(--reel) * 75ms + var(--row) * 20ms);
+}
+.key-cell.collected .key-art {
+  animation: key-lit 425ms ease-out both;
+}
+.tavern-shell .chest {
+  animation: chest-arrive 310ms ease-out both;
+  animation-delay: calc(680ms + var(--reel) * 90ms);
+}
+.tavern-shell .chest.unlocked {
+  animation: chest-unlock 570ms ease-out both;
+}
+.reveal-chests .chest.unlocked .tavern-chest-lid {
+  animation: chest-open 420ms ease-out both;
+  animation-delay: calc(380ms + var(--reel) * 170ms);
+}
+.reveal-chests .chest-multiplier {
+  animation: reveal-number 310ms ease-out both;
+  animation-delay: calc(660ms + var(--reel) * 170ms);
+}
+.bonus-paid {
+  animation: reveal-number 360ms 1450ms ease-out both;
+}
+.tavern-shell:not([data-mode="base"]) .reel-host canvas {
+  animation: bonus-symbols-enter 1180ms ease-out both;
+}
+.chest-coins {
+  position: absolute;
+  top: 35%;
+  left: 13%;
+  width: 74%;
+  animation: reveal-number 350ms ease-out both;
+  animation-delay: calc(550ms + var(--reel) * 170ms);
+}
+.tavern-dialog .chest-subtotal {
+  font-size: clamp(19px, 4vw, 38px);
+  color: #ffe099;
+  margin: 0;
+}
+.tavern-hud #win-amount {
+  font:
+    bold clamp(11px, 1.8vw, 20px) Outfit,
+    sans-serif;
+  color: #56def3;
+  text-align: left;
+}
+.tavern-hud #win-label {
+  text-align: left;
+  letter-spacing: 0;
+}
+@keyframes bonus-symbols-enter {
+  0%,
+  72% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.paytable-icon {
+  width: 28px;
+  margin: 0 auto;
+}
+@keyframes bonus-frame-enter {
+  0%,
+  32% {
+    opacity: 0;
+    translate: 0 22px;
+  }
+  100% {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes tavern-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  32% {
+    opacity: 1;
+  }
+}
+@keyframes key-enter {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes key-lit {
+  0% {
+    scale: 0.72;
+  }
+  48% {
+    scale: 1.22;
+    filter: drop-shadow(0 0 12px #ffdc3d) brightness(1.4);
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes chest-arrive {
+  0% {
+    opacity: 0;
+    translate: 0 21px;
+  }
+  72% {
+    translate: 0 -5px;
+  }
+  100% {
+    opacity: 1;
+    translate: 0;
+  }
+}
+@keyframes chest-unlock {
+  0% {
+    scale: 0.92;
+  }
+  42% {
+    scale: 1.16;
+    filter: brightness(1.65) drop-shadow(0 0 16px #ffd043);
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes chest-open {
+  from {
+    opacity: 0;
+    translate: 0 17px;
+    rotate: -12deg;
+  }
+  to {
+    opacity: 1;
+    translate: 0 -8%;
+    rotate: 0deg;
+  }
+}
+@keyframes reveal-number {
+  from {
+    opacity: 0;
+    scale: 0.75;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenery .base-art,
+  .scenery .bonus-art {
+    transition: none;
+  }
+  .tavern-shell .stage::after,
+  .tavern-shell:not([data-mode="base"]) .machine,
+  .tavern-shell:not([data-mode="base"]) .reel-host canvas,
+  .key-cell,
+  .key-cell.collected .key-art,
+  .tavern-shell .chest,
+  .tavern-shell .chest.unlocked,
+  .reveal-chests .chest.unlocked .tavern-chest-lid,
+  .reveal-chests .chest-multiplier,
+  .chest-coins,
+  .bonus-paid {
+    animation: none;
+  }
+}

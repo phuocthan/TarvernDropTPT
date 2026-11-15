@@ -8,7 +8,7 @@ import type {
 export function validateDefinition(game: GameDefinition) {
   if (
     game.lines.some(
-      (l) => l.length !== game.reels || l.some((r) => r < 0 || r >= game.rows),
+      (l) => l.length !== game.reels || l.some((r) => !Number.isInteger(r) || r < 0 || r >= game.rows),
     )
   )
     throw Error("Invalid paylines");

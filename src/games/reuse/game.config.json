@@ -1,0 +1,152 @@
+{
+  "$schema": "../../framework/game-config.schema.json",
+  "schemaVersion": 1,
+  "id": "reuse-3x3",
+  "title": "3 × 3 Reuse Demo",
+  "reels": 3,
+  "rows": 3,
+  "lines": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      1
+    ],
+    [
+      2,
+      2,
+      2
+    ],
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      2,
+      1,
+      0
+    ]
+  ],
+  "symbols": [
+    {
+      "id": "A",
+      "label": "A",
+      "kind": "royal",
+      "color": "#e8bd68",
+      "glyph": "A",
+      "pays": {
+        "3": 200
+      }
+    },
+    {
+      "id": "K",
+      "label": "K",
+      "kind": "royal",
+      "color": "#80ccce",
+      "glyph": "K",
+      "pays": {
+        "3": 120
+      }
+    },
+    {
+      "id": "Q",
+      "label": "Q",
+      "kind": "royal",
+      "color": "#e49bb4",
+      "glyph": "Q",
+      "pays": {
+        "3": 70
+      }
+    }
+  ],
+  "bets": [
+    100
+  ],
+  "initialBoard": [
+    [
+      "A",
+      "K",
+      "Q"
+    ],
+    [
+      "Q",
+      "A",
+      "K"
+    ],
+    [
+      "K",
+      "Q",
+      "A"
+    ]
+  ],
+  "routing": {
+    "query": "reuse",
+    "apiBase": "/api/reuse",
+    "skin": "basic"
+  },
+  "presentation": {
+    "spinType": "normal",
+    "cellSizePx": 96,
+    "gapPx": 6,
+    "normal": {
+      "speedPxPerSecond": 1700,
+      "turboSpeedPxPerSecond": 2800,
+      "stopDelayMs": 130,
+      "turboStopDelayMs": 20,
+      "bounceMs": 170,
+      "bouncePx": 8
+    },
+    "drop": {
+      "exit": {
+        "fallMs": 250,
+        "reelStaggerMs": 18,
+        "rowStaggerMs": 24,
+        "holdMs": 140
+      },
+      "enter": {
+        "fallMs": 390,
+        "reelStaggerMs": 76,
+        "rowStaggerMs": 52,
+        "holdMs": 0
+      },
+      "bounceMs": 100,
+      "bouncePx": 8,
+      "turboMultiplier": 4
+    }
+  },
+  "demo": {
+    "initialBalance": 100000,
+    "capMultiplier": 50,
+    "buyPrices": {
+      "tavern": 0,
+      "drop": 0
+    },
+    "chancePrices": {
+      "standard": 1,
+      "extra": 0,
+      "super": 0
+    },
+    "featureSpins": {
+      "tavern": 0,
+      "drop": 0
+    },
+    "retriggerSpins": 0,
+    "maxFeatureSpins": 0,
+    "chestMultipliers": {
+      "tavern": [],
+      "drop": []
+    },
+    "winTiers": [],
+    "scatterRates": {
+      "standard": 0,
+      "extra": 0,
+      "super": 0
+    }
+  },
+  "defaultBet": 100
+}

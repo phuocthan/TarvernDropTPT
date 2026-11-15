@@ -8,6 +8,8 @@ import {
   validateDefinition,
 } from "../src/framework/domain/rules.ts";
 import { MockGame } from "../server/mock-game.ts";
+import { loadGameConfig } from "../src/framework/game-config.ts";
+import { reuse } from "../src/games/reuse/definition.ts";
 const board = () => Array.from({ length: 5 }, () => ["A", "K", "Q", "J", "10"]);
 const command = (
   state: MockGame,
@@ -24,6 +26,23 @@ test("definition and all 15 line paths stay inside the board", () => {
   validateDefinition(tavern);
   assert.equal(tavern.lines.length, 15);
   assert.equal(tavern.symbols.length, 11);
+});
+test("config validation rejects invalid board geometry, symbol IDs and timing", () => {
+  const game = structuredClone(reuse);
+  game.initialBoard[0][0] = "missing";
+  assert.throws(() => loadGameConfig(game), /initialBoard/);
+  game.initialBoard = structuredClone(reuse.initialBoard);
+  game.lines[0][0] = 0.5;
+  assert.throws(() => loadGameConfig(game), /Invalid paylines/);
+  game.lines = structuredClone(reuse.lines);
+  game.presentation.normal.speedPxPerSecond = 0;
+  assert.throws(() => loadGameConfig(game), /presentation.normal/);
+});
+test("the 3 by 3 config disables bonus purchases and higher chances", () => {
+  const server = new MockGame(reuse);
+  assert.throws(() => server.execute(command(server, "buy", "buy-tavern")), /INVALID_COMMAND/);
+  assert.throws(() => server.execute({ ...command(server, "chance"), chance: "extra" }), /INVALID_COMMAND/);
+  assert.equal(server.state.version, 0);
 });
 test("Wild prefix selects best valid symbol without paying duplicate substitutions", () => {
   const b = board();
@@ -80,6 +99,44 @@ test("paid and free spin wallet accounting, locked bet and bonus buy", () => {
     /FEATURE_LOCKED/,
   );
 });
+test("bonus purchases land the exact number of Scatters on distinct reels", () => {
+  for (const [action, mode, count] of [
+    ["buy-tavern", "tavern", 3],
+    ["buy-drop", "drop", 4],
+  ] as const) {
+    const server = new MockGame(tavern, () => 0);
+    const buy = command(server, "buy", action);
+    const result = server.execute(buy);
+    const scatterCounts = result.state.board.map(
+      (reel) => reel.filter((id) => id === "bonus").length,
+    );
+    assert.equal(result.entry, mode);
+    assert.equal(result.state.feature?.played, 0);
+    assert.equal(scatterCounts.filter((scatters) => scatters === 1).length, count);
+    assert.equal(scatterCounts.reduce((sum, scatters) => sum + scatters, 0), count);
+    assert.deepEqual(server.execute(buy), result);
+  }
+});
+test("free spins favor first-chest progress using the sampled Scatter positions", () => {
+  let draws: number[] = [];
+  const server = new MockGame(tavern, () => draws.shift() ?? 0.5);
+  server.execute(command(server, "buy", "buy-tavern"));
+  const symbols = tavern.symbols.filter((symbol) => symbol.kind !== "bonus");
+  const sample = (id: string) =>
+    (symbols.findIndex((symbol) => symbol.id === id) + 0.5) / symbols.length;
+  const losingColumns = ["A", "K", "Q", "J", "10"];
+  draws = losingColumns.flatMap((id, reel) =>
+    Array.from({ length: 5 }, (_, row) =>
+      reel === 4 && row === 4 ? [0] : [0.5, sample(id)],
+    ).flat(),
+  );
+  draws.push(...board().flat().map(sample));
+  const result = server.execute(command(server, "free"));
+  assert.equal(result.state.board[4][4], "bonus");
+  assert.equal(result.state.feature?.chests[0].unlocked, true);
+  assert.equal(result.retrigger, 0);
+  assert.equal(draws.length, 0);
+});
 test("naturally triggered feature keeps its paid round and retriggers stay bounded", () => {
   const server = new MockGame(tavern, () => 0.5),
     b = board();
@@ -93,7 +150,7 @@ test("naturally triggered feature keeps its paid round and retriggers stay bound
   assert.equal(server.state.feature, null);
 });
 test("buy Drop has a distinct mode and completion credits feature once", () => {
-  const server = new MockGame(tavern, () => 0.5);
+  const server = new MockGame(tavern, () => 0);
   server.execute(command(server, "buy", "buy-drop"));
   assert.equal(server.state.feature?.mode, "drop");
   let completion;
@@ -106,7 +163,22 @@ test("buy Drop has a distinct mode and completion credits feature once", () => {
   assert.ok(completion?.completion);
   const balance = server.state.balance;
   assert.equal(balance, 90000 + completion!.completion!.featureAward);
-  assert.equal(completion!.completion!.product, 3 ** 5);
+  assert.equal(completion!.completion!.product, 5 ** 5);
+});
+test("three and four Scatters trigger the correct chest multiplier minimums", () => {
+  for (const [scatters, mode, minimum] of [
+    [3, "tavern", 2],
+    [4, "drop", 5],
+  ] as const) {
+    const game = structuredClone(tavern);
+    game.demo.featureSpins[mode] = 1;
+    const server = new MockGame(game, () => 0);
+    const trigger = board();
+    for (let reel = 0; reel < scatters; reel++) trigger[reel][0] = "bonus";
+    assert.equal(server.execute(command(server, "entry"), trigger).entry, mode);
+    const result = server.execute(command(server, "free"), board());
+    assert.deepEqual(result.completion?.multipliers, Array(5).fill(minimum));
+  }
 });
 test("losing and single-line boards remain distinct", () => {
   const b = Array.from({ length: 5 }, (_, c) =>

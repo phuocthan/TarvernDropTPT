@@ -1,93 +1,156 @@
-import { Container, Graphics, Text } from "pixi.js";
-import type { GameDefinition } from "../../framework/domain/contracts.ts";
-const CELL = 102;
-function label(value: string, size: number, color: number | string) {
-  return new Text({
-    text: value,
-    style: {
-      fontFamily: "Georgia, serif",
-      fontSize: size,
-      fontWeight: "bold",
-      fill: color,
-      dropShadow: { color: 0x000000, blur: 2, distance: 2, alpha: 0.65 },
-    },
-  });
+import { Assets, Container, Rectangle, Sprite, Texture } from "pixi.js";
+import { Spine, type Animation } from "@esotericsoftware/spine-pixi-v8";
+import { loadTextures } from "../../framework/presentation/assets.ts";
+import type { SymbolFactory, SymbolPhase } from "../../framework/presentation/board.ts";
+import { tavernAsset, textureRegion } from "./art.ts";
+
+const folder = "tavern-assets/assets/";
+// The four skeletons use the same authored origin and units. At a 110px reel
+// pitch this scale matches the visible symbol sizes on the reference board.
+const spineScale = 0.18;
+const symbols = [
+  ["A", "l1", 490, 384, 393, 576],
+  ["K", "l2", 473, 402, 426, 535],
+  ["Q", "l3", 504, 383, 365, 578],
+  ["J", "l4", 503, 414, 366, 516],
+  ["10", "l5", 447, 420, 478, 504],
+  ["ale", "h4", 420, 400, 541, 531],
+  ["barrel", "h2", 468, 423, 478, 537],
+  ["coin", "h3", 517, 389, 429, 534],
+  ["crown", "h1", 387, 353, 625, 584],
+  ["wild", "wild", 359, 345, 666, 754],
+  ["bonus", "bonus", 351, 285, 680, 789],
+] as const;
+
+export function paytableIcon(id: string) {
+  const [, file, x, y, width, height] = symbols.find(
+    ([symbol]) => symbol === id,
+  )!;
+  return textureRegion(
+    file + "_static.webp",
+    "paytable-icon",
+    [1400, 1400],
+    [x, y, width, height],
+  );
 }
-class TavernSymbol extends Container {
-  private currentId = "";
-  private plate = new Graphics();
-  private icon = new Graphics();
-  private title: Text;
-  constructor() {
-    super();
-    this.addChild(this.plate, this.icon);
-    this.title = label("", 42, 0xffffff);
-    this.title.anchor.set(0.5);
-    this.title.position.set(CELL / 2, CELL / 2);
-    this.addChild(this.title);
+
+export async function loadTavernSymbols(): Promise<SymbolFactory> {
+  const textures = await loadTextures(
+    Object.fromEntries(
+      symbols.map(([id, file]) => [id, folder + file + "_static.webp"]),
+    ),
+  );
+  for (const [id, , x, y, width, height] of symbols) {
+    const texture = textures.get(id)!;
+    textures.set(
+      id,
+      new Texture({
+        source: texture.source,
+        frame: new Rectangle(x, y, width, height),
+      }),
+    );
   }
-  set(id: string, game: GameDefinition) {
-    if (id === this.currentId) return;
-    this.currentId = id;
-    this.title.y = 51;
-    const symbol = game.symbols.find((s) => s.id === id)!;
-    const color = parseInt(symbol.color.slice(1), 16);
-    this.plate
-      .clear()
-      .roundRect(2, 2, CELL - 4, CELL - 4, 10)
-      .fill({ color: 0x211a17, alpha: 0.88 })
-      .stroke({ color: 0x635039, width: 1 });
-    this.icon.clear();
-    this.title.text = symbol.glyph;
-    this.title.style.fill = color;
-    this.title.style.fontSize = symbol.kind === "royal" ? 44 : 40;
-    if (symbol.kind === "wild" || symbol.kind === "bonus") {
-      this.icon
-        .circle(51, 49, 34)
-        .fill({ color, alpha: 0.17 })
-        .stroke({ color, width: 3 });
-      this.title.y = 43;
-      this.title.style.fontSize = 38;
-      const name = symbol.kind === "wild" ? "WILD" : "BONUS";
-      this.title.text = symbol.glyph + "\n" + name;
-      this.title.style.fontSize = 23;
-      this.title.style.align = "center";
-    } else if (id === "ale") {
-      this.title.text = "";
-      this.icon
-        .roundRect(30, 28, 39, 49, 5)
-        .fill(0xc48c2f)
-        .stroke({ color: 0xffda7a, width: 2 })
-        .roundRect(69, 38, 13, 25, 4)
-        .stroke({ color: 0xcfa45b, width: 6 })
-        .roundRect(26, 23, 46, 15, 7)
-        .fill(0xf3e0b5);
-      for (let n = 0; n < 3; n++)
-        this.icon.rect(38 + n * 10, 42, 3, 26).fill(0x805021);
-    } else if (id === "barrel") {
-      this.title.text = "";
-      this.icon
-        .roundRect(28, 19, 47, 64, 17)
-        .fill(0x9a592b)
-        .stroke({ color: 0xe2b06c, width: 2 })
-        .rect(26, 34, 51, 7)
-        .fill(0x9c9887)
-        .rect(26, 62, 51, 7)
-        .fill(0x9c9887);
-    } else if (id === "coin") {
-      this.icon
-        .circle(51, 51, 33)
-        .fill(0xb98520)
-        .stroke({ color: 0xf8da83, width: 4 })
-        .circle(51, 51, 25)
-        .stroke({ color: 0x674517, width: 2 });
-      this.title.style.fill = 0xffe6a1;
-    } else this.title.y = 51;
-  }
-}
-export function tavernSymbolFactory(game: GameDefinition) {
-  return () => {
-    const symbol = new TavernSymbol();
-    return { view: symbol, set: (id: string) => symbol.set(id, game) };
+  const atlas = tavernAsset("hd/td_master.atlas");
+  const groups = { l: "low", h: "high", w: "wild", b: "bonus" } as const;
+  const skeletons = new Map(
+    Object.entries(groups).map(([prefix, group]) => [
+      prefix,
+      tavernAsset(`td_symbols_${group}.skel`),
+    ]),
+  );
+  const clipsReady =
+    !matchMedia("(prefers-reduced-motion: reduce)").matches &&
+    (await Assets.load([atlas, ...skeletons.values()]).then(
+      () => true,
+      (error) => {
+        console.warn("Tavern symbol animations unavailable", error);
+        return false;
+      },
+    ));
+  const clips = new Map<string, string>(symbols.map(([id, name]) => [id, name]));
+  return (cellSizePx) => {
+    const cellCenter = cellSizePx / 2;
+    const sizing = cellSizePx / 102;
+    const view = new Container();
+    const sprite = new Sprite();
+    sprite.anchor.set(0.5);
+    sprite.position.set(cellCenter);
+    sprite.scale.set(0.15 * sizing);
+    view.addChild(sprite);
+    let id = "";
+    let phase: SymbolPhase = "idle";
+    let active: Spine | undefined;
+    const instances = new Map<string, Spine>();
+
+    function play(next: SymbolPhase, restart = false): number {
+      phase = next;
+      const name = clips.get(id);
+      if (!clipsReady || !name) return 0;
+      const family = name[0];
+      let spine = instances.get(family);
+      if (!spine) {
+        spine = Spine.from({
+          skeleton: skeletons.get(family)!,
+          atlas,
+          autoUpdate: false,
+        });
+        spine.position.set(cellCenter);
+        spine.scale.set(spineScale * sizing);
+        instances.set(family, spine);
+        view.addChild(spine);
+      }
+      if (active && active !== spine) {
+        active.autoUpdate = false;
+        active.visible = false;
+      }
+      active = spine;
+      spine.visible = true;
+      sprite.visible = false;
+
+      const idle = spine.skeleton.data.findAnimation(`${name}_static`)!;
+      const clip = spine.skeleton.data.findAnimation(`${name}_${next}`) ?? idle;
+      const current = spine.state.getCurrent(0);
+      if (!restart && current?.animation === clip) return 0;
+
+      // Finish an authored landing before a winning symbol changes pose.
+      if (
+        !restart && next === "win" &&
+        current?.animation?.name === `${name}_land` &&
+        current.trackTime < current.animationEnd
+      ) {
+        spine.state.clearNext(current);
+        spine.state.addAnimation(0, clip.name, false);
+        queueIdle(spine, idle);
+        return current.animationEnd - current.trackTime + clip.duration;
+      }
+
+      spine.state.clearTracks();
+      spine.skeleton.setToSetupPose();
+      spine.state.setAnimation(0, clip.name, clip === idle && idle.duration > 0);
+      if (clip !== idle && clip.duration > 0) queueIdle(spine, idle);
+      spine.update(0);
+      spine.autoUpdate = clip.duration > 0;
+      return clip.duration;
+    }
+
+    function queueIdle(spine: Spine, idle: Animation) {
+      const entry = spine.state.addAnimation(0, idle.name, idle.duration > 0);
+      if (idle.duration === 0) {
+        entry.listener = {
+          start: () => { spine.autoUpdate = false; },
+        };
+      }
+    }
+
+    return {
+      view,
+      set(nextId: string) {
+        if (id === nextId) return;
+        id = nextId;
+        if (!clipsReady) sprite.texture = textures.get(id)!;
+        play(phase, true);
+      },
+      effect: play,
+    };
   };
 }

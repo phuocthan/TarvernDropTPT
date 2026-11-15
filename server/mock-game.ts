@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type {
   Board,
+  Chance,
   Command,
+  FeatureState,
   GameDefinition,
+  LineWin,
   Outcome,
   Snapshot,
 } from "../src/framework/domain/contracts.ts";
@@ -61,6 +64,9 @@ export class MockGame {
         : command.action === "buy-drop"
           ? "drop"
           : null;
+    if ((buy && !rules.featureSpins[buy]) ||
+        (!feature && !rules.chancePrices[command.chance]))
+      throw Error("INVALID_COMMAND");
     const cost = feature
       ? 0
       : command.bet *
@@ -89,8 +95,9 @@ export class MockGame {
         cap: command.bet * rules.capMultiplier,
       };
     if (!buy) {
-      state.board = forcedBoard ?? this.board(command.chance);
-      outcome.wins = evaluate(this.game, state.board, command.bet);
+      const { board, wins } = this.spinResult(command, feature, forcedBoard);
+      state.board = board;
+      outcome.wins = wins;
       outcome.spinWin = outcome.wins.reduce((n, w) => n + w.amount, 0);
       const bonus = state.board
         .flat()
@@ -117,11 +124,10 @@ export class MockGame {
         const capped =
           feature.accumulated + state.round!.baseWin >= state.round!.cap;
         if (!feature.remaining || capped) {
+          const pool = rules.chestMultipliers[feature.mode];
           const multipliers = feature.chests.map((c) => {
             c.multiplier = c.unlocked
-              ? rules.chestMultipliers[
-                  Math.floor(this.rng() * rules.chestMultipliers.length)
-                ]
+              ? pool[Math.floor(this.rng() * pool.length)]
               : 1;
             return c.multiplier;
           });
@@ -145,11 +151,15 @@ export class MockGame {
         outcome.spinWin = state.round!.baseWin;
         outcome.paidAward = state.round!.baseWin;
         state.balance += outcome.paidAward;
-        if (bonus >= 3 && state.round!.baseWin < state.round!.cap)
-          this.enter(state, bonus >= 4 ? "drop" : "tavern", outcome);
+        const mode = bonus >= 4 ? "drop" : "tavern";
+        if (bonus >= 3 && rules.featureSpins[mode] && state.round!.baseWin < state.round!.cap)
+          this.enter(state, mode, outcome);
         else state.round = null;
       }
-    } else this.enter(state, buy, outcome);
+    } else {
+      state.board = this.bonusEntryBoard(buy);
+      this.enter(state, buy, outcome);
+    }
     state.version++;
     this.state = state;
     this.receipts.set(command.requestId, {
@@ -172,17 +182,56 @@ export class MockGame {
     };
     outcome.entry = mode;
   }
-  private board(chance: string): Board {
+  private bonusEntryBoard(mode: FeatureState["mode"]): Board {
+    const scatter = this.game.symbols.find((symbol) => symbol.kind === "bonus");
+    const count = mode === "drop" ? 4 : 3;
+    if (!scatter || this.game.reels < count || this.game.rows < 1)
+      throw Error("INVALID_COMMAND");
+    const board = this.board(null);
+    const reels = board.map((_, reel) => reel);
+    for (let placed = 0; placed < count; placed++) {
+      const [reel] = reels.splice(Math.floor(this.rng() * reels.length), 1);
+      board[reel][Math.floor(this.rng() * this.game.rows)] = scatter.id;
+    }
+    return board;
+  }
+  private spinResult(
+    command: Command,
+    feature: FeatureState | null,
+    forcedBoard?: Board,
+  ) {
+    const board = forcedBoard ?? this.board(command.chance);
+    const wins = evaluate(this.game, board, command.bet);
+    if (forcedBoard || !feature || feature.chests.some((chest) => chest.unlocked))
+      return { board, wins };
+
+    // Keep the sampled Scatter positions while looking for better first-chest progress.
+    const scatter = this.game.symbols.find((symbol) => symbol.kind === "bonus");
+    const alternative = this.board(null).map((column, reel) =>
+      column.map((symbol, row) =>
+        board[reel][row] === scatter?.id ? board[reel][row] : symbol,
+      ),
+    );
+    const alternativeWins = evaluate(this.game, alternative, command.bet);
+    const leadingKeyCount = (lineWins: LineWin[]) => {
+      const chests = structuredClone(feature.chests);
+      collect(chests, lineWins, this.game.rows);
+      return Math.max(...chests.map((chest) => chest.rows.length));
+    };
+    return leadingKeyCount(alternativeWins) > leadingKeyCount(wins)
+      ? { board: alternative, wins: alternativeWins }
+      : { board, wins };
+  }
+  private board(chance: Chance | null): Board {
     // Deliberately simple demo distribution, unrelated to the reference math.
     const ids = this.game.symbols
       .filter((s) => s.kind !== "bonus")
       .map((s) => s.id);
     const bonusId = this.game.symbols.find((s) => s.kind === "bonus")?.id;
-    const bonusRate =
-      chance === "super" ? 0.07 : chance === "extra" ? 0.05 : 0.03;
+    const bonusRate = chance === null ? 0 : this.game.demo.scatterRates[chance];
     return Array.from({ length: this.game.reels }, () =>
       Array.from({ length: this.game.rows }, () =>
-        bonusId && this.rng() < bonusRate
+        bonusId && bonusRate > 0 && this.rng() < bonusRate
           ? bonusId
           : ids[Math.floor(this.rng() * ids.length)],
       ),

@@ -71,24 +71,56 @@ export interface SymbolDefinition {
   glyph: string;
   pays: Record<number, number>;
 }
+export type ReelMotion = "normal" | "drop";
+export interface DropTiming {
+  fallMs: number;
+  reelStaggerMs: number;
+  rowStaggerMs: number;
+  holdMs: number;
+}
+export interface ReelPresentation {
+  spinType: ReelMotion;
+  cellSizePx: number;
+  gapPx: number;
+  normal: {
+    speedPxPerSecond: number;
+    turboSpeedPxPerSecond: number;
+    stopDelayMs: number;
+    turboStopDelayMs: number;
+    bounceMs: number;
+    bouncePx: number;
+  };
+  drop: {
+    exit: DropTiming;
+    enter: DropTiming;
+    bounceMs: number;
+    bouncePx: number;
+    turboMultiplier: number;
+  };
+}
 export interface GameDefinition {
+  schemaVersion: 1;
   id: string;
   title: string;
+  routing: { query: string; apiBase: string; skin: "basic" | "tavern" };
+  presentation: ReelPresentation;
   reels: number;
   rows: number;
   lines: number[][];
   symbols: SymbolDefinition[];
   bets: number[];
+  defaultBet: number;
   initialBoard: Board;
   demo: {
     initialBalance: number;
     capMultiplier: number;
     buyPrices: Record<"tavern" | "drop", number>;
     chancePrices: Record<Chance, number>;
+    scatterRates: Record<Chance, number>;
     featureSpins: Record<"tavern" | "drop", number>;
     retriggerSpins: number;
     maxFeatureSpins: number;
-    chestMultipliers: number[];
+    chestMultipliers: Record<FeatureState["mode"], number[]>;
     winTiers: { label: string; multiplier: number }[];
   };
 }

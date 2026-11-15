@@ -4,15 +4,30 @@ import type {
   GameDefinition,
   LineWin,
   Position,
+  ReelMotion,
+  ReelPresentation,
 } from "../domain/contracts.ts";
-const CELL = 102,
-  GAP = 8;
 const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export function reelCellCenter(
+  { reel, row }: Position,
+  { cellSizePx, gapPx }: Pick<ReelPresentation, "cellSizePx" | "gapPx">,
+) {
+  const pitch = cellSizePx + gapPx;
+  return { x: reel * pitch + cellSizePx / 2, y: row * pitch + cellSizePx / 2 };
+}
 export interface SymbolView {
   view: Container;
   set: (id: string) => void;
+  effect?: (phase: SymbolPhase) => number;
 }
-export type SymbolFactory = () => SymbolView;
+export type SymbolPhase = "idle" | "spin" | "land" | "win";
+export type SymbolFactory = (cellSizePx: number) => SymbolView;
+
+interface DropRound {
+  exit: Promise<void>;
+  skipped: boolean;
+}
+
 /** Presentation owns motion only. It never evaluates outcomes or changes wallet state. */
 export class BoardView {
   readonly app = new Application();
@@ -25,15 +40,21 @@ export class BoardView {
   private strip = new Container();
   private elapsed: number[] = [];
   private fast = false;
+  private dropRound: DropRound | null = null;
+  private finishDrop: (() => void) | null = null;
   private factory: SymbolFactory;
+  private readonly cell: number;
+  private readonly gap: number;
   constructor(game: GameDefinition, factory: SymbolFactory) {
     this.game = game;
     this.factory = factory;
+    this.cell = game.presentation.cellSizePx;
+    this.gap = game.presentation.gapPx;
   }
   async mount(host: HTMLElement) {
     await this.app.init({
-      width: this.game.reels * (CELL + GAP) - GAP,
-      height: this.game.rows * (CELL + GAP) - GAP,
+      width: this.game.reels * (this.cell + this.gap) - this.gap,
+      height: this.game.rows * (this.cell + this.gap) - this.gap,
       backgroundAlpha: 0,
       antialias: true,
       resolution: Math.min(devicePixelRatio, 2),
@@ -46,34 +67,40 @@ export class BoardView {
       `${this.game.reels} by ${this.game.rows} reel board`,
     );
     this.app.stage.addChild(this.strip, this.highlights, this.tokens);
+    const mask = new Graphics()
+      .rect(0, 0, this.app.screen.width, this.app.screen.height)
+      .fill(0xffffff);
+    this.app.stage.addChild(mask);
+    this.strip.mask = mask;
     for (let reel = 0; reel < this.game.reels; reel++) {
       const column = new Container();
-      column.x = reel * (CELL + GAP);
+      column.x = reel * (this.cell + this.gap);
       this.strip.addChild(column);
       this.columns.push(column);
       this.tiles.push([]);
       this.elapsed.push(0);
       this.spinning.push(false);
-      const mask = new Graphics()
-        .rect(column.x, 0, CELL, this.game.rows * (CELL + GAP) - GAP)
-        .fill(0xffffff);
-      this.app.stage.addChild(mask);
-      column.mask = mask;
       for (let row = 0; row < this.game.rows + 2; row++) {
-        const tile = this.factory();
+        const tile = this.factory(this.cell);
         column.addChild(tile.view);
         this.tiles[reel].push(tile);
       }
     }
     this.setBoard(this.game.initialBoard);
+    const normal = this.game.presentation.normal;
     this.app.ticker.add((tick) => {
       this.columns.forEach((_column, reel) => {
         if (!this.spinning[reel]) return;
-        this.elapsed[reel] += tick.deltaMS * (this.fast ? 2.8 : 1.7);
-        const offset = this.elapsed[reel] % (CELL + GAP),
-          cycle = Math.floor(this.elapsed[reel] / (CELL + GAP));
+        this.elapsed[reel] +=
+          (tick.deltaMS *
+            (this.fast
+              ? normal.turboSpeedPxPerSecond
+              : normal.speedPxPerSecond)) /
+          1000;
+        const offset = this.elapsed[reel] % (this.cell + this.gap),
+          cycle = Math.floor(this.elapsed[reel] / (this.cell + this.gap));
         this.tiles[reel].forEach((tile, row) => {
-          tile.view.y = (row - 1) * (CELL + GAP) + offset;
+          tile.view.y = (row - 1) * (this.cell + this.gap) + offset;
           tile.set(
             this.game.symbols[
               (cycle + row + reel * 3) % this.game.symbols.length
@@ -84,48 +111,154 @@ export class BoardView {
     });
   }
   setBoard(board: Board) {
+    this.dropRound = null;
+    this.finishDrop?.();
     this.spinning.fill(false);
-    this.columns.forEach((_col, reel) =>
-      this.tiles[reel].forEach((tile, row) => {
-        tile.view.y = (row - 1) * (CELL + GAP);
-        tile.view.visible = row > 0 && row <= this.game.rows;
-        if (row > 0 && row <= this.game.rows) tile.set(board[reel][row - 1]);
-      }),
-    );
+    this.clearHighlight();
+    board.forEach((symbols, reel) => this.setReel(reel, symbols, "idle"));
   }
-  start(turbo: boolean) {
+  private setReel(reel: number, symbols: string[], phase: SymbolPhase) {
+    this.tiles[reel].forEach((tile, row) => {
+      tile.view.y = (row - 1) * (this.cell + this.gap);
+      tile.view.alpha = 1;
+      tile.view.visible = row > 0 && row <= this.game.rows;
+      if (tile.view.visible) tile.set(symbols[row - 1]);
+      tile.effect?.(tile.view.visible ? phase : "idle");
+    });
+  }
+  start(turbo: boolean, motion: ReelMotion = this.game.presentation.spinType) {
     this.fast = turbo;
-    this.highlights.clear();
+    this.clearHighlight();
+    if (motion === "drop") {
+      for (const tile of this.tiles.flat()) {
+        if (tile.view.visible) tile.effect?.("idle");
+      }
+      this.dropRound = { exit: this.animateDrop(false), skipped: false };
+      return;
+    }
     this.spinning.fill(true);
     this.tiles.flat().forEach((t) => {
       t.view.visible = true;
+      t.effect?.("spin");
     });
   }
   skip() {
     this.fast = true;
+    if (this.dropRound) {
+      this.dropRound.skipped = true;
+      this.finishDrop?.();
+    }
   }
   async stop(board: Board) {
+    const drop = this.dropRound;
+    if (drop) {
+      await drop.exit;
+      if (this.dropRound !== drop) return;
+      if (!drop.skipped) {
+        board.forEach((symbols, reel) => this.setReel(reel, symbols, "idle"));
+        await this.animateDrop(true);
+      }
+      if (this.dropRound === drop) {
+        this.dropRound = null;
+        if (drop.skipped) this.setBoard(board);
+      }
+      return;
+    }
+    const normal = this.game.presentation.normal;
     for (let reel = 0; reel < this.game.reels; reel++) {
-      await delay(this.fast ? 20 : 130);
+      await delay(this.fast ? normal.turboStopDelayMs : normal.stopDelayMs);
       this.spinning[reel] = false;
-      this.tiles[reel].forEach((tile, row) => {
-        tile.view.y = (row - 1) * (CELL + GAP);
-        tile.view.visible = row > 0 && row <= this.game.rows;
-        if (row > 0 && row <= this.game.rows) tile.set(board[reel][row - 1]);
-      });
+      this.setReel(reel, board[reel], this.fast ? "idle" : "land");
       // Reel-specific settling bounce while later reels are still spinning.
       const col = this.columns[reel],
         start = performance.now();
       const bounce = () => {
-        const t = Math.min(1, (performance.now() - start) / 170);
-        col.y = Math.sin(t * Math.PI) * 8 * (1 - t);
+        const t = Math.min(1, (performance.now() - start) / normal.bounceMs);
+        col.y = Math.sin(t * Math.PI) * normal.bouncePx * (1 - t);
         if (t < 1) requestAnimationFrame(bounce);
         else col.y = 0;
       };
       bounce();
     }
   }
-  highlight(wins: LineWin[]) {
+  private animateDrop(entering: boolean) {
+    const pitch = this.cell + this.gap;
+    const boardHeight = this.game.rows * pitch;
+    const drop = this.game.presentation.drop;
+    const { fallMs, reelStaggerMs, rowStaggerMs, holdMs } = entering
+      ? drop.enter
+      : drop.exit;
+    const bounce = entering ? drop.bounceMs : 0;
+    const moves = this.tiles.flatMap((tiles, reel) =>
+      Array.from({ length: this.game.rows }, (_, row) => {
+        const rest = row * pitch;
+        const from = entering ? -pitch : rest;
+        const to = entering ? rest : boardHeight;
+        return {
+          tile: tiles[row + 1],
+          from,
+          to,
+          start:
+            reel * reelStaggerMs + (this.game.rows - 1 - row) * rowStaggerMs,
+          fall: fallMs * Math.sqrt((to - from) / boardHeight),
+          landed: false,
+        };
+      }),
+    );
+    const duration =
+      Math.max(...moves.map((move) => move.start + move.fall)) +
+      bounce +
+      holdMs;
+    const paint = (time: number) => {
+      for (const move of moves) {
+        const elapsed = time - move.start;
+        const progress = Math.max(0, Math.min(1, elapsed / move.fall));
+        const settle = Math.max(
+          0,
+          Math.min(1, (elapsed - move.fall) / (bounce || 1)),
+        );
+        const rebound = entering
+          ? drop.bouncePx * Math.sin(Math.PI * settle)
+          : 0;
+        move.tile.view.y =
+          move.from + (move.to - move.from) * progress ** 2 - rebound;
+        if (
+          entering &&
+          progress === 1 &&
+          !move.landed &&
+          !this.dropRound?.skipped
+        ) {
+          move.landed = true;
+          move.tile.effect?.("land");
+        }
+      }
+    };
+
+    paint(0);
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+      const speed = this.fast ? drop.turboMultiplier : 1;
+      let frame = 0;
+      const finish = () => {
+        cancelAnimationFrame(frame);
+        this.finishDrop = null;
+        paint(duration);
+        resolve();
+      };
+      const tick = (now: number) => {
+        const elapsed = (now - start) * speed;
+        if (elapsed >= duration) {
+          finish();
+        } else {
+          paint(elapsed);
+          frame = requestAnimationFrame(tick);
+        }
+      };
+      this.finishDrop = finish;
+      frame = requestAnimationFrame(tick);
+    });
+  }
+  highlight(wins: LineWin[], scatter: Position[] = [], dimUnmatched = false) {
     this.highlights.clear();
     const seen = new Set<string>();
     for (const win of wins) {
@@ -135,24 +268,48 @@ export class BoardView {
         seen.add(key);
         this.highlights
           .roundRect(
-            p.reel * (CELL + GAP) + 2,
-            p.row * (CELL + GAP) + 2,
-            CELL - 4,
-            CELL - 4,
+            p.reel * (this.cell + this.gap) + 2,
+            p.row * (this.cell + this.gap) + 2,
+            this.cell - 4,
+            this.cell - 4,
             10,
           )
           .stroke({ color: 0xffdc77, width: 3 });
       }
       win.positions.forEach((p, i) => {
-        const x = p.reel * (CELL + GAP) + CELL / 2,
-          y = p.row * (CELL + GAP) + CELL / 2;
+        const { x, y } = reelCellCenter(p, this.game.presentation);
         if (i === 0) this.highlights.moveTo(x, y);
         else this.highlights.lineTo(x, y);
       });
       this.highlights.stroke({ color: 0xffdc77, width: 2, alpha: 0.6 });
     }
+    for (const { reel, row } of scatter) seen.add(reel + ":" + row);
+    return this.playWinners(seen, dimUnmatched);
+  }
+  focusWins(positions: Position[]) {
+    return this.playWinners(
+      new Set(positions.map(({ reel, row }) => reel + ":" + row)),
+      true,
+    );
+  }
+  private playWinners(seen: Set<string>, dimUnmatched: boolean) {
+    let duration = 0;
+    for (const [reel, tiles] of this.tiles.entries()) {
+      for (const [slot, tile] of tiles.entries()) {
+        const matched = seen.has(reel + ":" + (slot - 1));
+        tile.view.alpha = dimUnmatched && seen.size && !matched ? 0.55 : 1;
+        if (matched) duration = Math.max(duration, tile.effect?.("win") ?? 0);
+      }
+    }
+    return duration;
+  }
+  clearHighlight() {
+    this.highlights.clear();
+    for (const tile of this.tiles.flat()) tile.view.alpha = 1;
   }
   destroy() {
+    this.dropRound = null;
+    this.finishDrop?.();
     this.app.destroy(true, { children: true });
   }
   async collect(positions: Position[]) {
@@ -161,9 +318,8 @@ export class BoardView {
         await delay(index * 35);
         const particle = new Graphics().circle(0, 0, 8).fill(0xffdf85);
         this.tokens.addChild(particle);
-        const x = p.reel * (CELL + GAP) + CELL / 2,
-          y = p.row * (CELL + GAP) + CELL / 2,
-          start = performance.now();
+        const { x, y } = reelCellCenter(p, this.game.presentation);
+        const start = performance.now();
         await new Promise<void>((resolve) => {
           const step = () => {
             const t = Math.min(1, (performance.now() - start) / 450);

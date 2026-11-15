@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<font>
+  <info face="td_red" size="493" bold="0" italic="0" charset="" unicode="" stretchH="493" smooth="1" aa="1" padding="0,0,0,0" spacing="1,0" outline="0"/>
+  <common lineHeight="493" base="493" scaleW="1282" scaleH="1503" pages="1" packed="0"/>
+  <pages>
+    <page id="0" file="td_red.webp"/>
+  </pages>
+  <chars>
+    <char id="32" x="0" y="0" width="75" height="1" xoffset="0" yoffset="0" xadvance="75" yadvance="1"/>
+    <char id="53" x="4" y="4" width="284" height="493" xoffset="0" yoffset="0" xadvance="284" yadvance="1"/>
+    <char id="44" x="296" y="4" width="165" height="493" xoffset="0" yoffset="0" xadvance="165" yadvance="1"/>
+    <char id="49" x="469" y="4" width="243" height="493" xoffset="0" yoffset="0" xadvance="243" yadvance="1"/>
+    <char id="50" x="4" y="505" width="269" height="493" xoffset="0" yoffset="0" xadvance="269" yadvance="1"/>
+    <char id="51" x="281" y="505" width="279" height="493" xoffset="0" yoffset="0" xadvance="279" yadvance="1"/>
+    <char id="52" x="568" y="505" width="337" height="493" xoffset="0" yoffset="0" xadvance="337" yadvance="1"/>
+    <char id="48" x="720" y="4" width="326" height="493" xoffset="0" yoffset="0" xadvance="326" yadvance="1"/>
+    <char id="54" x="4" y="1006" width="304" height="493" xoffset="0" yoffset="0" xadvance="304" yadvance="1"/>
+    <char id="55" x="316" y="1006" width="304" height="493" xoffset="0" yoffset="0" xadvance="304" yadvance="1"/>
+    <char id="56" x="628" y="1006" width="308" height="493" xoffset="0" yoffset="0" xadvance="308" yadvance="1"/>
+    <char id="57" x="913" y="505" width="308" height="493" xoffset="0" yoffset="0" xadvance="308" yadvance="1"/>
+    <char id="46" x="1054" y="4" width="184" height="493" xoffset="0" yoffset="0" xadvance="184" yadvance="1"/>
+    <char id="120" x="944" y="1006" width="334" height="493" xoffset="0" yoffset="0" xadvance="334" yadvance="1"/>
+  </chars>
+</font>

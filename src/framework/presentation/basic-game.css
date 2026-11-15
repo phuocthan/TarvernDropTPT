@@ -1,0 +1,18 @@
+.reuse-example a {
+  color: #f6d692;
+  text-underline-offset: 4px;
+}
+.reuse-example {
+  max-width: 440px;
+  margin: auto;
+  padding: 24px;
+}
+.reuse-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.reuse-controls button {
+  padding: 8px 16px;
+}
