@@ -244,7 +244,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
       !(feature?.remaining || autoRemaining)
     )
       return;
-    const delay = turbo ? 200 : feature?.played === 0 ? 1400 : 900;
+    const delay = turbo ? 250 : feature?.played === 0 ? 1400 : 900;
     autoTimer = setTimeout(() => {
       autoTimer = null;
       if (!dialog.open && controller.phase === "ready") void run("spin");
@@ -269,7 +269,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
     if (outcome.wins.length) audio.cue("win");
     const animateWins = async () => {
       const lineDuration = turbo
-        ? 170
+        ? 213
         : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
       for (const win of outcome.wins) {
         if (skipped) break;
@@ -282,16 +282,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
           () => skipped,
         );
       }
-      if (scatter.length && !skipped) {
-        const end = performance.now() + view.focusWins(scatter) * 1000;
-        await new Promise<void>((resolve) => {
-          const frame = (now: number) => {
-            if (now >= end || skipped || turbo) resolve();
-            else requestAnimationFrame(frame);
-          };
-          frame(performance.now());
-        });
-      }
+      if (scatter.length && (outcome.entry || !skipped))
+        await view.focusWins(scatter);
       view.clearHighlight();
     };
     const from = performance.now();
@@ -299,7 +291,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
       const tick = () => {
         const t = skipped
           ? 1
-          : Math.min(1, (performance.now() - from) / (turbo ? 100 : 650));
+          : Math.min(1, (performance.now() - from) / (turbo ? 125 : 650));
         displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
         const shown = presentingFeature
           ? presentingFeature.accumulated - outcome.spinWin + displayWin
@@ -438,7 +430,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition) {
   };
   $("speed").onclick = () => {
     turbo = !turbo;
-    if (turbo) view.skip();
     sync();
   };
   $("sound").onclick = () => {

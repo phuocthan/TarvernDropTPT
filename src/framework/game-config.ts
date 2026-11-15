@@ -103,7 +103,8 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.normal");
   if (
     !drop ||
-    !positiveInt(drop.turboMultiplier) ||
+    !Number.isFinite(drop.turboMultiplier) ||
+    drop.turboMultiplier < 1 ||
     !positiveInt(drop.bounceMs) ||
     !nonNegativeInt(drop.bouncePx) ||
     ![drop.enter, drop.exit].every(

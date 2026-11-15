@@ -192,7 +192,7 @@
               "minimum": 0
             },
             "turboMultiplier": {
-              "type": "integer",
+              "type": "number",
               "minimum": 1
             }
           },

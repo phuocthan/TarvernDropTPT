@@ -1,5 +1,5 @@
 import { Assets, Container, Rectangle, Sprite, Texture } from "pixi.js";
-import { Spine, type Animation } from "@esotericsoftware/spine-pixi-v8";
+import { Spine, type Animation, type TrackEntry } from "@esotericsoftware/spine-pixi-v8";
 import { loadTextures } from "../../framework/presentation/assets.ts";
 import type { SymbolFactory, SymbolPhase } from "../../framework/presentation/board.ts";
 import { tavernAsset, textureRegion } from "./art.ts";
@@ -82,10 +82,10 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
     let active: Spine | undefined;
     const instances = new Map<string, Spine>();
 
-    function play(next: SymbolPhase, restart = false): number {
+    function play(next: SymbolPhase, restart = false): Promise<void> | void {
       phase = next;
       const name = clips.get(id);
-      if (!clipsReady || !name) return 0;
+      if (!clipsReady || !name) return;
       const family = name[0];
       let spine = instances.get(family);
       if (!spine) {
@@ -110,27 +110,35 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
       const idle = spine.skeleton.data.findAnimation(`${name}_static`)!;
       const clip = spine.skeleton.data.findAnimation(`${name}_${next}`) ?? idle;
       const current = spine.state.getCurrent(0);
-      if (!restart && current?.animation === clip) return 0;
+      if (!restart && current?.animation === clip) return;
 
       // Finish an authored landing before a winning symbol changes pose.
       if (
-        !restart && next === "win" &&
+        !restart && next === "win" && clip !== idle &&
         current?.animation?.name === `${name}_land` &&
         current.trackTime < current.animationEnd
       ) {
         spine.state.clearNext(current);
-        spine.state.addAnimation(0, clip.name, false);
+        const win = spine.state.addAnimation(0, clip.name, false);
         queueIdle(spine, idle);
-        return current.animationEnd - current.trackTime + clip.duration;
+        return winFinished(win);
       }
 
       spine.state.clearTracks();
       spine.skeleton.setToSetupPose();
-      spine.state.setAnimation(0, clip.name, clip === idle && idle.duration > 0);
+      const entry = spine.state.setAnimation(0, clip.name, clip === idle && idle.duration > 0);
       if (clip !== idle && clip.duration > 0) queueIdle(spine, idle);
       spine.update(0);
       spine.autoUpdate = clip.duration > 0;
-      return clip.duration;
+      if (next === "win" && clip !== idle && clip.duration > 0)
+        return winFinished(entry);
+    }
+
+    function winFinished(entry: TrackEntry) {
+      return new Promise<void>((resolve) => {
+        const finish = () => resolve();
+        entry.listener = { complete: finish, dispose: finish };
+      });
     }
 
     function queueIdle(spine: Spine, idle: Animation) {

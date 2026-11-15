@@ -298,9 +298,9 @@
     "gapPx": 8,
     "normal": {
       "speedPxPerSecond": 1700,
-      "turboSpeedPxPerSecond": 2800,
+      "turboSpeedPxPerSecond": 2240,
       "stopDelayMs": 130,
-      "turboStopDelayMs": 20,
+      "turboStopDelayMs": 25,
       "bounceMs": 170,
       "bouncePx": 8
     },
@@ -319,7 +319,7 @@
       },
       "bounceMs": 100,
       "bouncePx": 8,
-      "turboMultiplier": 4
+      "turboMultiplier": 3.2
     }
   },
   "demo": {

@@ -18,7 +18,7 @@ export function reelCellCenter(
 export interface SymbolView {
   view: Container;
   set: (id: string) => void;
-  effect?: (phase: SymbolPhase) => number;
+  effect?: (phase: SymbolPhase) => Promise<void> | void;
 }
 export type SymbolPhase = "idle" | "spin" | "land" | "win";
 export type SymbolFactory = (cellSizePx: number) => SymbolView;
@@ -293,15 +293,18 @@ export class BoardView {
     );
   }
   private playWinners(seen: Set<string>, dimUnmatched: boolean) {
-    let duration = 0;
+    const animations: Promise<void>[] = [];
     for (const [reel, tiles] of this.tiles.entries()) {
       for (const [slot, tile] of tiles.entries()) {
         const matched = seen.has(reel + ":" + (slot - 1));
         tile.view.alpha = dimUnmatched && seen.size && !matched ? 0.55 : 1;
-        if (matched) duration = Math.max(duration, tile.effect?.("win") ?? 0);
+        if (matched) {
+          const animation = tile.effect?.("win");
+          if (animation) animations.push(animation);
+        }
       }
     }
-    return duration;
+    return Promise.all(animations);
   }
   clearHighlight() {
     this.highlights.clear();

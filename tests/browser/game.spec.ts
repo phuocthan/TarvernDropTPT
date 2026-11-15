@@ -39,6 +39,71 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   );
   expect(errors).toEqual([]);
 });
+for (const action of ["spin", "buy-drop"] as const) {
+  test(`Turbo waits for Scatter win before opening the bonus intro from ${action}`, async ({
+    page,
+  }) => {
+    const server = new MockGame(tavern, () => 0);
+    const scatterCount = action === "spin" ? 3 : 4;
+    const board = Array.from({ length: 5 }, (_, reel) =>
+      reel < scatterCount
+        ? ["bonus", "A", "K", "Q", "J"]
+        : ["10", "A", "K", "Q", "J"],
+    );
+    await page.route("**/api/session", (route) =>
+      route.fulfill({ json: server.state }),
+    );
+    await page.route("**/api/command", (route) => {
+      const command = route.request().postDataJSON();
+      expect(command.action).toBe(action);
+      return route.fulfill({ json: server.execute(command, board) });
+    });
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/");
+    await expect(page.locator("#spin")).toBeEnabled();
+    await page.evaluate(async (count) => {
+      const boardModule = "/src/framework/presentation/board.ts";
+      const { BoardView } = await import(boardModule);
+      const focusWins = BoardView.prototype.focusWins;
+      const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
+      BoardView.prototype.focusWins = function (
+        positions: { reel: number; row: number }[],
+      ) {
+        const animation = focusWins.call(this, positions);
+        if (
+          positions.length === count &&
+          positions.every(({ reel, row }, index) => reel === index && row === 0)
+        ) {
+          const start = performance.now();
+          void Promise.resolve(animation).then(() => {
+            dialog.dataset.scatterDuration = String(performance.now() - start);
+            dialog.dataset.scatterBeforeIntro = String(!dialog.open);
+          });
+        }
+        return animation;
+      };
+    }, scatterCount);
+    await page.getByRole("button", { name: "Turbo" }).click();
+    if (action === "spin") {
+      await page.getByRole("button", { name: "Spin", exact: true }).click();
+    } else {
+      await page.locator("#buy").click();
+      await page.locator('[data-buy="drop"]').click();
+      await page.locator("#confirm-buy").click();
+    }
+    await expect(
+      page.getByRole("heading", {
+        name: action === "spin" ? "TAVERN BONUS" : "DROP BONUS",
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 10000 });
+    const dialog = page.locator("#dialog");
+    await expect(dialog).toHaveAttribute("data-scatter-before-intro", "true");
+    const duration = await dialog.getAttribute("data-scatter-duration");
+    expect(Number(duration)).toBeGreaterThan(300);
+  });
+}
+
 test("free spins autoplay through a retrigger and reveal centered Drop multipliers", async ({
   page,
 }) => {

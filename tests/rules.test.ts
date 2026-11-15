@@ -37,6 +37,11 @@ test("config validation rejects invalid board geometry, symbol IDs and timing", 
   game.lines = structuredClone(reuse.lines);
   game.presentation.normal.speedPxPerSecond = 0;
   assert.throws(() => loadGameConfig(game), /presentation.normal/);
+  game.presentation.normal.speedPxPerSecond = reuse.presentation.normal.speedPxPerSecond;
+  game.presentation.drop.turboMultiplier = 3.2;
+  assert.equal(loadGameConfig(game).presentation.drop.turboMultiplier, 3.2);
+  game.presentation.drop.turboMultiplier = 0.9;
+  assert.throws(() => loadGameConfig(game), /presentation.drop/);
 });
 test("the 3 by 3 config disables bonus purchases and higher chances", () => {
   const server = new MockGame(reuse);
