@@ -37,4 +37,6 @@ See the [reference audit and unresolved rules](docs/reference-analysis.md) for t
 
 See the [framework flowchart and JSON configuration standard](docs/framework-flow.md) for adding a game to the shared catalog.
 
+See the [framework class diagrams and Tavern Drop runtime](docs/framework-classes-and-tavern-runtime.md) for the responsibilities of each class and game module, plus the spin, bonus, and recovery flows.
+
 The fake server owns all demo outcomes and balances. It is not certified math; no real money. Sessions reset on server restart. Browser recovery retries the same command only within a live mock session. The reference asset integration is local. The approved game math, final client asset pack, and production API are pending.

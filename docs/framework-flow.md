@@ -1,5 +1,7 @@
 # Slot Framework v1
 
+Xem [sơ đồ từng class, module Tavern và flow runtime](framework-classes-and-tavern-runtime.md) để tra trách nhiệm và luồng gọi giữa các thành phần.
+
 ```mermaid
 flowchart TD
     Config["game.config.json của từng game"] --> Validate["Kiểm tra phiên bản, lưới, symbol, payline và timing"]
