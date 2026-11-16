@@ -243,6 +243,7 @@
               "type": "integer",
               "minimum": 0
             },
+            "totalWinHoldMs": { "type": "integer", "minimum": 1 },
             "hideSymbolsUntilFirstSpin": {
               "type": "boolean",
               "default": false

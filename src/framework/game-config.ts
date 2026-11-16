@@ -163,6 +163,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     (!feature ||
       !nonNegativeInt(feature.startDelayMs) ||
       !nonNegativeInt(feature.endDelayMs) ||
+      (feature.totalWinHoldMs !== undefined && !positiveInt(feature.totalWinHoldMs)) ||
       (feature.hideSymbolsUntilFirstSpin !== undefined && typeof feature.hideSymbolsUntilFirstSpin !== "boolean"))
   )
     invalid("presentation.feature");

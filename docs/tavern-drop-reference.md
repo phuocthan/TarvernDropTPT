@@ -32,6 +32,7 @@ Help xác nhận **5 reel × 5 hàng**, thắng theo line **từ trái sang ph�
 - Ở bản demo gốc, mua Drop bằng số dư demo. Khi hiện **Resume Active Game**, chọn **Resume** để tiếp tục kết quả đã ghi. Hai Scatter đã dừng được giữ sáng trong khi các reel sau tiếp tục thả. Sau màn mở đầu, board trống trước lượt free spin đầu tiên.
 - Lượt gốc quan sát trực tiếp không mở rương và đi thẳng tới **Total Win 15.20** sau khi reelhouse rời bàn. Màn Total Win tự trở lại base. Video khách cung cấp ghi trường hợp có rương, gồm camera zoom, mở rương, chuyển hệ số vào tiền thắng, lần lượt các mức thắng đạt được và Total Win.
 - Đồng bộ clip hiện tại theo tên xuất từ Spine. Reelhouse dùng `4_finalwin` khi bắt đầu reveal, các track `*_chest_open`, `*_chest_open_idle`, `*_chest_finalwin`, rồi `2_bonus_exit`. Camera chuyển bằng scale quanh hàng rương. Màn kết quả dùng `total_win_start`, `total_win_idle` và `total_win_end`.
+- Menu gốc có **Info**, **Share** và hai thanh SFX/nhạc riêng. Bản demo local hiển thị thẻ thắng gần nhất trong phiên và sao chép nội dung thẻ qua clipboard.
 
 | Symbol                                |    3 |    4 |   5 |
 | ------------------------------------- | ---: | ---: | --: |

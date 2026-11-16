@@ -78,7 +78,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
    </div>
    <div class="hud-aux"><button id="rules" aria-label="Rules and paytable">ⓘ</button><button id="sound" aria-label="Toggle sound" aria-pressed="false">♫</button></div>
    <div id="auto-panel" class="tavern-hud-panel"></div>
-   ${gameMenuEnabled ? '<div id="hud-menu-panel" class="tavern-hud-panel" popover="auto" aria-label="Game menu"><button id="menu-rules" type="button">Game Rules</button><button id="menu-bet" type="button">Bet Menu</button><button id="menu-sound" type="button" aria-pressed="false">Sound</button><button id="menu-turbo" type="button" aria-pressed="false">Turbo</button></div>' : ""}
+   ${gameMenuEnabled ? `<div id="hud-menu-panel" class="tavern-hud-panel" popover="auto" aria-label="Game menu">
+     <button id="menu-rules" type="button" aria-label="Game Rules"><span aria-hidden="true">ℹ</span> Info</button>
+     <button id="menu-share" type="button"><span aria-hidden="true">↗</span> Share</button>
+     <label><span aria-hidden="true">◖))</span><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></label>
+     <label><span aria-hidden="true">♫</span><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></label>
+   </div>` : ""}
   </section>
  </main>
  <dialog id="dialog" class="tavern-dialog"><div class="modal-inner"><button class="close-modal" aria-label="Close dialog">×</button><div id="modal-content"></div></div></dialog>`;
@@ -113,7 +118,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     if (audio.muted || music === cue) return;
     if (music) audio.stop(music);
     music = cue;
-    audio.cue(music, true);
+    audio.cue(music, true, "music");
   }
   const {
     controller,
@@ -141,6 +146,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     skipped = false,
     autoTimer: ReturnType<typeof setTimeout> | null = null;
   let displayWin = 0;
+  let lastShareableWin: { amount: number; bet: number } | undefined;
   let payline: ReturnType<typeof createTavernPayline>;
   let effects: Awaited<ReturnType<typeof mountTavernEffects>> | undefined;
   const effectsReady = reducedMotion ? Promise.resolve(undefined) : mountTavernEffects(
@@ -273,10 +279,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     );
     $("speed").setAttribute("aria-pressed", String(turbo));
     $("sound").setAttribute("aria-pressed", String(!audio.muted));
-    if (gameMenuEnabled) {
-      $("menu-turbo").setAttribute("aria-pressed", String(turbo));
-      $("menu-sound").setAttribute("aria-pressed", String(!audio.muted));
-    }
   }
   function modal(content: string, dismissible = true, look = "") {
     dialog.dataset.look = look;
@@ -534,14 +536,23 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         amount, idle: "total_win_idle", outro: "total_win_end",
       });
       await new Promise<void>((resolve) => {
-        $<HTMLButtonElement>("continue").onclick = async (event) => {
-          (event.currentTarget as HTMLButtonElement).disabled = true;
+        const button = $<HTMLButtonElement>("continue");
+        const hold = game.presentation.feature?.totalWinHoldMs;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const close = async () => {
+          if (button.disabled) return;
+          button.disabled = true;
+          clearTimeout(timer);
           await enter;
           audio.cue("totalOutro");
           await effects?.endScreen("total_win_end");
           dialog.close();
           resolve();
         };
+        button.onclick = () => void close();
+        if (hold) void Promise.resolve(enter).then(() => {
+          if (!button.disabled) timer = setTimeout(() => void close(), hold);
+        });
       });
       view.setBoard(outcome.state.board);
       displayWin = c.roundAward;
@@ -553,6 +564,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       status(tier.label + " · " + money(outcome.spinWin));
       await showWinCelebration(tier.label, money(outcome.spinWin), winAnimation(tier.label));
     }
+    if (outcome.paidAward > 0 && !outcome.state.feature)
+      lastShareableWin = { amount: outcome.completion?.roundAward ?? outcome.paidAward, bet: outcome.bet };
     controller.completePresentation();
     if (autoRemaining) autoRemaining--;
     sync();
@@ -777,22 +790,39 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   if (gameMenuEnabled) {
     const menu = $("hud-menu-panel");
     $("menu-rules").onclick = () => { menu.hidePopover(); rules(); };
-    $("menu-sound").onclick = () => $("sound").click();
-    $("menu-turbo").onclick = () => $("speed").click();
-    $("menu-bet").onclick = () => {
+    menu.addEventListener("toggle", () => {
+      const open = menu.matches(":popover-open");
+      $("menu").textContent = open ? "×" : "☰";
+      $("menu").setAttribute("aria-expanded", String(open));
+    });
+    for (const channel of ["effects", "music"] as const) {
+      const slider = $<HTMLInputElement>(channel + "-volume");
+      slider.value = String(Math.round(audio.level(channel) * 100));
+      slider.oninput = () => {
+        audio.unlock();
+        audio.muted = false;
+        audio.setLevel(channel, Number(slider.value) / 100);
+        syncMusic(!!controller.state?.feature);
+      };
+    }
+    $("menu-share").onclick = () => {
       menu.hidePopover();
-      if (controller.phase !== "ready" || controller.state?.feature) return;
-      modal(`<h2>Bet Menu</h2><div class="bet-menu-grid">${game.bets.map((bet, index) =>
-        `<button type="button" data-bet-index="${index}" aria-pressed="${index === betIndex}">${money(bet)}</button>`,
-      ).join("")}</div>`);
-      dialog.querySelectorAll<HTMLButtonElement>("[data-bet-index]").forEach((button) => {
-        button.onclick = () => {
-          betIndex = Number(button.dataset.betIndex);
-          audio.cue("bet");
-          dialog.close();
-          sync();
-        };
-      });
+      const win = lastShareableWin;
+      modal(`<h2>Share</h2><p class="share-game">Tavern Drop</p>
+        <div class="share-card">${win
+          ? `<strong>Win $${money(win.amount)}</strong><p>Bet $${money(win.bet)}</p><button id="copy-win" type="button">Copy result</button>`
+          : "<strong>Nothing to share yet</strong><p>Play a round and your cards show up here.</p>"}</div>`,
+        true, "share",
+      );
+      if (win) $("copy-win").onclick = async () => {
+        const button = $("copy-win");
+        try {
+          await navigator.clipboard.writeText(`Tavern Drop · Win $${money(win.amount)} · Bet $${money(win.bet)}`);
+          button.textContent = "Copied";
+        } catch {
+          button.textContent = "Clipboard unavailable";
+        }
+      };
     };
   }
   dialog.addEventListener("cancel", (event) => {

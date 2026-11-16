@@ -337,6 +337,7 @@
     "feature": {
       "startDelayMs": 2000,
       "endDelayMs": 2000,
+      "totalWinHoldMs": 3500,
       "hideSymbolsUntilFirstSpin": true
     },
     "normal": {

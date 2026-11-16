@@ -116,6 +116,7 @@ export interface ReelPresentation {
   feature?: {
     startDelayMs: number;
     endDelayMs: number;
+    totalWinHoldMs?: number;
     hideSymbolsUntilFirstSpin?: boolean;
   };
   normal: {

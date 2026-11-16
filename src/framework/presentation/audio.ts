@@ -4,6 +4,7 @@ export type AudioCue = string | {
   durationMs: number;
   loop?: boolean;
 };
+export type AudioChannel = "effects" | "music";
 
 export function audioSpriteCues(
   manifest: { src: string[]; sprite: Record<string, [number, number, (boolean | number)?]> },
@@ -27,7 +28,8 @@ export class AudioBus<Cue extends string> {
   private context: AudioContext | null = null;
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private playing = new Map<Cue, Set<Playback>>();
-  private gain: GainNode | null = null;
+  private gains = new Map<AudioChannel, GainNode>();
+  private volumes: Record<AudioChannel, number> = { effects: 0.55, music: 0.55 };
   private isMuted = true;
   private files: Record<Cue, AudioCue>;
 
@@ -40,19 +42,33 @@ export class AudioBus<Cue extends string> {
   }
   set muted(value: boolean) {
     this.isMuted = value;
-    if (this.gain) this.gain.gain.value = value ? 0 : 0.55;
+    for (const [channel, gain] of this.gains) gain.gain.value = value ? 0 : this.volumes[channel];
     if (value) {
       for (const name of this.playing.keys()) this.stop(name);
     }
+  }
+
+  level(channel: AudioChannel) {
+    return this.volumes[channel];
+  }
+
+  setLevel(channel: AudioChannel, value: number) {
+    if (!Number.isFinite(value)) return;
+    this.volumes[channel] = Math.min(1, Math.max(0, value));
+    const gain = this.gains.get(channel);
+    if (gain) gain.gain.value = this.muted ? 0 : this.volumes[channel];
   }
 
   unlock() {
     if (!this.context) {
       if (typeof AudioContext === "undefined") return;
       this.context = new AudioContext();
-      this.gain = this.context.createGain();
-      this.gain.gain.value = this.muted ? 0 : 0.55;
-      this.gain.connect(this.context.destination);
+      for (const channel of ["effects", "music"] as const) {
+        const gain = this.context.createGain();
+        gain.gain.value = this.muted ? 0 : this.volumes[channel];
+        gain.connect(this.context.destination);
+        this.gains.set(channel, gain);
+      }
     }
     void this.context.resume().catch(() => undefined);
   }
@@ -75,8 +91,9 @@ export class AudioBus<Cue extends string> {
     }
   }
 
-  cue(name: Cue, loop = false) {
-    const { context, gain } = this;
+  cue(name: Cue, loop = false, channel: AudioChannel = "effects") {
+    const context = this.context;
+    const gain = this.gains.get(channel);
     const cue: AudioCue | undefined = this.files[name];
     if (this.muted || !context || !gain || !cue) return;
     const sprite = typeof cue === "string" ? undefined : cue;

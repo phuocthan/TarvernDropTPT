@@ -248,6 +248,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     const tiers: string[] = [];
     (window as any).featureTiers = tiers;
     new MutationObserver((mutations) => {
+      if (!performance.getEntriesByName("feature-result-open").length) return;
       for (const mutation of mutations) {
         for (const node of Array.from(mutation.addedNodes)) {
           if (node instanceof HTMLElement && node.matches(".win-celebration")) {
@@ -368,6 +369,10 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
   await expect(page.locator(".result-total")).toHaveText(unlocked ? "2.00" : "0.00");
   await expect(page.locator("#continue")).toBeEnabled();
+  if (!unlocked) {
+    await expect(page.locator("#dialog")).toBeHidden({ timeout: 16000 });
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
+  }
 });
 for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
   test(`autoplay and menu fit the ${viewport.width}px layout`, async ({ page }) => {
@@ -383,9 +388,13 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     await expect(panel).toBeHidden();
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("button", { name: "Game Rules" })).toBeInViewport();
+    await expect(page.getByRole("slider", { name: "Sound effects volume" })).toBeVisible();
+    await expect(page.getByRole("slider", { name: "Music volume" })).toBeVisible();
+    await page.getByRole("button", { name: "Share", exact: true }).click();
+    await expect(page.getByText("Nothing to share yet")).toBeVisible();
+    await page.getByRole("button", { name: "Close dialog" }).click();
     if (viewport.width > 670) {
       const before = await page.locator("#bet-track").getAttribute("aria-valuenow");
-      await page.getByRole("button", { name: "Open menu" }).click();
       await page.getByRole("button", { name: "Increase bet" }).click();
       await expect(page.locator("#bet-track")).toHaveAttribute("aria-valuenow", String(Number(before) + 1));
     }
