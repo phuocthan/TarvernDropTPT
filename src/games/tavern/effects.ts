@@ -274,13 +274,13 @@ export async function mountTavernEffects(
       width / 2 + (camera?.centerOffsetX ?? 80) * backgroundScale,
       height - bottom * backgroundScale,
     );
-    const reelScale = frameRect.width / 3976;
+    const sceneScale = sceneRect.width / scene.clientWidth || 1;
+    const reelScale = frameRect.width / sceneScale / 3976;
     reelhouse.scale.set(reelScale);
     // The source bonus pose lifts the frame by 221 Spine units.
     reelhouse.position.set(
-      frameRect.left - sceneRect.left + 1991 * reelScale,
-      frameRect.top -
-        sceneRect.top +
+      (frameRect.left - sceneRect.left) / sceneScale + 1991 * reelScale,
+      (frameRect.top - sceneRect.top) / sceneScale +
         (mode === "bonus" ? 2001 : 1780) * reelScale,
     );
     updateBackground(0);

@@ -4,7 +4,7 @@ Development continues in `phuocthan/TarvernDropTPT`. The client reviews publishe
 
 ## Milestone 1 package
 
-The explicit file list is in [export-milestone-1.ps1](../release/export-milestone-1.ps1). It includes the shared TypeScript/PixiJS core, Tavern 5 × 5 JSON and 3 × 3 reuse configuration, mock API, shared tests, a package lock and build configuration, and the client README and M1 documents. The release entry points mount both configurations using the shared placeholder skin.
+The explicit file list is in [export-milestone-1.ps1](../release/export-milestone-1.ps1). It includes the shared TypeScript/PixiJS core, Tavern 5 × 5 JSON and 3 × 3 reuse configuration, mock API, sanitized contract examples, shared tests, a package lock and build configuration, the client README and M1 documents, and two clean-preview screenshots. The release entry points mount both configurations using the shared placeholder skin.
 
 The development checkout retains the original reference art, fonts, audio, Spine files, asset viewer, research captures, technical notes, local runtime files, Railway configuration and development Git history. The public preview is built from a clean Git archive of a named commit.
 

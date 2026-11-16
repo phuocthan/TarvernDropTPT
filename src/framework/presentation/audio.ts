@@ -29,8 +29,11 @@ export class AudioBus<Cue extends string> {
   private playing = new Map<Cue, Set<Playback>>();
   private gain: GainNode | null = null;
   private isMuted = true;
+  private files: Record<Cue, AudioCue>;
 
-  constructor(private files: Record<Cue, AudioCue>) {}
+  constructor(files: Record<Cue, AudioCue>) {
+    this.files = files;
+  }
 
   get muted() {
     return this.isMuted;

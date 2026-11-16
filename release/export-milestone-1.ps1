@@ -23,6 +23,7 @@ $entries = @(
     'src/style.css', 'src/framework', 'src/games/reuse',
     'src/games/tavern/definition.ts', 'src/games/tavern/game.config.json',
     'tests/rules.test.ts', 'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',
+    'docs/milestone-1-api.md', 'docs/milestone-1-api-examples.json', 'docs/milestone-1-evidence',
     'release/milestone-1/main.ts', 'release/milestone-1/catalog.ts',
     'release/milestone-1/README.md'
 )

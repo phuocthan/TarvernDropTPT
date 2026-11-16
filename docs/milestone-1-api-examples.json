@@ -1,0 +1,534 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "currency": null,
+    "amountScale": 2,
+    "description": "Current mock shapes. The final free-spin example is seeded with nine prior spins and four collected keys."
+  },
+  "session": {
+    "method": "GET",
+    "path": "/api/session",
+    "status": 200,
+    "response": {
+      "version": 0,
+      "balance": 100000,
+      "board": [
+        [
+          "A",
+          "ale",
+          "K",
+          "coin",
+          "J"
+        ],
+        [
+          "barrel",
+          "Q",
+          "wild",
+          "J",
+          "A"
+        ],
+        [
+          "K",
+          "coin",
+          "bonus",
+          "ale",
+          "Q"
+        ],
+        [
+          "Q",
+          "ale",
+          "A",
+          "crown",
+          "K"
+        ],
+        [
+          "crown",
+          "J",
+          "coin",
+          "Q",
+          "barrel"
+        ]
+      ],
+      "feature": null,
+      "round": null
+    }
+  },
+  "normalWin": {
+    "method": "POST",
+    "path": "/api/command",
+    "status": 200,
+    "request": {
+      "requestId": "example-001",
+      "expectedVersion": 0,
+      "action": "spin",
+      "bet": 100,
+      "chance": "standard"
+    },
+    "response": {
+      "requestId": "example-001",
+      "bet": 100,
+      "state": {
+        "version": 1,
+        "balance": 99920,
+        "board": [
+          [
+            "A",
+            "K",
+            "Q",
+            "J",
+            "10"
+          ],
+          [
+            "A",
+            "10",
+            "coin",
+            "ale",
+            "J"
+          ],
+          [
+            "A",
+            "crown",
+            "barrel",
+            "coin",
+            "Q"
+          ],
+          [
+            "K",
+            "10",
+            "coin",
+            "J",
+            "ale"
+          ],
+          [
+            "Q",
+            "J",
+            "10",
+            "coin",
+            "barrel"
+          ]
+        ],
+        "feature": null,
+        "round": null
+      },
+      "wins": [
+        {
+          "line": 0,
+          "symbol": "A",
+          "positions": [
+            {
+              "reel": 0,
+              "row": 0
+            },
+            {
+              "reel": 1,
+              "row": 0
+            },
+            {
+              "reel": 2,
+              "row": 0
+            }
+          ],
+          "amount": 20
+        }
+      ],
+      "spinWin": 20,
+      "entry": null,
+      "retrigger": 0,
+      "collected": [],
+      "completion": null,
+      "finalFeature": null,
+      "paidAward": 20,
+      "capped": false
+    }
+  },
+  "dropEntry": {
+    "method": "POST",
+    "path": "/api/command",
+    "status": 200,
+    "request": {
+      "requestId": "example-002",
+      "expectedVersion": 1,
+      "action": "buy-drop",
+      "bet": 100,
+      "chance": "standard"
+    },
+    "response": {
+      "requestId": "example-002",
+      "bet": 100,
+      "state": {
+        "version": 2,
+        "balance": 89920,
+        "board": [
+          [
+            "bonus",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          [
+            "bonus",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          [
+            "bonus",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          [
+            "bonus",
+            "A",
+            "A",
+            "A",
+            "A"
+          ],
+          [
+            "A",
+            "A",
+            "A",
+            "A",
+            "A"
+          ]
+        ],
+        "feature": {
+          "mode": "drop",
+          "remaining": 10,
+          "played": 0,
+          "accumulated": 0,
+          "chests": [
+            {
+              "rows": [],
+              "unlocked": false,
+              "multiplier": null
+            },
+            {
+              "rows": [],
+              "unlocked": false,
+              "multiplier": null
+            },
+            {
+              "rows": [],
+              "unlocked": false,
+              "multiplier": null
+            },
+            {
+              "rows": [],
+              "unlocked": false,
+              "multiplier": null
+            },
+            {
+              "rows": [],
+              "unlocked": false,
+              "multiplier": null
+            }
+          ]
+        },
+        "round": {
+          "id": "00000000-0000-4000-8000-000000000001",
+          "bet": 100,
+          "baseWin": 0,
+          "cap": 500000
+        }
+      },
+      "wins": [],
+      "spinWin": 0,
+      "entry": "drop",
+      "retrigger": 0,
+      "collected": [],
+      "completion": null,
+      "finalFeature": null,
+      "paidAward": 0,
+      "capped": false
+    }
+  },
+  "resumeBeforeFinalSpin": {
+    "method": "GET",
+    "path": "/api/session",
+    "status": 200,
+    "response": {
+      "version": 2,
+      "balance": 89920,
+      "board": [
+        [
+          "bonus",
+          "A",
+          "A",
+          "A",
+          "A"
+        ],
+        [
+          "bonus",
+          "A",
+          "A",
+          "A",
+          "A"
+        ],
+        [
+          "bonus",
+          "A",
+          "A",
+          "A",
+          "A"
+        ],
+        [
+          "bonus",
+          "A",
+          "A",
+          "A",
+          "A"
+        ],
+        [
+          "A",
+          "A",
+          "A",
+          "A",
+          "A"
+        ]
+      ],
+      "feature": {
+        "mode": "drop",
+        "remaining": 1,
+        "played": 9,
+        "accumulated": 400,
+        "chests": [
+          {
+            "rows": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "unlocked": false,
+            "multiplier": null
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": null
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": null
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": null
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": null
+          }
+        ]
+      },
+      "round": {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "bet": 100,
+        "baseWin": 0,
+        "cap": 500000
+      }
+    }
+  },
+  "finalFreeSpin": {
+    "method": "POST",
+    "path": "/api/command",
+    "status": 200,
+    "request": {
+      "requestId": "example-003",
+      "expectedVersion": 2,
+      "action": "spin",
+      "bet": 100,
+      "chance": "standard"
+    },
+    "response": {
+      "requestId": "example-003",
+      "bet": 100,
+      "state": {
+        "version": 3,
+        "balance": 92020,
+        "board": [
+          [
+            "A",
+            "K",
+            "Q",
+            "J",
+            "10"
+          ],
+          [
+            "A",
+            "10",
+            "coin",
+            "ale",
+            "J"
+          ],
+          [
+            "A",
+            "crown",
+            "barrel",
+            "coin",
+            "Q"
+          ],
+          [
+            "K",
+            "10",
+            "coin",
+            "J",
+            "ale"
+          ],
+          [
+            "Q",
+            "J",
+            "10",
+            "coin",
+            "barrel"
+          ]
+        ],
+        "feature": null,
+        "round": null
+      },
+      "wins": [
+        {
+          "line": 0,
+          "symbol": "A",
+          "positions": [
+            {
+              "reel": 0,
+              "row": 0
+            },
+            {
+              "reel": 1,
+              "row": 0
+            },
+            {
+              "reel": 2,
+              "row": 0
+            }
+          ],
+          "amount": 20
+        }
+      ],
+      "spinWin": 20,
+      "entry": null,
+      "retrigger": 0,
+      "collected": [
+        {
+          "reel": 0,
+          "row": 0
+        },
+        {
+          "reel": 1,
+          "row": 0
+        },
+        {
+          "reel": 2,
+          "row": 0
+        }
+      ],
+      "completion": {
+        "accumulated": 420,
+        "multipliers": [
+          5,
+          1,
+          1,
+          1,
+          1
+        ],
+        "product": 5,
+        "featureAward": 2100,
+        "roundAward": 2100,
+        "capped": false
+      },
+      "finalFeature": {
+        "mode": "drop",
+        "remaining": 0,
+        "played": 10,
+        "accumulated": 420,
+        "chests": [
+          {
+            "rows": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ],
+            "unlocked": true,
+            "multiplier": 5
+          },
+          {
+            "rows": [
+              0
+            ],
+            "unlocked": false,
+            "multiplier": 1
+          },
+          {
+            "rows": [
+              0
+            ],
+            "unlocked": false,
+            "multiplier": 1
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": 1
+          },
+          {
+            "rows": [],
+            "unlocked": false,
+            "multiplier": 1
+          }
+        ]
+      },
+      "paidAward": 2100,
+      "capped": false
+    }
+  },
+  "retryAfterLostResponse": {
+    "method": "POST",
+    "path": "/api/command",
+    "status": 200,
+    "request": {
+      "requestId": "example-003",
+      "expectedVersion": 2,
+      "action": "spin",
+      "bet": 100,
+      "chance": "standard"
+    },
+    "responseFrom": "finalFreeSpin.response"
+  },
+  "errors": [
+    {
+      "status": 409,
+      "response": {
+        "error": "STALE_SESSION"
+      }
+    },
+    {
+      "status": 409,
+      "response": {
+        "error": "REQUEST_CONFLICT"
+      }
+    },
+    {
+      "status": 409,
+      "response": {
+        "error": "SESSION_EXPIRED"
+      }
+    },
+    {
+      "status": 409,
+      "response": {
+        "error": "INSUFFICIENT_BALANCE"
+      }
+    }
+  ]
+}

@@ -20,4 +20,5 @@ For development, `npm run dev` serves the UI at the Vite URL and runs the API on
 
 - [Deliverables and acceptance checklist](docs/milestone-1.md)
 - [Asset specifications and reference validation](docs/milestone-1-asset-spec.md)
+- [Mock API examples for integration review](docs/milestone-1-api.md)
 - [Development commit used for this snapshot](SOURCE_REVISION)

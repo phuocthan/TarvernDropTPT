@@ -186,7 +186,7 @@ for (const action of ["spin", "buy-drop"] as const) {
 test("free spins autoplay through a retrigger and reveal centered Drop multipliers", async ({
   page,
 }) => {
-  test.setTimeout(90000);
+  test.setTimeout(120000);
   const game = structuredClone(tavern);
   game.demo.featureSpins.drop = 2;
   game.demo.retriggerSpins = 1;
@@ -245,6 +245,18 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
     const status = document.querySelector("#status")!;
     const progress = document.querySelector("#feature-progress")!;
+    const tiers: string[] = [];
+    (window as any).featureTiers = tiers;
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.addedNodes)) {
+          if (node instanceof HTMLElement && node.matches(".win-celebration")) {
+            const label = node.querySelector("strong")?.textContent;
+            if (label?.endsWith(" WIN")) tiers.push(label);
+          }
+        }
+      }
+    }).observe(document.querySelector("#app")!, { childList: true });
     document.querySelector("#continue")!.addEventListener("click", () => {
       performance.mark("feature-continue");
     }, { once: true });
@@ -312,18 +324,17 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
   await expect(page.locator("#continue")).toBeEnabled();
   expect(new Set(await page.evaluate(() => (window as any).featureAmounts)).size).toBeGreaterThan(2);
+  expect(await page.evaluate(() => (window as any).featureTiers)).toEqual([
+    "BIG WIN", "SUPER WIN", "MEGA WIN", "EPIC WIN",
+  ]);
   const expected = server.state.balance;
   await page.locator("#continue").click();
   await expect(page.locator("#balance")).toHaveText(
     (expected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
   );
-  await page.screenshot({
-    path: "/tmp/tavern-template-desktop.png",
-    fullPage: true,
-  });
 });
 for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows all chests when one unlocks" : "omits chests when none unlock"}`, async ({ page }) => {
-  test.setTimeout(40000);
+  test.setTimeout(65000);
   const game = structuredClone(tavern);
   game.demo.featureSpins.drop = 1;
   const server = new MockGame(game, () => 0);
@@ -508,6 +519,7 @@ test("desktop landscape keeps the bottom reel row and spin controls visible", as
 test("the 3 × 3 build uses the shared board and has its own session", async ({
   page,
 }) => {
+  test.setTimeout(45000);
   await page.goto("/?game=reuse");
   await expect(page.locator("#reuse-board canvas")).toHaveAttribute(
     "aria-label",

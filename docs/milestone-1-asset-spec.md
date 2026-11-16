@@ -13,6 +13,12 @@
 
 The development checkout contains eight Spine exports, five WebP atlas pages, six Outfit WOFF2 files, three bitmap payout fonts and 66 named audio slices. The latest slice ends at 627.125 s in the 629 s OGG. The development build presents the reference assets for comparison. The public milestone preview contains Pixi-drawn placeholders.
 
-Representative playback cases are loading and welcome, base reels, bonus intro, chest open/idle/finalwin, all four major win tiers, and Total Win intro/idle/outro. The development browser suite exercises these paths with fixture-controlled outcomes. Inspect the framework preview by starting one spin on each board. It uses a separate mock wallet per route.
+| Evidence | Observed result |
+| --- | --- |
+| Reference audio integrity | The local OGG and JSON SHA-256 hashes matched the files served by the reference provider. |
+| Audio playback probe | Chromium decoded the OGG and MP3 sprite (629 s each) and rendered the reel-start segment to a non-silent PCM buffer. An individual MP3 cue decoded and rendered too. All 66 cue ends fall within both sprite files. |
+| Web fonts | Chromium loaded the six Outfit faces at weights 300 through 800. The payout display uses the three packaged bitmap fonts. |
+| Spine | Eight skeletons and 141 clip names were inventoried. The development browser suite exercises representative intro, land/win, bonus, chest and Total Win tracks with controlled outcomes. |
+| Preview | A production build served both mock boards. A spin on each route returned a board in the configured dimensions and reconciled its separate balance. |
 
 Approval of the final client art, branding and distribution rights remains open. Acceptance of asset verification applies to the required files in the asset pack the client approves for M1.

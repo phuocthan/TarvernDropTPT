@@ -3,7 +3,7 @@
 | Item | Detail |
 | --- | --- |
 | Price | $900 |
-| Planned kickoff | 17 November 2026, after both parties agree the scope and the client funds the milestone |
+| Planned kickoff | 17 November 2026, after scope agreement. The client confirmed funding. |
 | Target delivery | 23 November 2026 |
 | Acceptance | The client reviews the deliverables against the checklist below. The target date does not trigger automatic payment. |
 
@@ -14,10 +14,12 @@
 | Reference checklist | Confirm each screen, state, control, animation and asset in the inventory below. Approve which effects are authored in Spine and which are driven by code. |
 | Asset verification | Review [asset specifications and validation](milestone-1-asset-spec.md). Required files in the approved asset pack must load or play with the target runtime. Review playback evidence and close any required-asset blockers before acceptance. |
 | Initial asset specifications | Supply the [initial specification](milestone-1-asset-spec.md) within 1–2 business days of kickoff. A 17 November kickoff puts the target window at 18–19 November, subject to working days. |
-| Reusable core | Inspect TypeScript/PixiJS modules for config and schema, loading/assets, Normal and Drop reels, controls, audio, HTTP transport and session/recovery. Both demos use the same session and reel renderer. |
+| Reusable core | Inspect TypeScript/PixiJS modules for config and schema, loading/assets, Normal and Drop reels, controls, audio, HTTP transport and session/recovery. Both demos use the same session and reel renderer. See the [current mock contract](milestone-1-api.md). |
 | 3 × 3 example | Open `/?game=reuse`, start a mock spin and verify the board, paylines and separate wallet. The example demonstrates reuse and has no separate commercial scope. |
 | First runnable build | Open `/`, press **Spin** and verify that the 5 × 5 Drop board settles, the result is visible and the mock wallet updates. Temporary art and mock outcomes are within scope. The full game is a later deliverable. |
 | Source and build steps | Clone the milestone snapshot and run `npm ci`, `npm run build`, `npm start` and `npm test`. The public delivery candidate is in the GitHub release repository. The original client GitLab review location still needs its project URL and access. |
+
+The production preview was opened in Chromium with a fresh mock wallet on each route. A test spin settled on both boards and updated each balance. See the [5 × 5 Drop capture](milestone-1-evidence/5x5-drop.jpg) and the [3 × 3 Normal capture](milestone-1-evidence/3x3-normal.jpg).
 
 ## Reference inventory for client review
 
@@ -36,4 +38,4 @@ At kickoff, confirm the brand owner, logo variants, minimum clear space, splash 
 
 ## Review and sign-off
 
-Record the reviewed commit, client reviewer and review date. Track corrections against the table above. Confirm the funded milestone and the approved asset pack separately from the technical build review.
+Record the reviewed commit, client reviewer and review date. Track corrections against the table above and record the approved asset pack.
