@@ -287,6 +287,14 @@
 .mascot[data-ready] img {
   display: none;
 }
+.stage[data-mascot-behind-board] .mascot {
+  visibility: hidden;
+}
+@media (orientation: portrait) {
+  .tavern-shell .mascot {
+    z-index: var(--scene-layer-mascot-behind, 2);
+  }
+}
 .tavern-status {
   position: absolute;
   z-index: var(--scene-layer-table, 5);
@@ -341,9 +349,25 @@
   font-size: clamp(7px, 1.5vw, 13px);
   font-weight: bold;
 }
-.feature-button img {
-  width: 78%;
-  height: auto;
+.hud-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+}
+.feature-button .hud-icon {
+  width: 69%;
+  height: 86%;
+}
+.hud-menu .hud-icon {
+  width: .92em;
+  height: .92em;
+}
+.bet-arrows .hud-icon {
+  width: 70%;
+  height: 22px;
 }
 .hud-menu {
   font-size: clamp(16px, 3vw, 30px);
@@ -403,6 +427,7 @@
   border-color: #25ddf5;
 }
 .tavern-hud .spin-button {
+  position: relative;
   display: grid;
   place-content: center;
   flex: 0 0 auto;
@@ -415,6 +440,22 @@
   box-shadow: 0 0 0 1px #fff;
   font-size: clamp(24px, 5svh, 59px);
   line-height: 0.72;
+}
+.spin-button .hud-icon {
+  position: absolute;
+  inset: 13%;
+  width: auto;
+  height: auto;
+}
+.spin-button .hud-icon-autoplay-ready,
+.tavern-hud:has(#auto-panel:popover-open) .spin-button:has(.hud-icon-autoplay-ready) .hud-icon-spin {
+  display: none;
+}
+.tavern-hud:has(#auto-panel:popover-open) .spin-button .hud-icon-autoplay-ready {
+  display: block;
+}
+.spin-button :is(.hud-icon-stop, .hud-icon-skip) {
+  inset: 29%;
 }
 .tavern-hud .spin-button small {
   letter-spacing: 0;
@@ -951,6 +992,7 @@
   text-align: left;
 }
 #hud-menu-panel span { font-size: 16px; }
+#hud-menu-panel .hud-icon { height: 13px; }
 #hud-menu-panel input {
   width: 100%;
   height: 13px;

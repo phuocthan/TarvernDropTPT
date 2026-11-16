@@ -214,6 +214,16 @@
               },
               "additionalProperties": false
             },
+            "sideLogo": {
+              "type": "object",
+              "required": ["referenceAspect", "leftFactor", "upFactor"],
+              "properties": {
+                "referenceAspect": { "type": "number", "exclusiveMinimum": 1 },
+                "leftFactor": { "type": "number", "minimum": 0 },
+                "upFactor": { "type": "number", "minimum": 0 }
+              },
+              "additionalProperties": false
+            },
             "backgroundCamera": {
               "type": "object",
               "required": ["width", "top", "landscapeBottom", "portraitBottom", "centerOffsetX"],

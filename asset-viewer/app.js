@@ -11,17 +11,18 @@ const container = document.querySelector("#player");
 let player;
 let generation = 0;
 for (const name of objects) skeleton.add(new Option(name, name));
-for (const name of images) {
+const hud = ["menu", "close", "bet-up", "bet-down", "spin", "stop", "autoplay", "autoplay-ready", "turbo", "skip", "feature-buy", "info", "share"];
+for (const name of [...images.map((name) => "assets/" + name), "assets/sd/td_master.webp", ...hud.map((name) => "hud/" + name + ".svg")]) {
   const link = document.createElement("a");
-  link.href = base + "assets/" + name;
+  link.href = base + name;
   link.target = "_blank";
   link.rel = "noopener";
   const img = document.createElement("img");
   img.src = link.href;
-  img.alt = name;
+  img.alt = name.replace(/^assets\//, "");
   img.loading = "lazy";
   const caption = document.createElement("span");
-  caption.textContent = name;
+  caption.textContent = img.alt;
   link.append(img, caption);
   document.querySelector("#gallery").append(link);
 }

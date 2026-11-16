@@ -1,4 +1,4 @@
-import { Assets, Container, Rectangle, Sprite, Texture, Ticker } from "pixi.js";
+import { Assets, Container, Rectangle, Sprite, Texture } from "pixi.js";
 import { Spine, type Animation, type TrackEntry } from "@esotericsoftware/spine-pixi-v8";
 import { loadTextures } from "../../framework/presentation/assets.ts";
 import type { SymbolFactory, SymbolPhase } from "../../framework/presentation/board.ts";
@@ -71,8 +71,7 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
       },
     ));
   const clips = new Map<string, string>(symbols.map(([id, name]) => [id, name]));
-  if (clipsReady) Ticker.shared.minFPS = 0;
-  return (cellSizePx) => {
+  return (cellSizePx, ticker) => {
     const cellCenter = cellSizePx / 2;
     const sizing = cellSizePx / 102;
     const view = new Container();
@@ -96,6 +95,7 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
         spine = Spine.from({
           skeleton: skeletons.get(family)!,
           atlas,
+          ticker,
           autoUpdate: false,
         });
         spine.position.set(cellCenter);

@@ -311,9 +311,10 @@
       "rowPitch": 564
     },
     "scene": {
-      "layers": { "scenery": 1, "reels": 3, "mascot": 4, "table": 5 },
+      "layers": { "scenery": 1, "mascot-behind": 2, "reels": 3, "mascot": 4, "table": 5 },
       "openingDimmerOpacity": 0.55,
       "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },
+      "sideLogo": { "referenceAspect": 1.7777777778, "leftFactor": 0.68, "upFactor": 0.22 },
       "backgroundCamera": {
         "width": 6000,
         "top": 2060,
@@ -325,7 +326,8 @@
         "portraitMascot": "slot_character",
         "landscapeMascot": "slot_character",
         "baseTable": "background_normal_foreground",
-        "bonusTable": "background_bonus_foreground"
+        "bonusTable": "background_bonus_foreground",
+        "sideLogo": "title"
       }
     },
     "symbolLandingEffects": {

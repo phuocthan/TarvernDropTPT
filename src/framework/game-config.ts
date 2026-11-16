@@ -128,6 +128,11 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   const camera = scene?.backgroundCamera;
   const openingDimmer = scene?.openingDimmerOpacity;
   const chestCamera = scene?.chestCamera;
+  const sideLogo = scene?.sideLogo;
+  if (sideLogo !== undefined &&
+      (!sideLogo || !Number.isFinite(sideLogo.referenceAspect) || sideLogo.referenceAspect <= 1 ||
+       !nonNegative(sideLogo.leftFactor) || !nonNegative(sideLogo.upFactor)))
+    invalid("presentation.scene.sideLogo");
   if (chestCamera !== undefined &&
       (!chestCamera || !Number.isFinite(chestCamera.scale) || chestCamera.scale < 1 ||
        !nonNegative(chestCamera.originY) || chestCamera.originY > 1 ||

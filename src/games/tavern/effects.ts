@@ -1,19 +1,16 @@
 import { Application, Assets, BitmapText, Graphics, Text } from "pixi.js";
 import {
-  MixBlend,
-  MixDirection,
-  Physics,
   RegionAttachment,
-  Skeleton,
   Spine,
-  Vector2,
-  type Event as SpineEvent,
+  type Skeleton,
   type Slot,
 } from "@esotericsoftware/spine-pixi-v8";
 import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
 import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/presentation/scene.ts";
 import { tavernAsset } from "./art.ts";
 import { hasTavernBitmapFont } from "./typography.ts";
+import { createMascot, loadMascot, playMascotWin } from "./mascot.ts";
+import { animationBounds } from "./spine-bounds.ts";
 
 const atlas = tavernAsset("hd/td_master.atlas");
 const backgroundUrl = tavernAsset("td_backgrounds.skel");
@@ -49,50 +46,9 @@ function screenBounds(
   animations: string[],
   artSlots?: ReadonlySet<string>,
 ) {
-  const preview = new Skeleton(data);
-  const offset = new Vector2();
-  const size = new Vector2();
-  const events: SpineEvent[] = [];
-  let left = Infinity;
-  let top = Infinity;
-  let right = -Infinity;
-  let bottom = -Infinity;
-  for (const name of animations) {
-    const clip = data.findAnimation(name)!;
-    for (let frame = 0; frame <= 16; frame++) {
-      const time = (clip.duration * frame) / 16;
-      preview.setToSetupPose();
-      events.length = 0;
-      clip.apply(
-        preview,
-        time,
-        time,
-        false,
-        events,
-        1,
-        MixBlend.setup,
-        MixDirection.mixIn,
-      );
-      preview.updateWorldTransform(Physics.pose);
-      for (const slot of preview.drawOrder)
-        if (
-          cameraEffects.has(slot.data.name) ||
-          slot.color.a <= 0.01 ||
-          (artSlots && !artSlots.has(slot.data.name))
-        )
-          slot.setAttachment(null);
-      preview.getBounds(offset, size);
-      if (!Number.isFinite(size.x + size.y) || size.x <= 0 || size.y <= 0)
-        continue;
-      left = Math.min(left, offset.x);
-      top = Math.min(top, offset.y);
-      right = Math.max(right, offset.x + size.x);
-      bottom = Math.max(bottom, offset.y + size.y);
-    }
-  }
-  if (right <= left || bottom <= top)
-    return { x: -3000, y: -2000, width: 6000, height: 4000 };
-  return { x: left, y: top, width: right - left, height: bottom - top };
+  return animationBounds(data, animations, (slot) =>
+    !cameraEffects.has(slot.data.name) && (!artSlots || artSlots.has(slot.data.name)),
+  ) ?? { x: -3000, y: -2000, width: 6000, height: 4000 };
 }
 
 export async function mountTavernEffects(
@@ -101,11 +57,12 @@ export async function mountTavernEffects(
   reelHost: HTMLElement,
   foreground: HTMLElement,
   sceneLayout: ReelPresentation["scene"],
-  placeMascot: (anchor: SceneAnchor) => void,
+  placeMascot: (anchor?: SceneAnchor | null) => void,
 ) {
   const slots = sceneLayout?.slots ?? {};
   const camera = sceneLayout?.backgroundCamera;
   await Assets.load([atlas, backgroundUrl, reelhouseUrl, screensUrl]);
+  const mascotLoaded = await loadMascot().then(() => true, () => false);
   const app = new Application();
   await app.init({
     width: stage.clientWidth,
@@ -125,6 +82,17 @@ export async function mountTavernEffects(
     autoUpdate: false,
   });
   const reelhouse = createReelhouse(app, true);
+  const logo = sceneLayout?.sideLogo;
+  const logoBone = reelhouse.skeleton.findSlot(slots.sideLogo ?? "")?.bone;
+  let logoLeft = 0;
+  let logoUp = 0;
+  if (logoBone) {
+    reelhouse.afterUpdateWorldTransforms = () => {
+      if (stage.parentElement?.hasAttribute("data-opening")) return;
+      logoBone.worldX -= logoLeft;
+      logoBone.worldY -= logoUp;
+    };
+  }
   let chestZoom: Animation | undefined;
   let reelExit: Animation | undefined;
   const openingDimmer = new Graphics();
@@ -199,6 +167,11 @@ export async function mountTavernEffects(
   };
   screens.visible = reveal.visible = false;
   app.stage.addChild(background, openingDimmer, reelhouse, screens, reveal);
+  const portraitMascot = mascotLoaded ? createMascot(app) : undefined;
+  if (portraitMascot) {
+    portraitMascot.visible = portraitMascot.autoUpdate = false;
+    app.stage.addChildAt(portraitMascot, app.stage.getChildIndex(reelhouse));
+  }
   app.canvas.className = "tavern-spine-canvas";
   app.canvas.setAttribute("aria-hidden", "true");
   const scene = document.createElement("div");
@@ -221,11 +194,26 @@ export async function mountTavernEffects(
     background.update(time);
     const source = portrait ? reelhouse : background;
     const anchor = source.skeleton.findSlot((portrait ? slots.portraitMascot : slots.landscapeMascot) ?? "")?.bone;
-    if (anchor) placeMascot({
+    const inlineMascot = portrait && !!anchor && !!portraitMascot;
+    stage.toggleAttribute("data-mascot-behind-board", inlineMascot);
+    if (portraitMascot) {
+      portraitMascot.visible = portraitMascot.autoUpdate =
+        inlineMascot && !stage.parentElement?.hasAttribute("data-opening");
+    }
+    if (!anchor) {
+      placeMascot();
+      return;
+    }
+    const position = {
       x: source.x + anchor.worldX * source.scale.x,
       y: source.y + anchor.worldY * source.scale.y,
       scale: Math.hypot(anchor.a, anchor.c) * source.scale.x,
-    });
+    };
+    if (inlineMascot && portraitMascot) {
+      portraitMascot.position.set(position.x, position.y);
+      portraitMascot.scale.set(position.scale);
+      placeMascot(null);
+    } else placeMascot(position);
   }
   app.ticker.add((tick) => {
     if (host === scene) updateBackground(tick.deltaMS / 1000);
@@ -277,6 +265,11 @@ export async function mountTavernEffects(
     const sceneScale = sceneRect.width / scene.clientWidth || 1;
     const reelScale = frameRect.width / sceneScale / 3976;
     reelhouse.scale.set(reelScale);
+    const extraWidth = logo && !portrait
+      ? Math.min(height * 0.45, Math.max(0, width - height * logo.referenceAspect))
+      : 0;
+    logoLeft = reelScale ? extraWidth * (logo?.leftFactor ?? 0) / reelScale : 0;
+    logoUp = reelScale ? extraWidth * (logo?.upFactor ?? 0) / reelScale : 0;
     // The source bonus pose lifts the frame by 221 Spine units.
     reelhouse.position.set(
       (frameRect.left - sceneRect.left) / sceneScale + 1991 * reelScale,
@@ -409,6 +402,7 @@ export async function mountTavernEffects(
     observer.observe(target);
     reelhouse.visible = background.visible = false;
     reelhouse.autoUpdate = false;
+    if (portraitMascot) portraitMascot.visible = portraitMascot.autoUpdate = false;
   }
 
   function playSceneEffects(clips: SymbolLandingEffects) {
@@ -421,6 +415,9 @@ export async function mountTavernEffects(
   }
 
   return {
+    celebrateMascot() {
+      if (portraitMascot?.visible) playMascotWin(portraitMascot);
+    },
     showOpening() {
       setMode("base");
       openingDimmer.visible = true;

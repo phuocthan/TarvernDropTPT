@@ -105,6 +105,7 @@ export interface ReelPresentation {
     slots: Record<string, string>;
     openingDimmerOpacity?: number;
     chestCamera?: { scale: number; originY: number; durationMs: number };
+    sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };
     backgroundCamera?: {
       width: number;
       top: number;

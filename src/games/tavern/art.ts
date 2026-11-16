@@ -4,6 +4,12 @@ export function tavernAsset(name: string) {
   return assetUrl("tavern-assets/assets/" + name);
 }
 
+export function hudIcon(name: "menu" | "close" | "bet-up" | "bet-down" | "spin" |
+  "stop" | "autoplay" | "autoplay-ready" | "turbo" | "skip" | "feature-buy" |
+  "info" | "share") {
+  return `<span aria-hidden="true" class="hud-icon hud-icon-${name}" style="--icon:url('${assetUrl(`tavern-assets/hud/${name}.svg`)}')"></span>`;
+}
+
 const pages = [
   ["td_master.webp", 4096, 4095],
   ["td_master_2.webp", 4096, 4096],

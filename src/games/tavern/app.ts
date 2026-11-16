@@ -9,13 +9,13 @@ import {
   mountTavernEffects,
 } from "./effects.ts";
 import { loadTavernBitmapFonts, renderAmount } from "./typography.ts";
-import { artRegion, tavernAsset as asset } from "./art.ts";
-import { assetUrl } from "../../framework/presentation/assets.ts";
+import { artRegion, hudIcon, tavernAsset as asset } from "./art.ts";
 import { applySceneLayers, type SceneAnchor } from "../../framework/presentation/scene.ts";
 import type { BrandLoader } from "../../framework/presentation/brand-loading.ts";
 import { mountRoundPicker, updateBetTrack } from "../../framework/presentation/hud-controls.ts";
 import { countPayout, flyPayout } from "../../framework/presentation/payout.ts";
 import { loadTavernAudio } from "./audio.ts";
+import { mountMascot } from "./mascot.ts";
 import type {
   Chance,
   Chest,
@@ -41,7 +41,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
  <main class="game-shell tavern-shell" data-mode="base">
   <header class="tavern-top">
     <span><span id="game-title"></span> <small>Demo</small></span>
-    ${showAnimatorViewer ? '<a class="assets-link" href="./asset-viewer/index.html">Animator Viewer</a>' : ""}
+    ${showAnimatorViewer ? '<a class="assets-link" href="./?game=viewer">Animator Viewer</a>' : ""}
   </header>
   <section class="stage">
    <div class="scenery" aria-hidden="true">
@@ -63,24 +63,24 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
    <p id="status" class="tavern-status" role="status" aria-live="polite">Connecting to demo server…</p>
   </section>
   <section class="tavern-hud" aria-label="Game controls">
-   <button id="buy" class="feature-button" aria-label="Feature buy"><img src="${assetUrl("tavern-assets/favicon.png")}" alt=""></button>
+   <button id="buy" class="feature-button" aria-label="Feature buy">${hudIcon("feature-buy")}</button>
    <div class="hud-bar">
-    ${gameMenuEnabled ? '<button id="menu" class="hud-menu" aria-label="Open menu" popovertarget="hud-menu-panel">☰</button>' : ""}
+    ${gameMenuEnabled ? `<button id="menu" class="hud-menu" aria-label="Open menu" popovertarget="hud-menu-panel">${hudIcon("menu")}</button>` : ""}
     <div class="hud-money hud-balance"><span>Balance</span><strong id="balance">—</strong></div>
     <div class="hud-money win-value" id="win-value" hidden><span id="win-label">Win</span><strong id="win-amount">0.00</strong></div>
     <div id="free-spins" hidden><span>Free spins</span> <strong id="feature-progress">0</strong></div>
     <div class="hud-bet">
      <div class="hud-money hud-bet-amount"><span id="bet-label">Bet</span><strong id="bet">1.00</strong><div id="bet-track" role="meter" aria-label="Bet level" aria-valuemin="0"></div></div>
-     <div class="bet-arrows"><button id="bet-up" aria-label="Increase bet">⌃</button><button id="bet-down" aria-label="Decrease bet">⌄</button></div>
+     <div class="bet-arrows"><button id="bet-up" aria-label="Increase bet">${hudIcon("bet-up")}</button><button id="bet-down" aria-label="Decrease bet">${hudIcon("bet-down")}</button></div>
     </div>
-    <button id="spin" class="spin-button" disabled aria-label="Spin">↻<small>SPIN</small></button>
-    <div class="hud-quick"><button id="auto" aria-label="Autoplay">⟳</button><button id="speed" aria-label="Turbo" aria-pressed="false">ϟ</button></div>
+    <button id="spin" class="spin-button" disabled aria-label="Spin">${hudIcon("spin")}<small class="visually-hidden">SPIN</small></button>
+    <div class="hud-quick"><button id="auto" aria-label="Autoplay">${hudIcon("autoplay")}</button><button id="speed" aria-label="Turbo" aria-pressed="false">${hudIcon("turbo")}</button></div>
    </div>
    <div class="hud-aux"><button id="rules" aria-label="Rules and paytable">ⓘ</button><button id="sound" aria-label="Toggle sound" aria-pressed="false">♫</button></div>
    <div id="auto-panel" class="tavern-hud-panel"></div>
    ${gameMenuEnabled ? `<div id="hud-menu-panel" class="tavern-hud-panel" popover="auto" aria-label="Game menu">
-     <button id="menu-rules" type="button" aria-label="Game Rules"><span aria-hidden="true">ℹ</span> Info</button>
-     <button id="menu-share" type="button"><span aria-hidden="true">↗</span> Share</button>
+     <button id="menu-rules" type="button" aria-label="Game Rules">${hudIcon("info")} Info</button>
+     <button id="menu-share" type="button">${hudIcon("share")} Share</button>
      <label><span aria-hidden="true">◖))</span><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></label>
      <label><span aria-hidden="true">♫</span><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></label>
    </div>` : ""}
@@ -94,9 +94,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const stage = root.querySelector<HTMLElement>(".stage")!;
   if (scene) applySceneLayers(stage, scene.layers);
   const audioReady = loadTavernAudio();
-  let celebrate = () => {};
-  let mascotAnchor: SceneAnchor | undefined;
-  let placeMascot: ((anchor: SceneAnchor) => void) | undefined;
   const showLoadingError = () => {
     $("status").textContent = "Could not load the game. Reload to try again.";
     const boardLoading = $("loading");
@@ -129,15 +126,26 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     mount,
   } = createSlotSession(game, new HttpTransport(game.routing.apiBase), symbols, localStorage);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!reducedMotion)
-    void import("./mascot.ts")
-      .then(({ mountMascot }) => mountMascot($("mascot")))
-      .then(({ win, place }) => {
-        celebrate = win;
-        placeMascot = place;
-        if (mascotAnchor) place(mascotAnchor);
-      })
-      .catch((error) => console.warn("Tavern mascot unavailable", error));
+  let overlayMascot: Awaited<ReturnType<typeof mountMascot>> | undefined;
+  let overlayMount: Promise<void> | undefined;
+  let mascotAnchor: SceneAnchor | undefined;
+  let overlayVisible = false;
+  function placeOverlayMascot(anchor?: SceneAnchor | null) {
+    const visible = anchor !== null;
+    if (anchor) mascotAnchor = anchor;
+    if (overlayMascot) {
+      if (visible !== overlayVisible) overlayMascot.setActive(visible);
+      if (visible && mascotAnchor) overlayMascot.place(mascotAnchor);
+    }
+    overlayVisible = visible;
+    if (visible && !overlayMount) {
+      overlayMount = mountMascot($("mascot")).then((mounted) => {
+        overlayMascot = mounted;
+        if (mascotAnchor) mounted.place(mascotAnchor);
+        mounted.setActive(overlayVisible);
+      }).catch((error) => console.warn("Tavern mascot unavailable", error));
+    }
+  }
   const reelMotion: ReelMotion = game.presentation.spinType;
   let betIndex = game.bets.indexOf(game.defaultBet),
     chance: Chance = "standard",
@@ -149,16 +157,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   let lastShareableWin: { amount: number; bet: number } | undefined;
   let payline: ReturnType<typeof createTavernPayline>;
   let effects: Awaited<ReturnType<typeof mountTavernEffects>> | undefined;
+  function celebrate() {
+    if (overlayVisible) overlayMascot?.win();
+    effects?.celebrateMascot();
+  }
   const effectsReady = reducedMotion ? Promise.resolve(undefined) : mountTavernEffects(
     stage,
     root.querySelector<HTMLElement>(".frame-art")!,
     $("board"),
     $("scene-table"),
     scene,
-    (anchor) => {
-      mascotAnchor = anchor;
-      placeMascot?.(anchor);
-    },
+    placeOverlayMascot,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     return undefined;
@@ -179,7 +188,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (round) void run("spin");
     },
   );
-  const featureIcon = `<img src="${assetUrl("tavern-assets/favicon.png")}" alt="">`;
+  const featureIcon = hudIcon("feature-buy");
   const keyArt = artRegion("key", "key-art");
   const status = (text: string) => {
     $("status").textContent = text;
@@ -268,10 +277,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       "spinning",
       busy && controller.phase !== "recovery",
     );
-    $("spin").innerHTML = busy || nextFreeSpin
-      ? "■<small>SKIP</small>"
-      : "↻<small>SPIN</small>";
-    $("auto").textContent = autoRemaining ? String(autoRemaining) : "⟳";
+    const skip = busy || nextFreeSpin;
+    $("spin").innerHTML = `${skip ? hudIcon(nextFreeSpin ? "skip" : "stop") : hudIcon("spin") + hudIcon("autoplay-ready")}<small class="visually-hidden">${skip ? "SKIP" : "SPIN"}</small>`;
+    $("auto").innerHTML = autoRemaining ? String(autoRemaining) : hudIcon("autoplay");
     $("auto").setAttribute("aria-pressed", String(autoRemaining > 0));
     $("auto").setAttribute(
       "aria-label",
@@ -792,7 +800,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("menu-rules").onclick = () => { menu.hidePopover(); rules(); };
     menu.addEventListener("toggle", () => {
       const open = menu.matches(":popover-open");
-      $("menu").textContent = open ? "×" : "☰";
+      $("menu").innerHTML = hudIcon(open ? "close" : "menu");
       $("menu").setAttribute("aria-expanded", String(open));
     });
     for (const channel of ["effects", "music"] as const) {
@@ -848,6 +856,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       ? createReelhouse(view.app) : undefined;
     payline = createTavernPayline(view.app.stage, game, nativePayline, fonts.status === "fulfilled");
     effects = await effectsReady;
+    if (!effects && !reducedMotion) placeOverlayMascot();
     $("loading").remove();
     const openingKey = game.id + ".opening";
     if (

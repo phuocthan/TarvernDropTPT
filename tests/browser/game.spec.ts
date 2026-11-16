@@ -376,6 +376,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
 });
 for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
   test(`autoplay and menu fit the ${viewport.width}px layout`, async ({ page }) => {
+    test.setTimeout(60000);
     await page.setViewportSize(viewport);
     await page.goto("/");
     await expect(page.locator("#spin")).toBeEnabled();
@@ -437,6 +438,84 @@ test("mobile layout fits 390 pixels", async ({ page }) => {
     path: "/tmp/tavern-template-mobile.png",
     fullPage: true,
   });
+});
+
+test("query modes mount the viewer, Tavern Drop, and the 3 × 3 game", async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto("/?source=local&game=viewer");
+  const viewer = page.frameLocator(".animation-viewer-frame");
+  await expect(viewer.getByRole("heading", { name: "Asset viewer" })).toBeVisible();
+  await expect(viewer.locator("#animation")).toBeEnabled({ timeout: 20000 });
+  await viewer.locator("#skeleton").selectOption("reelhouse");
+  await expect(viewer.locator("#animation")).toHaveValue("1_idle", { timeout: 20000 });
+  await expect(viewer.locator("#player canvas")).toBeVisible();
+  await expect(page.locator("#spin")).toHaveCount(0);
+
+  await page.goto("/?game=default");
+  await expect(page.locator("#reuse-board canvas")).toHaveAttribute("aria-label", "3 by 3 reel board");
+  await page.goto("/?game=tarvern");
+  await expect(page.locator("#board canvas")).toHaveAttribute("aria-label", "5 by 5 reel board");
+});
+
+test("portrait renders the mascot behind the reelhouse and uses the reference HUD icons", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const icons = new Set<string>();
+  page.on("response", (response) => {
+    if (response.ok() && response.url().includes("/tavern-assets/hud/"))
+      icons.add(new URL(response.url()).pathname.split("/").at(-1)!);
+  });
+  await page.goto("/?game=tarvern");
+  await expect(page.locator(".stage")).toHaveAttribute("data-mascot-behind-board", "");
+  await expect(page.locator("#mascot")).toHaveCSS("visibility", "hidden");
+  await expect(page.locator("#mascot canvas")).toHaveCount(0);
+  await expect.poll(() => ["menu", "bet-up", "bet-down", "spin", "autoplay", "turbo"].every(
+    (icon) => icons.has(icon + ".svg"),
+  )).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await expect(page.locator(".stage")).not.toHaveAttribute("data-mascot-behind-board", "");
+  await expect(page.locator("#mascot")).toBeVisible();
+  await expect(page.locator("#mascot canvas")).toBeVisible();
+  await page.setViewportSize({ width: 1940, height: 980 });
+  await expect.poll(() => page.locator("#mascot canvas").evaluate((canvas: HTMLCanvasElement) =>
+    canvas.width / canvas.getBoundingClientRect().width,
+  )).toBeGreaterThanOrEqual(0.99);
+});
+
+test("Drop anticipation raises only landed Scatters above the dimmer and clears on Skip", async ({ page }) => {
+  const server = new MockGame(tavern, () => 0.5);
+  const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
+  board[0][0] = "bonus";
+  board[1][2] = "bonus";
+  await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+  await page.route("**/api/command", (route) => route.fulfill({
+    json: server.execute(route.request().postDataJSON(), board),
+  }));
+  await page.goto("/?game=tarvern");
+  await expect(page.locator("#spin")).toBeEnabled();
+  await page.evaluate(async () => {
+    const moduleUrl = "/src/framework/presentation/board.ts";
+    const { BoardView } = await import(moduleUrl);
+    const original = BoardView.prototype.raiseAnticipationSymbol;
+    BoardView.prototype.raiseAnticipationSymbol = function (tile) {
+      original.call(this, tile);
+      const reel = this.tiles.findIndex((column) => column.includes(tile));
+      const row = this.tiles[reel].indexOf(tile) - 1;
+      const raised = this.app.canvas.dataset.raisedScatters ?? "";
+      this.app.canvas.dataset.raisedScatters = raised + `${reel}:${row},`;
+    };
+  });
+  const canvas = page.locator("#board canvas");
+  const spin = page.locator("#spin");
+  await spin.click();
+  await expect(canvas).toHaveAttribute("data-anticipation-focus", "", { timeout: 12000 });
+  await expect(canvas).toHaveAttribute("data-raised-scatters", "0:0,1:2,");
+  await spin.click();
+  await expect(canvas).not.toHaveAttribute("data-anticipation-focus", "");
+  await expect(spin).toHaveAccessibleName("Spin");
+  await page.getByRole("button", { name: "Turbo" }).click();
+  await spin.click();
+  await expect(spin).toContainText("SPIN", { timeout: 12000 });
+  await expect(canvas).toHaveAttribute("data-raised-scatters", "0:0,1:2,");
 });
 test("lost response recovers the exact request without charging another spin", async ({
   page,

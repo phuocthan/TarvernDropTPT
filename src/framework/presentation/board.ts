@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, RenderLayer } from "pixi.js";
+import { Application, Container, Graphics, RenderLayer, UPDATE_PRIORITY, type Ticker } from "pixi.js";
 import { keepWithinVerticalViewport, reelCellCenter, type VerticalBounds } from "./grid.ts";
 import { drawDimmer } from "./scene.ts";
 import { planDropColumns } from "./drop-schedule.ts";
@@ -19,7 +19,7 @@ export interface SymbolView {
   verticalBounds?: () => VerticalBounds | undefined;
 }
 export type SymbolPhase = "idle" | "spin" | "land" | "win";
-export type SymbolFactory = (cellSizePx: number) => SymbolView;
+export type SymbolFactory = (cellSizePx: number, ticker: Ticker) => SymbolView;
 
 interface DropRound {
   exit: Promise<void>;
@@ -48,6 +48,7 @@ export class BoardView {
   private fast = false;
   private dropRound: DropRound | null = null;
   private finishDrop: (() => void) | null = null;
+  private resizeObserver?: ResizeObserver;
   private factory: SymbolFactory;
   private readonly cell: number;
   private readonly gap: number;
@@ -58,21 +59,33 @@ export class BoardView {
     this.gap = game.presentation.gapPx;
   }
   async mount(host: HTMLElement) {
+    const width = this.game.reels * (this.cell + this.gap) - this.gap;
+    const height = this.game.rows * (this.cell + this.gap) - this.gap;
+    const boardResolution = () => {
+      const dpr = Math.min(devicePixelRatio, 2);
+      return Math.min(dpr, Math.max(1, (host.clientWidth || width) * dpr / width));
+    };
     await this.app.init({
-      width: this.game.reels * (this.cell + this.gap) - this.gap,
-      height: this.game.rows * (this.cell + this.gap) - this.gap,
+      width,
+      height,
       backgroundAlpha: 0,
       antialias: true,
-      resolution: Math.min(devicePixelRatio, 2),
+      resolution: boardResolution(),
       autoDensity: true,
       preference: "webgl",
     });
+    this.app.ticker.minFPS = 0;
     host.appendChild(this.app.canvas);
+    this.resizeObserver = new ResizeObserver(() => {
+      const resolution = boardResolution();
+      if (Math.abs(this.app.renderer.resolution - resolution) > 0.05)
+        this.app.renderer.resize(width, height, resolution);
+    });
+    this.resizeObserver.observe(host);
     this.app.canvas.setAttribute(
       "aria-label",
       `${this.game.reels} by ${this.game.rows} reel board`,
     );
-    const { width, height } = this.app.screen;
     const maskedReels = new Container();
     drawDimmer(this.dimmer, width, height, this.game.presentation.winDimmerOpacity ?? 0.5);
     this.dimmer.visible = false;
@@ -91,7 +104,7 @@ export class BoardView {
       this.elapsed.push(0);
       this.spinning.push(false);
       for (let row = 0; row < this.game.rows + 2; row++) {
-        const tile = this.factory(this.cell);
+        const tile = this.factory(this.cell, this.app.ticker);
         if (this.game.presentation.symbolEdgeInsetPx !== undefined &&
           (row === 1 || row === this.game.rows)) {
           this.edgeTiles.set(tile, { reel, pivotY: tile.view.pivot.y, settled: true });
@@ -126,7 +139,7 @@ export class BoardView {
       this.strip.visible = true;
     });
     if (this.edgeTiles.size)
-      this.app.ticker.add(() => this.fitEdgeSymbols());
+      this.app.ticker.add(() => this.fitEdgeSymbols(), undefined, UPDATE_PRIORITY.LOW + 1);
   }
   setBoard(board: Board) {
     this.dropRound = null;
@@ -293,7 +306,11 @@ export class BoardView {
     for (const move of moves)
       move.start += plan?.starts[move.reel] ?? move.reel * reelStaggerMs;
     const landedReels = new Set<number>();
+    const landedAnticipationSymbols: SymbolView[] = [];
     let anticipating = false;
+    const anticipationSymbol = plan?.anticipationAt === undefined
+      ? undefined
+      : drop.anticipation?.symbolId;
     const duration =
       Math.max(...moves.map((move) => move.start + move.fall)) +
       bounce +
@@ -323,9 +340,13 @@ export class BoardView {
           if (edge) edge.settled = true;
           move.tile.effect?.("land");
           landing?.onLand(move.reel, move.row);
+          if (anticipationSymbol !== undefined &&
+              landing?.board[move.reel][move.row] === anticipationSymbol) {
+            landedAnticipationSymbols.push(move.tile);
+            if (anticipating) this.raiseAnticipationSymbol(move.tile);
+          }
         }
       }
-      if (entering) this.fitEdgeSymbols();
       if (!plan || !this.dropRound || this.dropRound.skipped) return;
       plan.starts.forEach((start, reel) => {
         if (time < start + reelLandMs || landedReels.has(reel)) return;
@@ -334,6 +355,9 @@ export class BoardView {
       });
       if (!anticipating && plan.anticipationAt !== undefined && time >= plan.anticipationAt) {
         anticipating = true;
+        this.dimmer.visible = true;
+        this.app.canvas.setAttribute("data-anticipation-focus", "");
+        for (const tile of landedAnticipationSymbols) this.raiseAnticipationSymbol(tile);
         landing?.events?.anticipation?.(true);
       }
     };
@@ -347,7 +371,10 @@ export class BoardView {
         cancelAnimationFrame(frame);
         this.finishDrop = null;
         paint(duration);
-        if (anticipating) landing?.events?.anticipation?.(false);
+        if (anticipating) {
+          this.clearHighlight();
+          landing?.events?.anticipation?.(false);
+        }
         resolve();
       };
       const tick = (now: number) => {
@@ -397,6 +424,10 @@ export class BoardView {
       true,
     );
   }
+  private raiseAnticipationSymbol(tile: SymbolView) {
+    this.winningSymbols.attach(tile.view);
+    tile.effect?.("win");
+  }
   private playWinners(seen: Set<string>, dimUnmatched: boolean) {
     const animations: Promise<void>[] = [];
     for (const [reel, tiles] of this.tiles.entries()) {
@@ -426,8 +457,10 @@ export class BoardView {
     this.winningSymbols.detachAll();
     this.dimmer.visible = false;
     this.app.canvas.removeAttribute("data-win-focus");
+    this.app.canvas.removeAttribute("data-anticipation-focus");
   }
   destroy() {
+    this.resizeObserver?.disconnect();
     this.dropRound = null;
     this.finishDrop?.();
     this.app.destroy(true, { children: true });
