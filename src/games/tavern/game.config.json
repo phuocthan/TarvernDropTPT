@@ -44,30 +44,58 @@
     [
       0,
       1,
-      2,
+      0,
       1,
       0
     ],
     [
-      4,
-      3,
-      2,
-      3,
-      4
-    ],
-    [
       1,
       2,
-      3,
+      1,
       2,
       1
     ],
     [
+      2,
       3,
+      2,
+      3,
+      2
+    ],
+    [
+      3,
+      4,
+      3,
+      4,
+      3
+    ],
+    [
+      1,
+      0,
+      1,
+      0,
+      1
+    ],
+    [
       2,
       1,
       2,
+      1,
+      2
+    ],
+    [
+      3,
+      2,
+      3,
+      2,
       3
+    ],
+    [
+      4,
+      3,
+      4,
+      3,
+      4
     ],
     [
       0,
@@ -82,34 +110,6 @@
       2,
       1,
       0
-    ],
-    [
-      1,
-      1,
-      2,
-      3,
-      3
-    ],
-    [
-      3,
-      3,
-      2,
-      1,
-      1
-    ],
-    [
-      2,
-      1,
-      0,
-      1,
-      2
-    ],
-    [
-      2,
-      3,
-      4,
-      3,
-      2
     ]
   ],
   "symbols": [
@@ -296,9 +296,46 @@
     "spinType": "drop",
     "cellSizePx": 102,
     "gapPx": 8,
+    "symbolEdgeInsetPx": 4,
+    "loadingScreen": {
+      "background": "tavern-assets/assets/td_loader_bg.webp",
+      "brandLogo": "tavern-assets/assets/paperclip_full_logo.webp",
+      "brandName": "Paperclip Gaming",
+      "gameLogo": "tavern-assets/assets/td_loader.webp"
+    },
+    "winDimmerOpacity": 0.5,
+    "animationGrid": {
+      "originSlot": "slot_symbols",
+      "reelPitch": 574,
+      "rowPitch": 564
+    },
+    "scene": {
+      "layers": { "scenery": 1, "reels": 3, "mascot": 4, "table": 5 },
+      "openingDimmerOpacity": 0.55,
+      "backgroundCamera": {
+        "width": 6000,
+        "top": 2060,
+        "landscapeBottom": 1650,
+        "portraitBottom": 1940,
+        "centerOffsetX": 80
+      },
+      "slots": {
+        "portraitMascot": "slot_character",
+        "landscapeMascot": "slot_character",
+        "baseTable": "background_normal_foreground",
+        "bonusTable": "background_bonus_foreground"
+      }
+    },
+    "symbolLandingEffects": {
+      "bonus": {
+        "background": "3_shake",
+        "reelhouse": "3_shake"
+      }
+    },
     "feature": {
       "startDelayMs": 2000,
-      "endDelayMs": 2000
+      "endDelayMs": 2000,
+      "hideSymbolsUntilFirstSpin": true
     },
     "normal": {
       "speedPxPerSecond": 1700,
@@ -360,16 +397,28 @@
     },
     "winTiers": [
       {
-        "label": "BIG WIN",
+        "label": "SMALL WIN",
+        "multiplier": 5
+      },
+      {
+        "label": "NICE WIN",
         "multiplier": 10
       },
       {
+        "label": "BIG WIN",
+        "multiplier": 20
+      },
+      {
+        "label": "SUPER WIN",
+        "multiplier": 50
+      },
+      {
         "label": "MEGA WIN",
-        "multiplier": 25
+        "multiplier": 75
       },
       {
         "label": "EPIC WIN",
-        "multiplier": 50
+        "multiplier": 100
       }
     ],
     "scatterRates": {

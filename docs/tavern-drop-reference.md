@@ -133,3 +133,41 @@ Tỷ lệ được so bằng các khung hình desktop. Chưa đo sai số vị t
 Trong lượt thắng quan sát lại, đường đỏ cam hiện từ chai bên trái và chạy qua đủ năm reel. Chỉ các ô trả thưởng sáng lên, số tiền của line hiện màu xanh ngay trên bàn. Skeleton `td_reelhouse` có các clip `payline_0` đến `payline_14`. Bản local vẽ đường từ cấu hình payline của demo và dùng hình đầu mút từ atlas gốc vì các đường chéo và zigzag trong cấu hình local có thể khác đường trong clip Spine. Khi có nhiều line, mỗi line được trình bày riêng.
 
 Spine Player tự canh khung xem theo clip. Đo ngay trên atlas ở cùng một scale tại ngưỡng alpha 50%, phần blur của Q cao khoảng 104 px trong khi pose rõ cao khoảng 91 px. Giữ pose rõ trong Drop loại bỏ cú nhảy do đổi từ attachment blur sang pose rõ khi tiếp đất. Các clip land và win vẫn có thay đổi kích thước do keyframe của asset.
+
+## 10. Đối chiếu clip Spine và font
+
+Đã kiểm kê **141 clip** trong tám skeleton, với tên và thời lượng đọc trực tiếp từ các tệp `.skel`. Trình tự dưới đây đối chiếu các cảnh có thể chạy trong demo gốc và các đoạn gọi animation của trình duyệt. [Demo gốc](https://paperclipgaming.com/ko/games/tavern-drop)
+
+| Skeleton | Số clip | Tích hợp trong Tavern |
+| --- | ---: | --- |
+| `td_backgrounds` | 8 | `0_base_enter/idle`, `0_bonus_enter/idle`, zoom vào/ra, shake khi retrigger, pose portrait `4_mobile`. |
+| `td_reelhouse` | 81 | Splash và vào game theo hướng màn hình, idle, chuyển base/bonus, spin/skip/shake, 25 clip key, 25 clip rương, 15 clip payline, `4_finalwin` trước khi mở rương và pose `41_fade_extras` lúc ra Total Win. |
+| `td_screens` | 14 | `bonus_*` cho Tavern, `super_*` cho Drop, `addfs` cho retrigger, sáu clip thắng và chuỗi `total_win_start/idle/end`. |
+| `td_character` | 2 | `idle` và `win` cho mascot trên desktop và mobile. |
+| `td_symbols_low` | 15 | Năm nhóm chữ/số, mỗi nhóm có `spin`, `static` và `win`. |
+| `td_symbols_high` | 13 | Bốn nhóm món đồ có `spin`, `static` và `win`. Món Feast có thêm `land`. |
+| `td_symbols_wild` | 4 | `wild_spin/static/land/win`. |
+| `td_symbols_bonus` | 4 | `bonus_spin/static/land/win`. Đợi Scatter diễn xong trước intro. |
+
+Mười lăm đường thắng trong config Tavern dùng đúng các chuỗi hàng ở mục 3. `payline_0` đến `payline_14` chạy trên đúng đường, với số tiền bitmap xanh và đổi đỏ từ 20× bet. HUD, shop và Help dùng các weight Outfit 300–800. Số tiền của màn thắng và Total Win dùng bitmap vàng gắn vào slot `slot_win`. Khi bonus có số lượt khác 10, slot intro hiển thị số thực từ server.
+
+Ngưỡng trình diễn Small/Nice/Big/Super/Mega/Epic lần lượt là 5×, 10×, 20×, 50×, 75× và 100×. Small và Nice cùng dùng clip `smallwin`. Khi mock server trả kết quả chạm cap, Tavern dùng clip `maxwin`. Giá mua, multiplier và cap vẫn theo config của bản demo.
+
+HTML và Pixi giữ số tiền, nút, tọa độ tương tác và fallback tĩnh. Spine cung cấp phần hình chuyển động. Khi chạy bằng reduced motion hoặc thiếu tài nguyên Spine, game vẫn hiển thị kết quả và cho tiếp tục.
+
+### Clip chưa được gọi trong gameplay
+
+Đã đối chiếu SHA-256 của cả tám skeleton với demo v13. Cả tám tệp khớp bản gốc.
+
+| Clip | Runtime Tavern hiện tại | Demo gốc v13 |
+| --- | --- | --- |
+| `td_reelhouse / 3_push` | Có trong Animator Viewer. Gameplay chưa có điểm gọi. Scatter đáp xuống phát `3_shake` theo config. | Sự kiện tiếp đất của từng Scatter gọi `3_shake` cho nền và khung reel. Chưa thấy điểm gọi `3_push`. |
+| `l1_spin`–`l5_spin`, `h1_spin`–`h4_spin`, `wild_spin`, `bonus_spin` | Đã nối cho Normal. Tavern đang mặc định Drop và ẩn menu đổi kiểu reel, nên 11 pose 0 giây này chưa chạy trong luồng Drop. | Gọi pose `*_spin` khi symbol mới bước vào `revealing` và đang rơi xuống. Sau đó dùng `land` cho Feast, Wild và Scatter, hoặc `static` cho symbol còn lại. |
+
+`h2_land`, `h3_land` và `h4_land` xuất hiện trong bảng ánh xạ của demo gốc. Cả hai bản dùng cùng tệp `td_symbols_high.skel`, và danh sách clip trong tệp chỉ có `h1_land`. Demo gốc chọn `land` cho Feast, Wild và Scatter trong luồng reveal đã kiểm tra. [Demo gốc](https://paperclipgaming.com/ko/games/tavern-drop)
+
+### Căn vị trí payline, chuyển Free Spins và mascot
+
+- Đối chiếu v13, bàn symbol neo vào `reelhouse/slot_symbols`, với bước 574 đơn vị theo cột và 564 theo hàng. Tavern dùng hai tỷ lệ riêng để đưa payline về tâm ô của Pixi.
+- V13 đưa symbol của lượt kích hoạt ra khỏi reel trong cảnh vào bonus. Tavern giữ board trống từ sau khi Scatter diễn xong đến khi bàn mới của lượt Free Spin đầu được thả vào.
+- Mascot dùng `background/slot_character` ở landscape và `reelhouse/slot_character` ở portrait. Thứ tự lớp là reel, mascot, rồi bàn tiền cảnh. Camera nền landscape được chỉnh theo chiều cao mép khăn để giữ hàng symbol cuối nhìn thấy. [Demo gốc](https://paperclipgaming.com/ko/games/tavern-drop)

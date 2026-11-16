@@ -15,9 +15,13 @@ export function createSlotSession(
   );
   const board = new BoardView(game, symbols);
   const timing = game.presentation.feature;
+  function prepareFeatureEntry() {
+    if (timing?.hideSymbolsUntilFirstSpin) board.hideSymbols();
+  }
   return {
     controller,
     board,
+    prepareFeatureEntry,
     nextSpinDelay(baseDelayMs: number) {
       const feature = controller.state?.feature;
       return baseDelayMs +
@@ -32,6 +36,7 @@ export function createSlotSession(
     async mount(host: HTMLElement) {
       await Promise.all([board.mount(host), controller.boot()]);
       board.setBoard(controller.state!.board);
+      if (controller.state!.feature?.played === 0) prepareFeatureEntry();
     },
   };
 }

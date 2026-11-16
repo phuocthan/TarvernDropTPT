@@ -2,6 +2,37 @@
   font-family: Outfit;
   src: url("/tavern-assets/assets/outfit-v11-latin_latin-ext-regular-BDXaL9-u.woff2")
     format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-v11-latin_latin-ext-300-COlrd1hX.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-500-CMfhJlfe.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-600-DuSOvJ_5.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-700-D9T176aR.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: Outfit;
+  src: url("/tavern-assets/assets/outfit-800-ySok2YOt.woff2") format("woff2");
+  font-weight: 800 900;
   font-display: swap;
 }
 .tavern-shell,
@@ -76,17 +107,23 @@
   right: -1%;
   height: 87%;
 }
-.scenery .table {
+.tavern-foreground {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: var(--scene-layer-table, 5);
+}
+.tavern-foreground .table {
   position: absolute;
   left: 50%;
   bottom: -1%;
   width: max(100%, 103svh);
   transform: translateX(-50%);
-  z-index: 1;
 }
-.scenery .base-art,
-.scenery .bonus-art {
-  transition: opacity 540ms ease-in-out;
+.tavern-foreground[data-anchored] .table {
+  inset: 0 auto auto 0;
+  transform-origin: top left;
 }
 .tavern-shell[data-mode="base"] .bonus-art,
 .tavern-shell:not([data-mode="base"]) .base-art {
@@ -115,7 +152,7 @@
   max-width: none;
   margin: 0;
   transform: translate(-50%, -50%);
-  z-index: 3;
+  z-index: var(--scene-layer-reels, 3);
 }
 .tavern-shell:not([data-mode="base"]) .machine {
   top: 43%;
@@ -234,8 +271,12 @@
   right: -1%;
   bottom: 9%;
   width: min(40vw, 65svh, 570px);
-  z-index: 2;
+  z-index: var(--scene-layer-mascot, 4);
   pointer-events: none;
+}
+.mascot[data-anchored] {
+  right: auto;
+  bottom: auto;
 }
 .mascot-animation,
 .mascot img {
@@ -248,7 +289,7 @@
 }
 .tavern-status {
   position: absolute;
-  z-index: 4;
+  z-index: var(--scene-layer-table, 5);
   inset: auto 8px max(80px, 12svh);
   margin: 0;
   color: #fff8d6;
@@ -533,22 +574,6 @@
 .reveal-chests .chest {
   width: 20%;
 }
-.flying-win {
-  position: fixed;
-  z-index: 2;
-  color: #fff2a2;
-  font-size: clamp(20px, 5vw, 36px);
-  font-weight: 900;
-  white-space: nowrap;
-  pointer-events: none;
-  text-shadow: 0 2px #8b400a, 0 3px 10px #240d00;
-}
-.result-total-updated {
-  animation: result-total-pulse 350ms ease-out;
-}
-@keyframes result-total-pulse {
-  50% { transform: scale(1.15); color: #fff8c6; }
-}
 .win-celebration {
   position: fixed;
   inset: 0;
@@ -557,29 +582,19 @@
   place-content: center;
   text-align: center;
   pointer-events: none;
-  background: radial-gradient(ellipse, #c17312dc, #140b20ef 70%);
-  animation: win-celebration-enter 350ms ease-out both;
+  background: #180f1ac4;
 }
-.win-celebration strong, .result-tier {
+.win-celebration strong {
   color: #ffe285;
   font-size: clamp(32px, 9vw, 90px);
   font-weight: 900;
   text-shadow: 0 3px #a94e0e, 0 6px 12px #220d00;
-  animation: win-celebration-enter 500ms ease-out both;
 }
-.win-celebration span {
+.win-celebration-value {
   color: white;
   font-size: clamp(26px, 7vw, 64px);
   font-weight: bold;
   text-shadow: 0 3px 8px #4d1f00;
-}
-.tavern-dialog .result-tier {
-  font-size: clamp(24px, 6vw, 50px);
-  margin: 6px;
-}
-@keyframes win-celebration-enter {
-  from { opacity: 0; scale: 0.7; }
-  to { opacity: 1; scale: 1; }
 }
 .visually-hidden {
   position: absolute;
@@ -690,50 +705,11 @@
   }
 }
 
-.tavern-shell:not([data-mode="base"]) .machine {
-  animation: bonus-frame-enter 710ms ease-out both;
-}
-.tavern-shell:not([data-mode="base"]) .stage::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  background: radial-gradient(ellipse, #ffd971ab, #fcb84500 68%);
-  pointer-events: none;
-  animation: tavern-flash 690ms ease-out both;
-}
-.key-cell {
-  animation: key-enter 270ms ease-out both;
-  animation-delay: calc(360ms + var(--reel) * 75ms + var(--row) * 20ms);
-}
-.key-cell.collected .key-art {
-  animation: key-lit 425ms ease-out both;
-}
-.tavern-shell .chest {
-  animation: chest-arrive 310ms ease-out both;
-  animation-delay: calc(680ms + var(--reel) * 90ms);
-}
-.tavern-shell .chest.unlocked {
-  animation: chest-unlock 570ms ease-out both;
-}
-.reveal-chests .chest.revealed .tavern-chest-lid {
-  animation: chest-open 420ms ease-out both;
-}
-.reveal-chests .chest-multiplier {
-  animation: reveal-number 310ms ease-out both;
-}
-.bonus-paid {
-  animation: reveal-number 360ms ease-out both;
-}
-.tavern-shell:not([data-mode="base"]) .reel-host canvas {
-  animation: bonus-symbols-enter 1180ms ease-out both;
-}
 .chest-coins {
   position: absolute;
   top: 35%;
   left: 13%;
   width: 74%;
-  animation: reveal-number 350ms ease-out both;
 }
 .tavern-dialog .chest-subtotal {
   font-size: clamp(19px, 4vw, 38px);
@@ -751,124 +727,116 @@
   text-align: left;
   letter-spacing: 0;
 }
-@keyframes bonus-symbols-enter {
-  0%,
-  72% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
 .paytable-icon {
   width: 28px;
   margin: 0 auto;
 }
-@keyframes bonus-frame-enter {
-  0%,
-  32% {
-    opacity: 0;
-    translate: 0 22px;
-  }
-  100% {
-    opacity: 1;
-    translate: 0 0;
-  }
+
+.tavern-spine-scene {
+  position: absolute;
+  inset: 0;
+  z-index: var(--scene-layer-scenery, 1);
+  pointer-events: none;
 }
-@keyframes tavern-flash {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  32% {
-    opacity: 1;
-  }
+.stage[data-spine-scene] :is(.scenery, .tavern-logo, .frame-art, .reel-keys, .chest-row) {
+  visibility: hidden;
 }
-@keyframes key-enter {
-  from {
-    opacity: 0;
-    scale: 0.7;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
+.tavern-spine-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-@keyframes key-lit {
-  0% {
-    scale: 0.72;
-  }
-  48% {
-    scale: 1.22;
-    filter: drop-shadow(0 0 12px #ffdc3d) brightness(1.4);
-  }
-  100% {
-    scale: 1;
-  }
+.tavern-screen-art {
+  width: min(90vw, 820px);
+  height: min(49svh, 400px);
+  margin-inline: auto;
+  pointer-events: none;
 }
-@keyframes chest-arrive {
-  0% {
-    opacity: 0;
-    translate: 0 21px;
-  }
-  72% {
-    translate: 0 -5px;
-  }
-  100% {
-    opacity: 1;
-    translate: 0;
-  }
+.tavern-screen-art:empty {
+  display: none;
 }
-@keyframes chest-unlock {
-  0% {
-    scale: 0.92;
-  }
-  42% {
-    scale: 1.16;
-    filter: brightness(1.65) drop-shadow(0 0 16px #ffd043);
-  }
-  100% {
-    scale: 1;
-  }
+.win-celebration:has([data-spine-ready]) strong,
+#modal-content:has(> .tavern-screen-art[data-spine-ready]) > h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
-@keyframes chest-open {
-  from {
-    opacity: 0;
-    translate: 0 17px;
-    rotate: -12deg;
-  }
-  to {
-    opacity: 1;
-    translate: 0 -8%;
-    rotate: 0deg;
-  }
+#modal-content:has(> .tavern-screen-art[data-spine-ready]) > :is(.bonus-preview, .bonus-instructions) {
+  display: none;
 }
-@keyframes reveal-number {
-  from {
-    opacity: 0;
-    scale: 0.75;
-  }
-  to {
-    opacity: 1;
-    scale: 1;
-  }
+#modal-content:has(> .tavern-screen-art[data-spine-ready]) > .free-spin-title {
+  font-size: clamp(20px, 3.5vw, 36px);
+  margin-block: 4px;
 }
-@media (prefers-reduced-motion: reduce) {
-  .scenery .base-art,
-  .scenery .bonus-art {
-    transition: none;
-  }
-  .tavern-shell .stage::after,
-  .tavern-shell:not([data-mode="base"]) .machine,
-  .tavern-shell:not([data-mode="base"]) .reel-host canvas,
-  .key-cell,
-  .key-cell.collected .key-art,
-  .tavern-shell .chest,
-  .tavern-shell .chest.unlocked,
-  .reveal-chests .chest.revealed .tavern-chest-lid,
-  .reveal-chests .chest-multiplier,
-  .chest-coins,
-  .bonus-paid {
-    animation: none;
-  }
+.reveal-chests {
+  position: relative;
+}
+.tavern-chest-art {
+  position: absolute;
+  inset: -60% 0 -40%;
+  pointer-events: none;
+}
+.reveal-chests .chest[data-spine-chest] .atlas-art {
+  visibility: hidden;
+}
+.reveal-chests .chest-multiplier {
+  z-index: 1;
+}
+.tavern-bitmap-number {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.tavern-bitmap-number > span {
+  display: inline-block;
+  flex: none;
+  background-repeat: no-repeat;
+}
+.tavern-shell[data-opening] :is(.machine, .mascot, .tavern-hud, .tavern-status) {
+  visibility: hidden;
+}
+.opening-continue {
+  position: absolute;
+  inset: auto 0 2%;
+  z-index: 5;
+  width: min(44vw, 235px);
+  height: 22px;
+  margin: auto;
+  border: 0;
+  color: transparent;
+  background: url("/tavern-assets/assets/continue.webp") center / contain no-repeat;
+}
+.opening-terms {
+  position: absolute;
+  inset: auto auto 2svh 12px;
+  z-index: 5;
+  color: #fff;
+  font-size: 11px;
+  text-shadow: 0 1px 2px #000;
+}
+.tavern-dialog[data-look="bonus"] .scene-continue {
+  width: min(44vw, 235px);
+  height: 22px;
+  border: 0;
+  color: transparent;
+  background: url("/tavern-assets/assets/continue.webp") center / contain no-repeat;
+}
+#modal-content:has(> .tavern-screen-art[data-spine-ready]) > .scene-continue {
+  position: fixed;
+  inset: auto 0 2svh;
+  margin: auto;
+}
+.tavern-screen-art[data-spine-amount] ~ :is(.win-celebration-value, .result-total),
+.tavern-screen-art[data-spine-count] ~ .free-spin-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+#modal-content:has(> :is([data-spine-clip="total_win_start"], [data-spine-clip="maxwin"])[data-spine-ready]) > :is(.reveal-chests, .chest-subtotal) {
+  position: absolute;
+  clip-path: inset(50%);
 }

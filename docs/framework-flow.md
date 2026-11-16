@@ -41,9 +41,15 @@ Hai game mẫu đều dùng [schema v1](../src/framework/game-config.schema.json
 | Symbol và payline | Số loại symbol là độ dài mảng `symbols`. `pays` ánh xạ số symbol khớp sang hệ số tính theo phần trăm bet. Mỗi phần tử của `lines` chứa một chỉ số hàng cho từng reel, từ trái sang phải. |
 | Bet | `bets` và `defaultBet` dùng đơn vị tiền nhỏ nhất. Bet mặc định phải thuộc danh sách. |
 | Bố cục reel | `presentation.cellSizePx` và `gapPx` dùng pixel logic của Pixi. |
+| Mép reel | `presentation.symbolEdgeInsetPx` bật khoảng an toàn ở mép trên và dưới. Board dịch hàng biên khi hình vượt khoảng này. Skin có thể cung cấp bounds bằng `SymbolView.verticalBounds()`. |
 | Normal | `presentation.spinType: "normal"`. Cấu hình tốc độ thường và turbo bằng px/giây, khoảng chờ dừng giữa reel bằng ms, thời gian và độ nảy khi dừng. |
 | Drop | `presentation.spinType: "drop"`. Hai pha `exit` và `enter` có thời gian rơi, độ lệch theo reel và hàng, thời gian giữ pha. Có thể chỉnh hệ số turbo và độ nảy. |
-| Free Spins | `presentation.feature.startDelayMs` cộng vào khoảng nghỉ trước lượt Free Spin đầu. `endDelayMs` giữ màn chơi sau lượt cuối trước khi hiện kết quả. Cả hai tính bằng ms và mặc định là 0 khi bỏ khối `feature`. |
+| Payline | `presentation.winDimmerOpacity` đặt độ tối trong khoảng 0–1, mặc định 0.5. `BoardView.focusWins()` đặt các symbol của line đang chạy trên lớp dim chung. |
+| Tọa độ animation | `presentation.animationGrid` ghi slot gốc, bước cột và bước hàng của asset. `alignReelGrid()` đưa hai bước này về lưới logical của board. |
+| Hiệu ứng tiếp đất | `presentation.symbolLandingEffects` ánh xạ ID symbol sang tên clip theo lớp cảnh. `BoardView.stop()` chuyển các clip đã cấu hình cho skin khi symbol đáp xuống. Tavern dùng lớp `background` và `reelhouse`. |
+| Free Spins | `presentation.feature.startDelayMs` cộng vào khoảng nghỉ trước lượt Free Spin đầu. `endDelayMs` giữ màn chơi sau lượt cuối trước khi hiện kết quả. `hideSymbolsUntilFirstSpin` để lại reel trống trong intro và khi chờ lượt đầu. |
+| Màn tải | `presentation.loadingScreen` khai báo ảnh nền, logo hãng và logo game. Framework hiện màn tải trước khi import skin, cập nhật phần trăm theo các bước khởi tạo và gỡ màn tải khi game sẵn sàng. |
+| Lớp cảnh | `presentation.scene` chứa thứ tự lớp, tên slot neo, camera nền và `openingDimmerOpacity` cho màn giới thiệu. `applySceneLayers()` đưa thứ tự lớp vào CSS. |
 | Mock backend | `demo` chứa số dư đầu, cap, tỷ lệ Scatter, giá và số lượt bonus, hệ số rương và ngưỡng win. Số free spins bằng 0 tắt mode bonus tương ứng. |
 
 ## Thêm game

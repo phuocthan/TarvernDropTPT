@@ -1,8 +1,6 @@
 import { Assets, type Texture } from "pixi.js";
-
-export function assetUrl(path: string) {
-  return new URL(import.meta.env.BASE_URL + path, document.baseURI).href;
-}
+import { assetUrl } from "./asset-url.ts";
+export { assetUrl } from "./asset-url.ts";
 
 export async function loadTextures<T extends string>(
   files: Record<T, string>,

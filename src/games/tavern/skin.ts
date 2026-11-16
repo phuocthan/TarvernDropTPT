@@ -1,13 +1,16 @@
-import { Assets, Container, Rectangle, Sprite, Texture } from "pixi.js";
+import { Assets, Container, Rectangle, Sprite, Texture, Ticker } from "pixi.js";
 import { Spine, type Animation, type TrackEntry } from "@esotericsoftware/spine-pixi-v8";
 import { loadTextures } from "../../framework/presentation/assets.ts";
 import type { SymbolFactory, SymbolPhase } from "../../framework/presentation/board.ts";
 import { tavernAsset, textureRegion } from "./art.ts";
+import symbolVerticalBounds from "./symbol-vertical-bounds.json";
 
 const folder = "tavern-assets/assets/";
 // The four skeletons use the same authored origin and units. At a 110px reel
 // pitch this scale matches the visible symbol sizes on the reference board.
 const spineScale = 0.18;
+// Rendered silhouette at the authored scale, sampled at 30 fps at alpha >= 96/255.
+const boundsByClip: Record<string, number[][]> = symbolVerticalBounds;
 const symbols = [
   ["A", "l1", 490, 384, 393, 576],
   ["K", "l2", 473, 402, 426, 535],
@@ -68,6 +71,7 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
       },
     ));
   const clips = new Map<string, string>(symbols.map(([id, name]) => [id, name]));
+  if (clipsReady) Ticker.shared.minFPS = 0;
   return (cellSizePx) => {
     const cellCenter = cellSizePx / 2;
     const sizing = cellSizePx / 102;
@@ -159,6 +163,26 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
         play(phase, true);
       },
       effect: play,
+      verticalBounds() {
+        if (!clipsReady && sprite.texture !== Texture.EMPTY) {
+          return { top: cellCenter - sprite.height / 2, bottom: cellCenter + sprite.height / 2 };
+        }
+        const entry = active?.state.getCurrent(0);
+        const clip = entry?.animation;
+        const frames = clip && boundsByClip[clip.name];
+        if (!entry || !clip || !frames) return;
+        const last = frames.length - 1;
+        const t = clip.duration
+          ? Math.max(0, Math.min(1, entry.getAnimationTime() / clip.duration)) * last
+          : 0;
+        const index = Math.floor(t);
+        const [top, bottom] = frames[index];
+        const [nextTop, nextBottom] = frames[Math.min(index + 1, last)];
+        return {
+          top: cellCenter + (top + (nextTop - top) * (t - index)) * sizing,
+          bottom: cellCenter + (bottom + (nextBottom - bottom) * (t - index)) * sizing,
+        };
+      },
     };
   };
 }

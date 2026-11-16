@@ -1,16 +1,18 @@
 import { Application, Assets } from "pixi.js";
 import { Spine } from "@esotericsoftware/spine-pixi-v8";
 import { assetUrl } from "../../framework/presentation/assets.ts";
+import type { SceneAnchor } from "../../framework/presentation/scene.ts";
 
 export async function mountMascot(host: HTMLElement) {
   const app = new Application();
   await app.init({
-    width: 280,
-    height: 320,
+    width: 420,
+    height: 440,
     backgroundAlpha: 0,
     resolution: Math.min(devicePixelRatio, 1.5),
     preference: "webgl",
   });
+  app.ticker.maxFPS = 30;
   try {
     const skeleton = assetUrl("tavern-assets/assets/td_character.skel");
     const atlas = assetUrl("tavern-assets/assets/hd/td_master.atlas");
@@ -24,7 +26,7 @@ export async function mountMascot(host: HTMLElement) {
     mascot.scale.set(scale);
     mascot.position.set(
       app.screen.width / 2 - (bounds.x + bounds.width / 2) * scale,
-      app.screen.height - 12 - (bounds.y + bounds.height) * scale,
+      app.screen.height - 76 - (bounds.y + bounds.height) * scale,
     );
     app.stage.addChild(mascot);
     app.canvas.className = "mascot-animation";
@@ -34,10 +36,19 @@ export async function mountMascot(host: HTMLElement) {
       app.render();
       app.stop();
     }
-    return () => {
-      if (reduceMotion) return;
-      mascot.state.setAnimation(0, "win", false);
-      mascot.state.addAnimation(0, "idle", true, 0);
+    return {
+      place({ x, y, scale: worldScale }: SceneAnchor) {
+        const ratio = worldScale / scale;
+        host.dataset.anchored = "true";
+        host.style.left = `${x - mascot.x * ratio}px`;
+        host.style.top = `${y - mascot.y * ratio}px`;
+        host.style.width = `${app.screen.width * ratio}px`;
+      },
+      win() {
+        if (reduceMotion) return;
+        mascot.state.setAnimation(0, "win", false);
+        mascot.state.addAnimation(0, "idle", true, 0);
+      },
     };
   } catch (error) {
     app.destroy(true, { children: true });

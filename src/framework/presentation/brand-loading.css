@@ -1,0 +1,41 @@
+.brand-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background-color: #17100e;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  color: white;
+}
+.brand-loading-logos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: min(3svh, 28px);
+  transform: translateY(-6svh);
+}
+.brand-loading-studio {
+  width: min(53vw, 47svh, 500px);
+  height: auto;
+}
+.brand-loading-game {
+  width: min(67vw, 62svh, 576px);
+  height: auto;
+}
+.brand-loading-progress {
+  position: absolute;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: clamp(21px, 4svh, 32px);
+  font-weight: 700;
+  text-shadow: 0 2px 2px #000, 0 3px 0 #000;
+}
+.brand-loading-reload {
+  position: absolute;
+  bottom: 72px;
+  padding: 9px 16px;
+}

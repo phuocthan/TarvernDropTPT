@@ -3,8 +3,9 @@ import { Container, Graphics, Text } from "pixi.js";
 import { createSlotSession } from "../session.ts";
 import { HttpTransport } from "../transport/http.ts";
 import type { GameDefinition } from "../domain/contracts.ts";
+import type { BrandLoader } from "./brand-loading.ts";
 
-export async function mountBasicGame(root: HTMLElement, game: GameDefinition) {
+export async function mountBasicGame(root: HTMLElement, game: GameDefinition, loader?: BrandLoader) {
   root.innerHTML = `
     <main class="reuse-example">
       <a href="./">← Tavern Drop</a>
@@ -64,8 +65,10 @@ export async function mountBasicGame(root: HTMLElement, game: GameDefinition) {
     host.style.aspectRatio = `${board.app.screen.width} / ${board.app.screen.height}`;
     sync();
     status.textContent = "";
+    loader?.ready();
   } catch {
     status.textContent = "Could not start the game. Reload to retry.";
+    loader?.fail();
     return;
   }
 

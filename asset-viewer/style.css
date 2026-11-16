@@ -1,1 +1,16 @@
 @font-face{font-family:Outfit;src:url("../tavern-assets/assets/outfit-v11-latin_latin-ext-regular-BDXaL9-u.woff2")}*{box-sizing:border-box}body{margin:0;background:#211620;color:#f8eddd;font-family:Outfit,sans-serif}header{padding:28px max(24px,calc((100vw - 1200px)/2));display:flex;align-items:center;gap:28px;background:#3a2430;border-bottom:4px solid #c28a43}header img{width:150px;max-height:110px;object-fit:contain}h1,h2,p{margin:0}h1{font-size:32px}p{color:#d3bdb3;margin-top:7px}main{max-width:1200px;margin:auto;padding:36px 24px 80px;display:grid;gap:50px}.section-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}.section-head span{color:#e6c27c}.controls{display:flex;gap:16px;margin-bottom:12px}label{display:grid;gap:7px;flex:1;color:#e6cdb8}select{width:100%;background:#49303b;color:#fff;border:1px solid #886357;border-radius:6px;padding:11px;font:inherit}select:focus-visible,a:focus-visible{outline:3px solid #f6c95f;outline-offset:3px}#status{min-height:25px;font-size:14px}#player{height:530px;background:#352635;border:1px solid #755647;border-radius:8px;overflow:hidden}.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}.gallery a{color:#f1dbbd;text-decoration:none;background:#3b2a35;border:1px solid #644653;border-radius:7px;overflow:hidden}.gallery img{width:100%;height:165px;object-fit:contain;background:repeating-conic-gradient(#58434c 0 25%,#493640 0 50%) 50% / 20px 20px}.gallery span{display:block;padding:11px;font-size:14px;overflow-wrap:anywhere}@media(max-width:600px){header{padding:20px;gap:14px}header img{width:90px}h1{font-size:26px}.controls{flex-direction:column}#player{height:420px}}
+
+#replay {
+  align-self: end;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid #886357;
+  border-radius: 6px;
+  background: #49303b;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+#replay:focus-visible { outline: 3px solid #f6c95f; outline-offset: 3px; }
+#replay:disabled { opacity: .55; cursor: default; }

@@ -2,6 +2,11 @@ import { test, expect } from "@playwright/test";
 import { MockGame } from "../../server/mock-game.ts";
 import { tavern } from "../../src/games/tavern/definition.ts";
 import { reuse } from "../../src/games/reuse/definition.ts";
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.title.startsWith("real demo API")) return;
+  await page.addInitScript((key) => sessionStorage.setItem(key, "seen"), tavern.id + ".opening");
+});
+
 test("real demo API boots the Pixi board, spins and opens rules", async ({
   page,
 }) => {
@@ -12,7 +17,20 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
       assetRequests.add(new URL(response.url()).pathname);
   });
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  let releaseSession!: () => void;
+  const sessionGate = new Promise<void>((resolve) => { releaseSession = resolve; });
+  await page.route("**/api/session", async (route) => {
+    await sessionGate;
+    await route.continue();
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("img", { name: "Paperclip Gaming" })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Loading progress" })).toBeVisible();
+  await expect(page.locator("#app")).toHaveAttribute("aria-busy", "true");
+  releaseSession();
+  await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(".brand-loading")).toHaveCount(0);
+  await page.locator(".opening-continue").click();
   await expect(page.locator("#spin")).toBeEnabled();
   await expect(page.locator("#balance")).toHaveText("1,000.00");
   await page.locator("#rules").click();
@@ -38,6 +56,66 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
     ]),
   );
   expect(errors).toEqual([]);
+});
+test("a lone Scatter shakes the scene and the active payline renders above the dimmer", async ({
+  page,
+}) => {
+  const server = new MockGame(tavern, () => 0);
+  const board = [
+    ["A", "K", "Q", "J", "bonus"],
+    ["A", "10", "coin", "ale", "J"],
+    ["A", "crown", "barrel", "coin", "Q"],
+    ["K", "10", "coin", "J", "ale"],
+    ["Q", "J", "10", "coin", "barrel"],
+  ];
+  await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+  await page.route("**/api/command", (route) => {
+    const outcome = server.execute(route.request().postDataJSON(), board);
+    expect(outcome.entry).toBeNull();
+    expect(outcome.wins.map(({ line }) => line)).toEqual([0]);
+    return route.fulfill({ json: outcome });
+  });
+  await page.goto("/");
+  await expect(page.locator(".stage")).toHaveAttribute("data-spine-scene", "true");
+  await page.evaluate(async () => {
+    const boardUrl = "/src/framework/presentation/board.ts";
+    const spineUrl = performance.getEntriesByType("resource")
+      .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+    const [{ BoardView }, { AnimationState }] = await Promise.all([
+      import(boardUrl), import(spineUrl),
+    ]);
+    const markers = document.documentElement.dataset;
+    const setAnimation = AnimationState.prototype.setAnimation;
+    AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
+      if (name === "3_shake")
+        markers.scatterShakes = String(Number(markers.scatterShakes ?? 0) + 1);
+      return setAnimation.call(this, track, name, loop);
+    };
+    const focusWins = BoardView.prototype.focusWins;
+    BoardView.prototype.focusWins = function (positions: { reel: number; row: number }[]) {
+      const played = focusWins.call(this, positions);
+      const { dimmer, winningSymbols, tiles } = this;
+      const winningViews = positions.map(({ reel, row }) => tiles[reel][row + 1].view);
+      markers.winFocus = String(
+        dimmer.visible &&
+        dimmer.parent.children.indexOf(dimmer) < dimmer.parent.children.indexOf(winningSymbols) &&
+        winningSymbols.renderLayerChildren.length === winningViews.length &&
+        winningViews.every((view) => view.parentRenderLayer === winningSymbols) &&
+        tiles.flat().every(({ view }: { view: { alpha: number } }) => view.alpha === 1),
+      );
+      return played;
+    };
+    const clearHighlight = BoardView.prototype.clearHighlight;
+    BoardView.prototype.clearHighlight = function () {
+      clearHighlight.call(this);
+      if (markers.winFocus)
+        markers.winFocusCleared = String(!this.dimmer.visible && this.winningSymbols.renderLayerChildren.length === 0);
+    };
+  });
+  await page.getByRole("button", { name: "Spin", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-scatter-shakes", "2");
+  await expect(page.locator("html")).toHaveAttribute("data-win-focus", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-win-focus-cleared", "true");
 });
 for (const action of ["spin", "buy-drop"] as const) {
   test(`Turbo waits for Scatter win before opening the bonus intro from ${action}`, async ({
@@ -107,7 +185,7 @@ for (const action of ["spin", "buy-drop"] as const) {
 test("free spins autoplay through a retrigger and reveal centered Drop multipliers", async ({
   page,
 }) => {
-  test.setTimeout(60000);
+  test.setTimeout(90000);
   const game = structuredClone(tavern);
   game.demo.featureSpins.drop = 2;
   game.demo.retriggerSpins = 1;
@@ -132,6 +210,22 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await expect(page.locator("#spin")).toBeEnabled();
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
+  await page.evaluate(async () => {
+    const boardUrl = "/src/framework/presentation/board.ts";
+    const { BoardView } = await import(boardUrl);
+    const markers = document.documentElement.dataset;
+    const hideSymbols = BoardView.prototype.hideSymbols;
+    BoardView.prototype.hideSymbols = function () {
+      hideSymbols.call(this);
+      markers.bonusBoardHidden = String(!this.strip.visible);
+    };
+    const start = BoardView.prototype.start;
+    BoardView.prototype.start = function (turbo: boolean, motion: string) {
+      start.call(this, turbo, motion);
+      if (markers.bonusBoardHidden && !markers.firstFreeSpinStarted)
+        markers.firstFreeSpinStarted = String(!this.strip.visible);
+    };
+  });
   const purchase = page.waitForResponse(
     (response) => response.url().endsWith("/api/command") && response.ok(),
   );
@@ -143,6 +237,8 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await expect(
     page.getByRole("heading", { name: "DROP BONUS", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".tavern-screen-art")).toHaveAttribute("data-spine-clip", "super_intro");
+  await expect(page.locator("html")).toHaveAttribute("data-bonus-board-hidden", "true");
   expect(requests).toHaveLength(0);
   await page.evaluate(() => {
     const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
@@ -197,9 +293,10 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(delays.start).toBeGreaterThanOrEqual(1400 + tavern.presentation.feature!.startDelayMs - 50);
   expect(delays.end).toBeGreaterThanOrEqual(tavern.presentation.feature!.endDelayMs - 50);
   expect(requests).toHaveLength(3);
+  await expect(page.locator("html")).toHaveAttribute("data-first-free-spin-started", "true");
   expect(new Set(requests).size).toBe(3);
   const multipliers = page.locator(".reveal-chests .chest-multiplier");
-  await expect(multipliers).toHaveText(Array(5).fill("×5"), { timeout: 15000 });
+  await expect(multipliers).toHaveText(Array(5).fill("×5"), { timeout: 24000 });
   await expect(page.locator("#continue")).toBeEnabled({ timeout: 5000 });
   expect(new Set(await page.evaluate(() => (window as any).featureAmounts)).size).toBeGreaterThan(2);
   for (const multiplier of await multipliers.all()) {
@@ -253,8 +350,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(0);
     await expect(page.locator(".reveal-chests .chest").nth(3).locator(".chest-multiplier")).toHaveText("×2", { timeout: 5000 });
     await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(1);
-    await expect(page.locator(".flying-win")).toHaveText("+1.00");
-    await expect(page.locator(".result-total")).toHaveText("1.00");
+    await expect(page.locator(".tavern-chest-art")).toHaveAttribute("data-spine-clip", "36_reel_3_chest_open");
     await expect(page.locator(".result-total")).toHaveText("2.00", { timeout: 5000 });
   } else {
     await expect(page.locator(".reveal-chests")).toHaveCount(0);
@@ -262,7 +358,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   }
   await expect(page.locator("#continue")).toBeEnabled();
 });
-for (const [multiplier, label] of [[10, "BIG WIN"], [25, "MEGA WIN"], [50, "EPIC WIN"]] as const) {
+for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEGA WIN"], [100, "EPIC WIN"]] as const) {
   test(`${label} displays its celebration`, async ({ page }) => {
     const server = new MockGame(tavern, () => 0);
     await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
@@ -278,8 +374,10 @@ for (const [multiplier, label] of [[10, "BIG WIN"], [25, "MEGA WIN"], [50, "EPIC
     await expect(page.locator("#spin")).toBeEnabled();
     await page.locator("#spin").click();
     await expect(page.locator(".win-celebration strong")).toHaveText(label, { timeout: 15000 });
-    await expect(page.locator(".win-celebration span")).toHaveText(`${multiplier}.00`);
-    await expect(page.locator(".win-celebration")).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator(".win-celebration-value")).toHaveText(`${multiplier}.00`);
+    await expect(page.locator(".win-celebration .tavern-screen-art"))
+      .toHaveAttribute("data-spine-clip", label.toLowerCase().replace(/\s/g, ""));
+    await expect(page.locator(".win-celebration")).toHaveCount(0, { timeout: 14000 });
   });
 }
 test("mobile layout fits 390 pixels", async ({ page }) => {
@@ -351,7 +449,12 @@ test("desktop landscape keeps the bottom reel row and spin controls visible", as
   const mascotLayer = await page.locator(".mascot").evaluate(
     (mascot) => Number(getComputedStyle(mascot).zIndex),
   );
-  expect(machineLayer).toBeGreaterThan(mascotLayer);
+  const table = page.locator(".tavern-foreground");
+  await expect(table).toHaveAttribute("data-anchored", "true");
+  await expect(page.locator(".mascot")).toHaveAttribute("data-anchored", "true");
+  expect(mascotLayer).toBeGreaterThan(machineLayer);
+  expect(await table.evaluate((node) => Number(getComputedStyle(node).zIndex)))
+    .toBeGreaterThan(mascotLayer);
   for (const viewport of [
     { width: 1280, height: 720 },
     { width: 788, height: 510 },
@@ -443,7 +546,7 @@ test("Tavern defaults to Drop with demo controls hidden and Skip preserves one r
   await expect(page.getByRole("button", { name: "Reels: Drop" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "3 × 3" })).toHaveCount(0);
   await spin.click();
-  await expect(page.getByRole("status")).toHaveText("Waiting for the symbols…");
+  await expect.poll(() => commands.length).toBe(1);
   await expect(spin).toContainText("SKIP");
   await spin.click();
   releaseResult();

@@ -88,12 +88,65 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     !nonNegativeInt(display.gapPx)
   )
     invalid("presentation");
-  const { normal, drop, feature } = display;
+  const { normal, drop, feature, animationGrid, scene } = display;
+  const loading = display.loadingScreen;
+  if (loading !== undefined &&
+    (!loading || ![loading.background, loading.brandLogo, loading.brandName, loading.gameLogo].every(nonEmpty)))
+    invalid("presentation.loadingScreen");
+  if (
+    display.symbolEdgeInsetPx !== undefined &&
+    (!nonNegativeInt(display.symbolEdgeInsetPx) ||
+      display.symbolEdgeInsetPx * 2 >= game.rows * (display.cellSizePx + display.gapPx) - display.gapPx)
+  )
+    invalid("presentation.symbolEdgeInsetPx");
+  if (
+    animationGrid !== undefined &&
+    (!animationGrid || !nonEmpty(animationGrid.originSlot) ||
+      !positiveInt(animationGrid.reelPitch) || !positiveInt(animationGrid.rowPitch))
+  )
+    invalid("presentation.animationGrid");
+  if (
+    scene !== undefined &&
+    (!scene || !scene.layers || Array.isArray(scene.layers) ||
+      typeof scene.layers !== "object" ||
+      !Object.entries(scene.layers).every(([name, z]) => key.test(name) && Number.isSafeInteger(z)) ||
+      !scene.slots || Array.isArray(scene.slots) || typeof scene.slots !== "object" ||
+      !Object.values(scene.slots).every(nonEmpty))
+  )
+    invalid("presentation.scene");
+  const camera = scene?.backgroundCamera;
+  const openingDimmer = scene?.openingDimmerOpacity;
+  if (openingDimmer !== undefined && (!nonNegative(openingDimmer) || openingDimmer > 1))
+    invalid("presentation.scene.openingDimmerOpacity");
+  if (
+    camera !== undefined &&
+    (!camera || ![camera.width, camera.top, camera.landscapeBottom, camera.portraitBottom].every(positiveInt) ||
+      !Number.isFinite(camera.centerOffsetX))
+  )
+    invalid("presentation.scene.backgroundCamera");
+  if (
+    display.winDimmerOpacity !== undefined &&
+    (!nonNegative(display.winDimmerOpacity) || display.winDimmerOpacity > 1)
+  )
+    invalid("presentation.winDimmerOpacity");
+  const landing = display.symbolLandingEffects;
+  if (
+    landing !== undefined &&
+    (!landing || typeof landing !== "object" || Array.isArray(landing) ||
+      !Object.entries(landing).every(
+        ([id, clips]) =>
+          ids.has(id) && clips && typeof clips === "object" && !Array.isArray(clips) &&
+          Object.keys(clips).length > 0 &&
+          Object.entries(clips).every(([layer, clip]) => nonEmpty(layer) && nonEmpty(clip)),
+      ))
+  )
+    invalid("presentation.symbolLandingEffects");
   if (
     feature !== undefined &&
     (!feature ||
       !nonNegativeInt(feature.startDelayMs) ||
-      !nonNegativeInt(feature.endDelayMs))
+      !nonNegativeInt(feature.endDelayMs) ||
+      (feature.hideSymbolsUntilFirstSpin !== undefined && typeof feature.hideSymbolsUntilFirstSpin !== "boolean"))
   )
     invalid("presentation.feature");
   if (

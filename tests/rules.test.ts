@@ -10,6 +10,7 @@ import {
 import { MockGame } from "../server/mock-game.ts";
 import { loadGameConfig } from "../src/framework/game-config.ts";
 import { reuse } from "../src/games/reuse/definition.ts";
+import { alignReelGrid, keepWithinVerticalViewport, reelCellCenter } from "../src/framework/presentation/grid.ts";
 const board = () => Array.from({ length: 5 }, () => ["A", "K", "Q", "J", "10"]);
 const command = (
   state: MockGame,
@@ -24,8 +25,32 @@ const command = (
 });
 test("definition and all 15 line paths stay inside the board", () => {
   validateDefinition(tavern);
-  assert.equal(tavern.lines.length, 15);
+  assert.deepEqual(tavern.lines.map((line) => line.join("")), [
+    "00000", "11111", "22222", "33333", "44444",
+    "01010", "12121", "23232", "34343", "10101",
+    "21212", "32323", "43434", "01234", "43210",
+  ]);
   assert.equal(tavern.symbols.length, 11);
+});
+test("the authored payline grid aligns unequal source pitches with the reel cells", () => {
+  const layout = tavern.presentation;
+  const { reelPitch, rowPitch } = layout.animationGrid!;
+  const origin = { x: -1147.22, y: -1199.99 };
+  const aligned = alignReelGrid(layout, { ...origin, reelPitch, rowPitch });
+  for (const position of [{ reel: 0, row: 0 }, { reel: 4, row: 4 }]) {
+    const { x, y } = reelCellCenter(position, layout);
+    assert.ok(Math.abs(aligned.x + (origin.x + position.reel * reelPitch) * aligned.scaleX - x) < 0.001);
+    assert.ok(Math.abs(aligned.y + (origin.y + position.row * rowPitch) * aligned.scaleY - y) < 0.001);
+  }
+});
+test("reel edge correction translates only the outlines crossing its vertical safe area", () => {
+  assert.equal(keepWithinVerticalViewport({ top: -20, bottom: 110 }, 542, 4), 24);
+  assert.equal(keepWithinVerticalViewport({ top: 448, bottom: 561 }, 542, 4), -23);
+  assert.equal(keepWithinVerticalViewport({ top: 4, bottom: 538 }, 542, 4), 0);
+  assert.equal(loadGameConfig(tavern).presentation.symbolEdgeInsetPx, 4);
+  const game = structuredClone(tavern);
+  game.presentation.symbolEdgeInsetPx = 271;
+  assert.throws(() => loadGameConfig(game), /presentation.symbolEdgeInsetPx/);
 });
 test("config validation rejects invalid board geometry, symbol IDs and timing", () => {
   const game = structuredClone(reuse);
@@ -51,6 +76,19 @@ test("config validation rejects invalid board geometry, symbol IDs and timing", 
   });
   game.presentation.feature.endDelayMs = -1;
   assert.throws(() => loadGameConfig(game), /presentation.feature/);
+});
+test("config validates the win dimmer and scene effects for known symbols", () => {
+  const game = structuredClone(tavern);
+  assert.equal(loadGameConfig(game).presentation.winDimmerOpacity, 0.5);
+  game.presentation.winDimmerOpacity = 1.1;
+  assert.throws(() => loadGameConfig(game), /presentation.winDimmerOpacity/);
+  game.presentation.winDimmerOpacity = 0;
+  game.presentation.symbolLandingEffects = { missing: { scene: "land" } };
+  assert.throws(() => loadGameConfig(game), /presentation.symbolLandingEffects/);
+  game.presentation.symbolLandingEffects = { A: { scene: " " } };
+  assert.throws(() => loadGameConfig(game), /presentation.symbolLandingEffects/);
+  game.presentation.symbolLandingEffects = { A: { scene: "land" } };
+  assert.equal(loadGameConfig(game).presentation.symbolLandingEffects?.A.scene, "land");
 });
 test("the 3 by 3 config disables bonus purchases and higher chances", () => {
   const server = new MockGame(reuse);

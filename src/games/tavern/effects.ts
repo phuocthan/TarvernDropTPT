@@ -1,0 +1,554 @@
+import { Application, Assets, BitmapText, Graphics, Text } from "pixi.js";
+import {
+  MixBlend,
+  MixDirection,
+  Physics,
+  RegionAttachment,
+  Skeleton,
+  Spine,
+  Vector2,
+  type Event as SpineEvent,
+  type Slot,
+} from "@esotericsoftware/spine-pixi-v8";
+import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
+import { drawDimmer, type SceneAnchor } from "../../framework/presentation/scene.ts";
+import { tavernAsset } from "./art.ts";
+import { hasTavernBitmapFont } from "./typography.ts";
+
+const atlas = tavernAsset("hd/td_master.atlas");
+const backgroundUrl = tavernAsset("td_backgrounds.skel");
+const reelhouseUrl = tavernAsset("td_reelhouse.skel");
+const screensUrl = tavernAsset("td_screens.skel");
+const cameraEffects = new Set(["fade", "fx_light"]);
+const introArtSlots = new Set(["bonus_title", "bonus_img", "bonus_desc", "fs"]);
+
+export function createReelhouse(app: Application, autoUpdate = false) {
+  return Spine.from({
+    skeleton: reelhouseUrl,
+    atlas,
+    ticker: app.ticker,
+    autoUpdate,
+  });
+}
+
+export async function loadReelhouse() {
+  await Assets.load([atlas, reelhouseUrl]);
+}
+
+export function playClip(spine: Spine, track: number, name: string) {
+  const entry = spine.state.setAnimation(track, name, false);
+  if (!entry.animation?.duration) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const finish = () => resolve();
+    entry.listener = { complete: finish, dispose: finish };
+  });
+}
+
+function screenBounds(
+  data: Skeleton["data"],
+  animations: string[],
+  artSlots?: ReadonlySet<string>,
+) {
+  const preview = new Skeleton(data);
+  const offset = new Vector2();
+  const size = new Vector2();
+  const events: SpineEvent[] = [];
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const name of animations) {
+    const clip = data.findAnimation(name)!;
+    for (let frame = 0; frame <= 16; frame++) {
+      const time = (clip.duration * frame) / 16;
+      preview.setToSetupPose();
+      events.length = 0;
+      clip.apply(
+        preview,
+        time,
+        time,
+        false,
+        events,
+        1,
+        MixBlend.setup,
+        MixDirection.mixIn,
+      );
+      preview.updateWorldTransform(Physics.pose);
+      for (const slot of preview.drawOrder)
+        if (
+          cameraEffects.has(slot.data.name) ||
+          slot.color.a <= 0.01 ||
+          (artSlots && !artSlots.has(slot.data.name))
+        )
+          slot.setAttachment(null);
+      preview.getBounds(offset, size);
+      if (!Number.isFinite(size.x + size.y) || size.x <= 0 || size.y <= 0)
+        continue;
+      left = Math.min(left, offset.x);
+      top = Math.min(top, offset.y);
+      right = Math.max(right, offset.x + size.x);
+      bottom = Math.max(bottom, offset.y + size.y);
+    }
+  }
+  if (right <= left || bottom <= top)
+    return { x: -3000, y: -2000, width: 6000, height: 4000 };
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+export async function mountTavernEffects(
+  stage: HTMLElement,
+  frame: HTMLElement,
+  foreground: HTMLElement,
+  sceneLayout: ReelPresentation["scene"],
+  placeMascot: (anchor: SceneAnchor) => void,
+) {
+  const slots = sceneLayout?.slots ?? {};
+  const camera = sceneLayout?.backgroundCamera;
+  await Assets.load([atlas, backgroundUrl, reelhouseUrl, screensUrl]);
+  const app = new Application();
+  await app.init({
+    width: stage.clientWidth,
+    height: stage.clientHeight,
+    backgroundAlpha: 0,
+    antialias: false,
+    resolution: Math.min(devicePixelRatio, 1.5),
+    preference: "webgl",
+  });
+  app.ticker.maxFPS = 30;
+  app.ticker.minFPS = 0;
+
+  const background = Spine.from({
+    skeleton: backgroundUrl,
+    atlas,
+    ticker: app.ticker,
+    autoUpdate: false,
+  });
+  const reelhouse = createReelhouse(app, true);
+  const openingDimmer = new Graphics();
+  openingDimmer.visible = false;
+  const tables = [
+    [background.skeleton.findSlot(slots.baseTable ?? ""), foreground.querySelector<HTMLElement>(".base-art")],
+    [background.skeleton.findSlot(slots.bonusTable ?? ""), foreground.querySelector<HTMLElement>(".bonus-art")],
+  ] as const;
+  const foregroundAlpha = new Map<Slot, number>();
+  const vertices = new Float32Array(8);
+  background.afterUpdateWorldTransforms = () => {
+    const opening = stage.parentElement?.hasAttribute("data-opening");
+    for (const [slot, table] of tables) {
+      if (!slot || !table) continue;
+      if (opening) {
+        table.style.opacity = "0";
+        continue;
+      }
+      const attachment = slot.getAttachment();
+      table.style.opacity = attachment ? String(slot.color.a) : "0";
+      if (attachment instanceof RegionAttachment) {
+        foreground.dataset.anchored = "true";
+        attachment.computeWorldVertices(slot, vertices, 0, 2);
+        const [blX, blY, tlX, tlY, trX, trY] = vertices;
+        const scale = background.scale.x;
+        const ux = (trX - tlX) * scale, uy = (trY - tlY) * scale;
+        const vx = (blX - tlX) * scale, vy = (blY - tlY) * scale;
+        const width = Math.hypot(ux, uy), height = Math.hypot(vx, vy);
+        if (width > 0 && height > 0) {
+          table.style.width = `${width}px`;
+          table.style.height = `${height}px`;
+          table.style.transform = `matrix(${ux / width},${uy / width},${vx / height},${vy / height},${background.x + tlX * scale},${background.y + tlY * scale})`;
+        }
+      }
+      foregroundAlpha.set(slot, slot.color.a);
+      slot.color.a = 0;
+    }
+  };
+  const screens = Spine.from({
+    skeleton: screensUrl,
+    atlas,
+    ticker: app.ticker,
+    autoUpdate: false,
+  });
+  const payout = new BitmapText({
+    style: { fontFamily: "td_gold", fontSize: 480 },
+  });
+  payout.anchor.set(0.5);
+  screens.addSlotObject("slot_win", payout, { followSlotColor: true });
+  const spinCount = new Text({
+    style: {
+      fontFamily: "Outfit",
+      fontWeight: "800",
+      fontSize: 310,
+      fill: 0xffd35a,
+      stroke: { color: 0x3f200e, width: 30, join: "round" },
+    },
+  });
+  spinCount.anchor.set(0.5);
+  screens.addSlotObject("fs", spinCount, { followSlotColor: true });
+  screens.afterUpdateWorldTransforms = ({ skeleton }) => {
+    // The dialog backdrop already dims the whole viewport.
+    skeleton.findSlot("fade")?.setAttachment(null);
+    // Only the exact count of ten can use the authored text sprite.
+    if (spinCount.text) skeleton.findSlot("fs")?.setAttachment(null);
+  };
+  const reveal = createReelhouse(app);
+  const visibleChestSlots = new Set<number>();
+  reveal.afterUpdateWorldTransforms = ({ skeleton }) => {
+    for (const slot of skeleton.slots)
+      if (!visibleChestSlots.has(slot.data.index)) slot.setAttachment(null);
+  };
+  screens.visible = reveal.visible = false;
+  app.stage.addChild(background, openingDimmer, reelhouse, screens, reveal);
+  app.canvas.className = "tavern-spine-canvas";
+  app.canvas.setAttribute("aria-hidden", "true");
+  const scene = document.createElement("div");
+  scene.className = "tavern-spine-scene";
+  const frozenScene = document.createElement("canvas");
+  frozenScene.className = "tavern-spine-canvas";
+  frozenScene.setAttribute("aria-hidden", "true");
+  stage.prepend(scene);
+  scene.append(app.canvas);
+  let host: HTMLElement = scene;
+  let mode: "base" | "bonus" | undefined;
+  let previousFeature: FeatureState | null = null;
+  let portrait = stage.clientHeight > stage.clientWidth;
+  let baseExited = false;
+  let bounds = screenBounds(screens.skeleton.data, []);
+  const viewports = new Map<string, typeof bounds>();
+
+  function updateBackground(time: number) {
+    for (const [slot, alpha] of foregroundAlpha) slot.color.a = alpha;
+    background.update(time);
+    const source = portrait ? reelhouse : background;
+    const anchor = source.skeleton.findSlot((portrait ? slots.portraitMascot : slots.landscapeMascot) ?? "")?.bone;
+    if (anchor) placeMascot({
+      x: source.x + anchor.worldX * source.scale.x,
+      y: source.y + anchor.worldY * source.scale.y,
+      scale: Math.hypot(anchor.a, anchor.c) * source.scale.x,
+    });
+  }
+  app.ticker.add((tick) => {
+    if (host === scene) updateBackground(tick.deltaMS / 1000);
+  }, undefined, -10);
+
+  function layout() {
+    const { clientWidth: width, clientHeight: height } = host;
+    if (!width || !height) return;
+    if (app.screen.width !== width || app.screen.height !== height)
+      app.renderer.resize(width, height);
+    if (openingDimmer.visible)
+      drawDimmer(openingDimmer, width, height, sceneLayout?.openingDimmerOpacity ?? 0);
+    if (host !== scene) {
+      if (reveal.visible) {
+        const scale = width / 2860;
+        reveal.scale.set(scale);
+        reveal.position.set(
+          width / 2 + 20 * scale,
+          height * 0.53 - 1640 * scale,
+        );
+        return;
+      }
+      const scale =
+        Math.min(width / bounds.width, height / bounds.height) * 0.94;
+      screens.scale.set(scale);
+      screens.position.set(
+        width / 2 - (bounds.x + bounds.width / 2) * scale,
+        height / 2 - (bounds.y + bounds.height / 2) * scale,
+      );
+      return;
+    }
+    const nextPortrait = height > width;
+    if (nextPortrait !== portrait) {
+      portrait = nextPortrait;
+      applyOrientation();
+    }
+    const sceneRect = scene.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const bottom = (portrait ? camera?.portraitBottom : camera?.landscapeBottom) ?? 1940;
+    const backgroundScale = Math.max(
+      width / (camera?.width ?? 6000),
+      height / ((camera?.top ?? 2060) + bottom),
+    );
+    background.scale.set(backgroundScale);
+    background.position.set(
+      width / 2 + (camera?.centerOffsetX ?? 80) * backgroundScale,
+      height - bottom * backgroundScale,
+    );
+    const reelScale = frameRect.width / 3976;
+    reelhouse.scale.set(reelScale);
+    // The source bonus pose lifts the frame by 221 Spine units.
+    reelhouse.position.set(
+      frameRect.left - sceneRect.left + 1991 * reelScale,
+      frameRect.top -
+        sceneRect.top +
+        (mode === "bonus" ? 2001 : 1780) * reelScale,
+    );
+    updateBackground(0);
+  }
+  const observer = new ResizeObserver(layout);
+  observer.observe(stage);
+  observer.observe(frame);
+  layout();
+
+  function applyOrientation() {
+    if (portrait) {
+      reelhouse.state.setAnimation(0, "0_mobile", false);
+      background.state.setAnimation(4, "4_mobile", false);
+    } else {
+      reelhouse.state.clearTrack(0);
+      background.state.clearTrack(4);
+    }
+  }
+
+  function setMode(next: "base" | "bonus") {
+    if (next === mode) return;
+    const was = mode;
+    mode = next;
+    previousFeature = null;
+    background.state.clearTracks();
+    reelhouse.state.clearTracks();
+    foregroundAlpha.clear();
+    background.skeleton.setToSetupPose();
+    reelhouse.skeleton.setToSetupPose();
+    applyOrientation();
+    if (was || next === "base") {
+      background.state.setAnimation(0, `0_${next}_enter`, false);
+      background.state.addAnimation(0, `0_${next}_idle`, true, 0);
+    } else {
+      background.state.setAnimation(0, "0_bonus_idle", true);
+    }
+    if (!was && next === "base") {
+      reelhouse.state.setAnimation(
+        1,
+        portrait ? "1_game_enter_mobile" : "1_game_enter",
+        false,
+      );
+      reelhouse.state.addAnimation(1, "1_idle", true, 0);
+    } else if (was) {
+      if (baseExited && next === "bonus") {
+        reelhouse.state.setAnimation(2, "2_bonus_enter", false);
+      } else {
+        reelhouse.state.setAnimation(2, `2_${was}_exit`, false);
+        reelhouse.state.addAnimation(2, `2_${next}_enter`, false, 0);
+      }
+      background.state.setAnimation(1, "1_zoom_out", false);
+      if (next === "base") reelhouse.state.addAnimation(2, "1_idle", true, 0);
+    } else {
+      const entry = reelhouse.state.setAnimation(2, "2_bonus_enter", false);
+      entry.trackTime = entry.animation!.duration;
+    }
+    baseExited = false;
+    reelhouse.update(0);
+    layout();
+  }
+
+  function syncFeature(feature: FeatureState | null) {
+    if (!feature) return;
+    feature.chests.forEach((chest, reel) => {
+      const previous = previousFeature?.chests[reel];
+      for (const row of chest.rows) {
+        if (previous?.rows.includes(row)) continue;
+        const index = reel * 5 + row;
+        const entry = reelhouse.state.setAnimation(
+          5 + index,
+          `${5 + index}_activate_${reel}_${row}`,
+          false,
+        );
+        if (!previousFeature) entry.trackTime = entry.animation!.duration;
+      }
+      if (chest.unlocked && !previous?.unlocked) {
+        const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
+        if (previousFeature) {
+          reelhouse.state.setAnimation(30 + reel, prefix + "activate", false);
+          reelhouse.state.addAnimation(30 + reel, prefix + "idle", true, 0);
+        } else {
+          reelhouse.state.setAnimation(30 + reel, prefix + "idle", true);
+        }
+      }
+    });
+    previousFeature = feature;
+  }
+
+  function hideScreen() {
+    if (host === scene) return;
+    observer.unobserve(host);
+    host.removeAttribute("data-spine-ready");
+    host.removeAttribute("data-spine-amount");
+    host.removeAttribute("data-spine-count");
+    host = scene;
+    screens.state.clearTracks();
+    reveal.state.clearTracks();
+    visibleChestSlots.clear();
+    screens.visible = reveal.visible = false;
+    screens.autoUpdate = reveal.autoUpdate = false;
+    reelhouse.visible = background.visible = true;
+    reelhouse.autoUpdate = true;
+    frozenScene.remove();
+    scene.append(app.canvas);
+    stage.dataset.spineScene = "true";
+    layout();
+  }
+
+  function mountOverlay(target: HTMLElement) {
+    if (host !== scene && host !== target) hideScreen();
+    if (host === scene) {
+      frozenScene.width = app.canvas.width;
+      frozenScene.height = app.canvas.height;
+      app.render();
+      frozenScene.getContext("2d")?.drawImage(app.canvas, 0, 0);
+      scene.append(frozenScene);
+    }
+    host = target;
+    target.dataset.spineReady = "true";
+    target.append(app.canvas);
+    observer.observe(target);
+    reelhouse.visible = background.visible = false;
+    reelhouse.autoUpdate = false;
+  }
+
+  function playSceneEffects(clips: SymbolLandingEffects) {
+    for (const [layer, spine] of Object.entries({ background, reelhouse })) {
+      const clip = clips[layer];
+      if (!clip || !spine.skeleton.data.findAnimation(clip)) continue;
+      void playClip(spine, 3, clip);
+      spine.state.addEmptyAnimation(3, 0);
+    }
+  }
+
+  return {
+    showOpening() {
+      setMode("base");
+      openingDimmer.visible = true;
+      layout();
+      stage.dataset.spineScene = "true";
+      background.state.setAnimation(1, "1_zoom_in", false);
+      reelhouse.state.setAnimation(
+        1,
+        portrait ? "1_splash_intro_mobile" : "1_splash_intro",
+        false,
+      );
+    },
+    async enterGame() {
+      openingDimmer.visible = false;
+      background.state.setAnimation(1, "1_zoom_out", false);
+      const done = playClip(
+        reelhouse,
+        1,
+        portrait ? "1_game_enter_mobile" : "1_game_enter",
+      );
+      reelhouse.state.addAnimation(1, "1_idle", true, 0);
+      await done;
+    },
+    sync(feature: FeatureState | null) {
+      setMode(feature ? "bonus" : "base");
+      syncFeature(feature);
+      if (host === scene) stage.dataset.spineScene = "true";
+    },
+    spin() {
+      void playClip(reelhouse, 3, "3_spin_start");
+      reelhouse.state.addEmptyAnimation(3, 0);
+    },
+    skip() {
+      void playClip(reelhouse, 3, "3_skip");
+      reelhouse.state.addEmptyAnimation(3, 0);
+    },
+    playSceneEffects,
+    shake() {
+      playSceneEffects({ background: "3_shake", reelhouse: "3_shake" });
+    },
+    async prepareBonusIntro() {
+      baseExited = true;
+      background.state.setAnimation(1, "1_zoom_in", false);
+      reelhouse.state.setAnimation(2, "2_base_exit", false);
+      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    },
+    revealChests() {
+      return playClip(reelhouse, 4, "4_finalwin");
+    },
+    async prepareTotalWin() {
+      background.state.setAnimation(1, "1_zoom_in", false);
+      reelhouse.state.setAnimation(90, "2_bonus_exit", false);
+      await new Promise<void>((resolve) => setTimeout(resolve, 350));
+      reelhouse.state.setAnimation(41, "41_fade_extras", false);
+      reelhouse.update(0);
+    },
+    async showScreen(
+      target: HTMLElement,
+      name: string,
+      {
+        idle,
+        outro,
+        amount,
+        count,
+      }: {
+        idle?: string;
+        outro?: string;
+        amount?: string;
+        count?: number;
+      } = {},
+    ) {
+      mountOverlay(target);
+      reveal.visible = false;
+      reveal.autoUpdate = false;
+      screens.visible = true;
+      screens.autoUpdate = true;
+      payout.text = amount && hasTavernBitmapFont("td_gold") ? amount : "";
+      payout.scale.set(1);
+      if (payout.width > 3000) payout.scale.set(3000 / payout.width);
+      spinCount.text =
+        count === undefined || count === 10 ? "" : `${count} FREE SPINS`;
+      target.toggleAttribute("data-spine-count", count !== undefined);
+      target.toggleAttribute("data-spine-amount", !!payout.text);
+      const key = [name, idle, outro].join(":");
+      const intro = name === "bonus_intro" || name === "super_intro";
+      bounds =
+        viewports.get(key) ??
+        screenBounds(
+          screens.skeleton.data,
+          intro
+            ? [name]
+            : [name, ...[idle, outro].filter((clip): clip is string => !!clip)],
+          intro ? introArtSlots : undefined,
+        );
+      viewports.set(key, bounds);
+      target.dataset.spineClip = name;
+      layout();
+      screens.state.clearTracks();
+      screens.skeleton.setToSetupPose();
+      const done = playClip(screens, 0, name);
+      if (idle) screens.state.addAnimation(0, idle, true, 0);
+      screens.update(0);
+      await done;
+    },
+    async openChest(target: HTMLElement, reel: number) {
+      mountOverlay(target);
+      screens.visible = false;
+      screens.autoUpdate = false;
+      reveal.visible = true;
+      reveal.autoUpdate = true;
+      const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
+      const finalWin = `${31 + reel * 2}_reel_${reel}_chest_finalwin`;
+      for (const name of [prefix + "open", prefix + "open_idle", finalWin]) {
+        for (const timeline of reveal.skeleton.data.findAnimation(name)!
+          .timelines)
+          if ("slotIndex" in timeline && typeof timeline.slotIndex === "number")
+            visibleChestSlots.add(timeline.slotIndex);
+      }
+      layout();
+      const done = playClip(reveal, reel, prefix + "open");
+      reveal.state.addAnimation(reel, prefix + "open_idle", true, 0);
+      target.dataset.spineClip = prefix + "open";
+      reveal.update(0);
+      await done;
+    },
+    finishChest(reel: number) {
+      const name = `${31 + reel * 2}_reel_${reel}_chest_finalwin`;
+      return playClip(reveal, 10 + reel, name);
+    },
+    async endScreen(name?: string) {
+      if (host === scene) return;
+      if (name) {
+        await playClip(screens, 0, name);
+        background.state.setAnimation(1, "1_zoom_out", false);
+      }
+      hideScreen();
+    },
+  };
+}

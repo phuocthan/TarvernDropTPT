@@ -129,6 +129,82 @@
           "type": "integer",
           "minimum": 0
         },
+        "symbolEdgeInsetPx": {
+          "description": "Vertical clearance for symbols at the top and bottom of the reel aperture.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "loadingScreen": {
+          "type": "object",
+          "required": ["background", "brandLogo", "brandName", "gameLogo"],
+          "properties": {
+            "background": { "type": "string", "pattern": "\\S" },
+            "brandLogo": { "type": "string", "pattern": "\\S" },
+            "brandName": { "type": "string", "pattern": "\\S" },
+            "gameLogo": { "type": "string", "pattern": "\\S" }
+          },
+          "additionalProperties": false
+        },
+        "winDimmerOpacity": {
+          "description": "Opacity of the dark overlay beneath the active winning symbols.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5
+        },
+        "symbolLandingEffects": {
+          "description": "Maps symbol IDs to animation clips keyed by the skin's scene layer.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "pattern": "\\S" },
+            "additionalProperties": { "type": "string", "pattern": "\\S" }
+          }
+        },
+        "animationGrid": {
+          "type": "object",
+          "required": ["originSlot", "reelPitch", "rowPitch"],
+          "properties": {
+            "originSlot": { "type": "string", "pattern": "\\S" },
+            "reelPitch": { "type": "integer", "minimum": 1 },
+            "rowPitch": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "scene": {
+          "type": "object",
+          "required": ["layers", "slots"],
+          "properties": {
+            "layers": {
+              "type": "object",
+              "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+              "additionalProperties": { "type": "integer" }
+            },
+            "slots": {
+              "type": "object",
+              "additionalProperties": { "type": "string", "pattern": "\\S" }
+            },
+            "openingDimmerOpacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "backgroundCamera": {
+              "type": "object",
+              "required": ["width", "top", "landscapeBottom", "portraitBottom", "centerOffsetX"],
+              "properties": {
+                "width": { "type": "integer", "minimum": 1 },
+                "top": { "type": "integer", "minimum": 1 },
+                "landscapeBottom": { "type": "integer", "minimum": 1 },
+                "portraitBottom": { "type": "integer", "minimum": 1 },
+                "centerOffsetX": { "type": "number" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "feature": {
           "type": "object",
           "required": ["startDelayMs", "endDelayMs"],
@@ -142,6 +218,10 @@
               "description": "Delay after the last spin presentation and before the feature result.",
               "type": "integer",
               "minimum": 0
+            },
+            "hideSymbolsUntilFirstSpin": {
+              "type": "boolean",
+              "default": false
             }
           },
           "additionalProperties": false

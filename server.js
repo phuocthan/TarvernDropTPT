@@ -11,6 +11,9 @@ const games = new Map(catalog.map((definition) => [
   { definition, cookie: `${definition.routing.query}-session`, sessions: new Map() },
 ]));
 const root = resolve("dist");
+const viewerRoot = resolve("asset-viewer");
+const loopbackPeers = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+const loopbackHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -79,11 +82,23 @@ createServer(async (req, res) => {
       }
       return json(res, 404, { error: "NOT_FOUND" });
     }
-    const file = resolve(
-      root,
-      "." + (path === "/" ? "/index.html" : decodeURIComponent(path)),
-    );
-    if (!file.startsWith(root + sep)) {
+    let staticRoot = root;
+    let staticPath = path === "/" ? "/index.html" : decodeURIComponent(path);
+    if (staticPath.startsWith("/asset-viewer/")) {
+      if (
+        process.argv.includes("--no-animator-viewer") ||
+        !loopbackPeers.has(req.socket.remoteAddress) ||
+        !loopbackHost.test(req.headers.host ?? "")
+      ) {
+        res.writeHead(404).end("Not found");
+        return;
+      }
+      staticRoot = viewerRoot;
+      staticPath = staticPath.slice("/asset-viewer".length);
+      if (staticPath === "/") staticPath = "/index.html";
+    }
+    const file = resolve(staticRoot, "." + staticPath);
+    if (!file.startsWith(staticRoot + sep)) {
       res.writeHead(403).end();
       return;
     }

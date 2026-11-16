@@ -72,6 +72,13 @@ export interface SymbolDefinition {
   pays: Record<number, number>;
 }
 export type ReelMotion = "normal" | "drop";
+export type SymbolLandingEffects = Record<string, string>;
+export interface BrandLoadingConfig {
+  background: string;
+  brandLogo: string;
+  brandName: string;
+  gameLogo: string;
+}
 export interface DropTiming {
   fallMs: number;
   reelStaggerMs: number;
@@ -82,9 +89,27 @@ export interface ReelPresentation {
   spinType: ReelMotion;
   cellSizePx: number;
   gapPx: number;
+  symbolEdgeInsetPx?: number;
+  winDimmerOpacity?: number;
+  symbolLandingEffects?: Record<string, SymbolLandingEffects>;
+  loadingScreen?: BrandLoadingConfig;
+  animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };
+  scene?: {
+    layers: Record<string, number>;
+    slots: Record<string, string>;
+    openingDimmerOpacity?: number;
+    backgroundCamera?: {
+      width: number;
+      top: number;
+      landscapeBottom: number;
+      portraitBottom: number;
+      centerOffsetX: number;
+    };
+  };
   feature?: {
     startDelayMs: number;
     endDelayMs: number;
+    hideSymbolsUntilFirstSpin?: boolean;
   };
   normal: {
     speedPxPerSecond: number;

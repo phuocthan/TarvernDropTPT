@@ -1,63 +1,73 @@
-import {
-  Assets,
-  Container,
-  Graphics,
-  GraphicsPath,
-  Rectangle,
-  Sprite,
-  Text,
-  Texture,
-} from "pixi.js";
+import { BitmapText, Container, Text } from "pixi.js";
+import type { Spine } from "@esotericsoftware/spine-pixi-v8";
 import type {
-  SpineTexture,
-  TextureAtlas,
-} from "@esotericsoftware/spine-pixi-v8";
-import type { GameDefinition, LineWin } from "../../framework/domain/contracts.ts";
-import { reelCellCenter } from "../../framework/presentation/board.ts";
-import { tavernAsset } from "./art.ts";
+  GameDefinition,
+  LineWin,
+} from "../../framework/domain/contracts.ts";
+import { alignReelGrid, reelCellCenter } from "../../framework/presentation/grid.ts";
 
-export function createTavernPayline(stage: Container, game: GameDefinition) {
-  const atlas = Assets.get<TextureAtlas>(tavernAsset("hd/td_master.atlas"));
-  const cap = (name: string, size: number) => {
-    const region = atlas?.findRegion(name);
-    const source = (region?.page.texture as SpineTexture | undefined)?.texture
-      .source;
-    if (!region || !source) return new Sprite();
-    const rotated = region.degrees === 90;
-    const sprite = new Sprite(
-      new Texture({
-        source,
-        frame: new Rectangle(
-          region.x,
-          region.y,
-          rotated ? region.height : region.width,
-          rotated ? region.width : region.height,
-        ),
-        rotate: rotated ? 2 : 0,
-      }),
-    );
-    sprite.anchor.set(0.5);
-    sprite.width = size;
-    sprite.scale.y = sprite.scale.x;
-    return sprite;
-  };
+const originalRows = [
+  "00000",
+  "11111",
+  "22222",
+  "33333",
+  "44444",
+  "01010",
+  "12121",
+  "23232",
+  "34343",
+  "10101",
+  "21212",
+  "32323",
+  "43434",
+  "01234",
+  "43210",
+];
+
+export function createTavernPayline(
+  stage: Container,
+  game: GameDefinition,
+  native?: Spine,
+  bitmapFont = false,
+) {
   const layer = new Container();
-  const trace = new Graphics();
-  const bottle = cap("payline_bottle", 42);
-  const stopper = cap("payline_install bottle", 24);
-  const label = new Text({
-    style: {
-      fontFamily: "Arial, sans-serif",
-      fontSize: 44,
-      fontWeight: "900",
-      fill: 0xadff35,
-      stroke: { color: 0x172503, width: 5, join: "round" },
-      dropShadow: { color: 0x120d09, blur: 2, distance: 3, alpha: 0.9 },
-    },
-  });
+  const label = bitmapFont
+    ? new BitmapText({ style: { fontFamily: "td_green", fontSize: 54 } })
+    : new Text({
+        style: {
+          fontFamily: "Outfit",
+          fontSize: 44,
+          fontWeight: "800",
+          fill: 0xadff35,
+          stroke: { color: 0x172315, width: 4, join: "round" },
+        },
+      });
   label.anchor.set(0.5);
+  const highLabel = bitmapFont
+    ? new BitmapText({ style: { fontFamily: "td_red", fontSize: 54 } })
+    : null;
+  highLabel?.anchor.set(0.5);
   layer.visible = false;
-  layer.addChild(trace, bottle, stopper, label);
+  const source = game.presentation.animationGrid;
+  const origin = source && native?.skeleton.findSlot(source.originSlot)?.bone;
+  if (native && source && origin) {
+    native.autoUpdate = false;
+    native.update(0);
+    const aligned = alignReelGrid(game.presentation, {
+      x: origin.worldX, y: origin.worldY,
+      reelPitch: source.reelPitch, rowPitch: source.rowPitch,
+    });
+    native.scale.set(aligned.scaleX, aligned.scaleY);
+    native.position.set(aligned.x, aligned.y);
+    native.afterUpdateWorldTransforms = ({ skeleton }) => {
+      for (const slot of skeleton.slots)
+        if (!/^(line_holder|payline_)/.test(slot.data.name))
+          slot.setAttachment(null);
+    };
+    layer.addChild(native);
+  }
+  layer.addChild(label);
+  if (highLabel) layer.addChild(highLabel);
   stage.addChild(layer);
 
   return {
@@ -65,25 +75,38 @@ export function createTavernPayline(stage: Container, game: GameDefinition) {
       win: LineWin,
       rows: number[],
       amount: string,
+      highAmount: boolean,
       duration: number,
       skipped: () => boolean,
     ) {
-      const points = rows.map((row, reel) => reelCellCenter({ reel, row }, game.presentation));
-      const first = points[0],
-        last = points[points.length - 1];
-      const anchor = win.positions[1] ?? win.positions[0];
+      const index = originalRows.indexOf(rows.join(""));
+      const clip =
+        index >= 0 && origin
+          ? native?.skeleton.data.findAnimation(`payline_${index}`)
+          : null;
+      if (native) {
+        native.visible = !!clip;
+        if (clip) {
+          native.state.clearTracks();
+          native.skeleton.setToSetupPose();
+          native.state.setAnimation(0, clip.name, false);
+          native.update(0);
+        }
+      }
+      const amountLabel = highAmount && highLabel ? highLabel : label;
+      label.visible = amountLabel === label;
+      if (highLabel) highLabel.visible = amountLabel === highLabel;
+      const anchor = {
+        reel: (win.positions.length - 1) / 2,
+        row: (Math.min(...rows) + Math.max(...rows)) / 2,
+      };
       const amountAt = reelCellCenter(anchor, game.presentation);
-      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const segments = points.length - 1;
-      bottle.position.copyFrom(first);
-      stopper.position.copyFrom(last);
-      label.text = amount;
-      label.position.set(
-        amountAt.x,
-        amountAt.y + (anchor.row === game.rows - 1 ? -36 : 32) * game.presentation.cellSizePx / 102,
-      );
+      amountLabel.text = amount;
+      amountLabel.position.set(amountAt.x, amountAt.y);
       layer.visible = true;
 
+      const clipSeconds = clip?.duration ?? 0;
+      let trackTime = 0;
       const start = performance.now();
       await new Promise<void>((resolve) => {
         const frame = (now: number) => {
@@ -92,39 +115,11 @@ export function createTavernPayline(stage: Container, game: GameDefinition) {
             resolve();
             return;
           }
-          const progress = reduced
-            ? 1
-            : Math.min(1, elapsed / (duration * 0.48));
-          const travelled = (1 - (1 - progress) ** 2) * segments;
-          const path = new GraphicsPath().moveTo(first.x, first.y);
-          for (let index = 0; index < segments && index < travelled; index++) {
-            const from = points[index],
-              to = points[index + 1];
-            const part = Math.min(1, travelled - index);
-            path.lineTo(
-              from.x + (to.x - from.x) * part,
-              from.y + (to.y - from.y) * part,
-            );
+          if (native && clip) {
+            const time = (elapsed / duration) * clipSeconds;
+            native.update(time - trackTime);
+            trackTime = time;
           }
-          trace
-            .clear()
-            .path(path)
-            .stroke({
-              color: 0xd9280b,
-              width: 14,
-              alpha: 0.32,
-              cap: "round",
-              join: "round",
-            })
-            .path(path)
-            .stroke({ color: 0xef411c, width: 8, cap: "round", join: "round" })
-            .path(path)
-            .stroke({ color: 0xff9b43, width: 3, cap: "round", join: "round" });
-          stopper.visible = progress >= 1;
-          label.alpha = reduced ? 1 : Math.min(1, elapsed / (duration * 0.24));
-          layer.alpha = reduced
-            ? 1
-            : Math.min(1, (duration - elapsed) / (duration * 0.18));
           requestAnimationFrame(frame);
         };
         frame(start);
