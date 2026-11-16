@@ -525,10 +525,61 @@
   width: min(69vw, 530px);
 }
 .reveal-chests {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  justify-content: center;
   width: min(90%, 500px);
   margin: 12px auto;
+}
+.reveal-chests .chest {
+  width: 20%;
+}
+.flying-win {
+  position: fixed;
+  z-index: 2;
+  color: #fff2a2;
+  font-size: clamp(20px, 5vw, 36px);
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 2px #8b400a, 0 3px 10px #240d00;
+}
+.result-total-updated {
+  animation: result-total-pulse 350ms ease-out;
+}
+@keyframes result-total-pulse {
+  50% { transform: scale(1.15); color: #fff8c6; }
+}
+.win-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse, #c17312dc, #140b20ef 70%);
+  animation: win-celebration-enter 350ms ease-out both;
+}
+.win-celebration strong, .result-tier {
+  color: #ffe285;
+  font-size: clamp(32px, 9vw, 90px);
+  font-weight: 900;
+  text-shadow: 0 3px #a94e0e, 0 6px 12px #220d00;
+  animation: win-celebration-enter 500ms ease-out both;
+}
+.win-celebration span {
+  color: white;
+  font-size: clamp(26px, 7vw, 64px);
+  font-weight: bold;
+  text-shadow: 0 3px 8px #4d1f00;
+}
+.tavern-dialog .result-tier {
+  font-size: clamp(24px, 6vw, 50px);
+  margin: 6px;
+}
+@keyframes win-celebration-enter {
+  from { opacity: 0; scale: 0.7; }
+  to { opacity: 1; scale: 1; }
 }
 .visually-hidden {
   position: absolute;
@@ -578,12 +629,46 @@
   .tavern-hud {
     width: 96vw;
     gap: 5px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .tavern-hud .feature-button {
+    width: 50px;
+  }
+  .tavern-hud .hud-aux {
+    grid-column: 2;
+    grid-row: 1;
+    grid-auto-flow: column;
+    justify-self: end;
   }
   .hud-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
     gap: 4px;
   }
+  .tavern-hud .hud-menu {
+    min-width: 36px;
+    min-height: 44px;
+  }
+  .tavern-hud .bet-arrows button,
+  .tavern-hud .hud-quick button,
+  .tavern-hud .hud-aux button {
+    width: 36px;
+    min-height: 36px;
+    font-size: 23px;
+  }
+  .tavern-hud .bet-arrows button {
+    width: 44px;
+    min-height: 44px;
+    font-size: 28px;
+  }
+  .tavern-hud .spin-button {
+    width: 64px;
+    height: 64px;
+    font-size: 38px;
+  }
   .tavern-status {
-    bottom: max(67px, 10svh);
+    bottom: max(150px, 19svh);
   }
   .shop-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -631,16 +716,14 @@
 .tavern-shell .chest.unlocked {
   animation: chest-unlock 570ms ease-out both;
 }
-.reveal-chests .chest.unlocked .tavern-chest-lid {
+.reveal-chests .chest.revealed .tavern-chest-lid {
   animation: chest-open 420ms ease-out both;
-  animation-delay: calc(380ms + var(--reel) * 170ms);
 }
 .reveal-chests .chest-multiplier {
   animation: reveal-number 310ms ease-out both;
-  animation-delay: calc(660ms + var(--reel) * 170ms);
 }
 .bonus-paid {
-  animation: reveal-number 360ms 1450ms ease-out both;
+  animation: reveal-number 360ms ease-out both;
 }
 .tavern-shell:not([data-mode="base"]) .reel-host canvas {
   animation: bonus-symbols-enter 1180ms ease-out both;
@@ -651,7 +734,6 @@
   left: 13%;
   width: 74%;
   animation: reveal-number 350ms ease-out both;
-  animation-delay: calc(550ms + var(--reel) * 170ms);
 }
 .tavern-dialog .chest-subtotal {
   font-size: clamp(19px, 4vw, 38px);
@@ -783,7 +865,7 @@
   .key-cell.collected .key-art,
   .tavern-shell .chest,
   .tavern-shell .chest.unlocked,
-  .reveal-chests .chest.unlocked .tavern-chest-lid,
+  .reveal-chests .chest.revealed .tavern-chest-lid,
   .reveal-chests .chest-multiplier,
   .chest-coins,
   .bonus-paid {

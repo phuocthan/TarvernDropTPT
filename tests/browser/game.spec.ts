@@ -161,6 +161,10 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     const resultPopup = new MutationObserver(() => {
       if (dialog.open && dialog.querySelector(".reveal-chests")) {
         performance.mark("feature-result-open");
+        const total = dialog.querySelector(".result-total")!;
+        const amounts = [total.textContent];
+        (window as any).featureAmounts = amounts;
+        new MutationObserver(() => amounts.push(total.textContent)).observe(total, { childList: true });
         resultPopup.disconnect();
       }
     });
@@ -195,7 +199,9 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(requests).toHaveLength(3);
   expect(new Set(requests).size).toBe(3);
   const multipliers = page.locator(".reveal-chests .chest-multiplier");
-  await expect(multipliers).toHaveText(Array(5).fill("×5"));
+  await expect(multipliers).toHaveText(Array(5).fill("×5"), { timeout: 15000 });
+  await expect(page.locator("#continue")).toBeEnabled({ timeout: 5000 });
+  expect(new Set(await page.evaluate(() => (window as any).featureAmounts)).size).toBeGreaterThan(2);
   for (const multiplier of await multipliers.all()) {
     await expect(multiplier).toHaveCSS("text-align", "center");
     expect(
@@ -216,6 +222,66 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     fullPage: true,
   });
 });
+for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows all chests when one unlocks" : "omits chests when none unlock"}`, async ({ page }) => {
+  test.setTimeout(40000);
+  const game = structuredClone(tavern);
+  game.demo.featureSpins.drop = 1;
+  const server = new MockGame(game, () => 0);
+  await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+  await page.route("**/api/command", (route) => {
+    const command = route.request().postDataJSON();
+    const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
+    const outcome = server.execute(command, board);
+    if (unlocked && outcome.completion && outcome.finalFeature) {
+      outcome.finalFeature.chests[3] = { rows: [0, 1, 2, 3, 4], unlocked: true, multiplier: 2 };
+      Object.assign(outcome.completion, { accumulated: 100, featureAward: 200, roundAward: 200, multipliers: [1, 1, 1, 2, 1], product: 2 });
+    }
+    return route.fulfill({ json: outcome });
+  });
+  await page.goto("/");
+  await expect(page.locator("#spin")).toBeEnabled();
+  await page.locator("#buy").click();
+  await page.locator('[data-buy="drop"]').click();
+  await page.locator("#confirm-buy").click();
+  await expect(page.getByRole("heading", { name: "DROP BONUS" })).toBeVisible();
+  await page.locator("#continue").click();
+  await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
+  if (unlocked) {
+    await expect(page.locator(".reveal-chests .chest")).toHaveCount(5);
+    await expect(page.locator(".result-total")).toHaveText("1.00");
+    await page.waitForTimeout(1200);
+    await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(0);
+    await expect(page.locator(".reveal-chests .chest").nth(3).locator(".chest-multiplier")).toHaveText("×2", { timeout: 5000 });
+    await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(1);
+    await expect(page.locator(".flying-win")).toHaveText("+1.00");
+    await expect(page.locator(".result-total")).toHaveText("1.00");
+    await expect(page.locator(".result-total")).toHaveText("2.00", { timeout: 5000 });
+  } else {
+    await expect(page.locator(".reveal-chests")).toHaveCount(0);
+    await expect(page.locator(".result-total")).toHaveText("0.00");
+  }
+  await expect(page.locator("#continue")).toBeEnabled();
+});
+for (const [multiplier, label] of [[10, "BIG WIN"], [25, "MEGA WIN"], [50, "EPIC WIN"]] as const) {
+  test(`${label} displays its celebration`, async ({ page }) => {
+    const server = new MockGame(tavern, () => 0);
+    await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+    await page.route("**/api/command", (route) => {
+      const command = route.request().postDataJSON();
+      const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
+      const outcome = server.execute(command, board);
+      outcome.spinWin = outcome.paidAward = command.bet * multiplier;
+      outcome.state.balance += outcome.spinWin;
+      return route.fulfill({ json: outcome });
+    });
+    await page.goto("/");
+    await expect(page.locator("#spin")).toBeEnabled();
+    await page.locator("#spin").click();
+    await expect(page.locator(".win-celebration strong")).toHaveText(label, { timeout: 15000 });
+    await expect(page.locator(".win-celebration span")).toHaveText(`${multiplier}.00`);
+    await expect(page.locator(".win-celebration")).toHaveCount(0, { timeout: 5000 });
+  });
+}
 test("mobile layout fits 390 pixels", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
