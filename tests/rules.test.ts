@@ -10,8 +10,29 @@ import {
 import { MockGame } from "../server/mock-game.ts";
 import { loadGameConfig } from "../src/framework/game-config.ts";
 import { reuse } from "../src/games/reuse/definition.ts";
+import { planDropColumns } from "../src/framework/presentation/drop-schedule.ts";
+import { audioSpriteCues } from "../src/framework/presentation/audio.ts";
 import { alignReelGrid, keepWithinVerticalViewport, reelCellCenter } from "../src/framework/presentation/grid.ts";
 const board = () => Array.from({ length: 5 }, () => ["A", "K", "Q", "J", "10"]);
+test("Drop anticipation serializes remaining reels after two Scatters land", () => {
+  const result = [["bonus"], ["bonus"], ["A"], ["A"], ["A"]];
+  assert.deepEqual(planDropColumns(result, 76, 390, {
+    symbolId: "bonus", count: 2, reelPauseMs: 800,
+  }), { starts: [0, 76, 1266, 2456, 3646], anticipationAt: 466 });
+  assert.deepEqual(planDropColumns(result, 76, 390), {
+    starts: [0, 76, 152, 228, 304], anticipationAt: undefined,
+  });
+});
+test("audio sprite cues share fallback files and use millisecond ranges", () => {
+  const cues = audioSpriteCues({
+    src: ["./media/sounds.ogg", "./media/sounds.mp3"],
+    sprite: { music: [120, 2400, true], invalid: [-10, 15] },
+  }, "https://example.test/game/");
+  assert.deepEqual(cues, { music: {
+    sources: ["https://example.test/game/media/sounds.ogg", "https://example.test/game/media/sounds.mp3"],
+    offsetMs: 120, durationMs: 2400, loop: true,
+  } });
+});
 const command = (
   state: MockGame,
   requestId: string,

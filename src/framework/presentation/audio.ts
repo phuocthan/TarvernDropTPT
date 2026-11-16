@@ -1,15 +1,46 @@
+export type AudioCue = string | {
+  sources: readonly string[];
+  offsetMs: number;
+  durationMs: number;
+  loop?: boolean;
+};
+
+export function audioSpriteCues(
+  manifest: { src: string[]; sprite: Record<string, [number, number, (boolean | number)?]> },
+  base: string,
+): Record<string, AudioCue> {
+  const sources = manifest.src.map((file) => new URL(file, base).href);
+  const cues: Record<string, AudioCue> = {};
+  for (const [name, [offsetMs, durationMs, loop]] of Object.entries(manifest.sprite)) {
+    if (!Number.isFinite(offsetMs) || offsetMs < 0 ||
+      !Number.isFinite(durationMs) || durationMs <= 0) continue;
+    cues[name] = { sources, offsetMs, durationMs, loop: Boolean(loop) };
+  }
+  return cues;
+}
+
+interface Playback {
+  source?: AudioBufferSourceNode;
+}
+
 export class AudioBus<Cue extends string> {
   private context: AudioContext | null = null;
-  private clips = new Map<Cue, Promise<AudioBuffer>>();
+  private buffers = new Map<string, Promise<AudioBuffer>>();
+  private playing = new Map<Cue, Set<Playback>>();
   private gain: GainNode | null = null;
+  private isMuted = true;
 
-  constructor(private files: Record<Cue, string>) {}
+  constructor(private files: Record<Cue, AudioCue>) {}
 
   get muted() {
-    return !this.gain || this.gain.gain.value === 0;
+    return this.isMuted;
   }
   set muted(value: boolean) {
+    this.isMuted = value;
     if (this.gain) this.gain.gain.value = value ? 0 : 0.55;
+    if (value) {
+      for (const name of this.playing.keys()) this.stop(name);
+    }
   }
 
   unlock() {
@@ -17,35 +48,68 @@ export class AudioBus<Cue extends string> {
       if (typeof AudioContext === "undefined") return;
       this.context = new AudioContext();
       this.gain = this.context.createGain();
-      this.gain.gain.value = 0;
+      this.gain.gain.value = this.muted ? 0 : 0.55;
       this.gain.connect(this.context.destination);
     }
     void this.context.resume().catch(() => undefined);
   }
 
-  cue(name: Cue) {
-    if (this.muted || !this.context || !this.gain) return;
-    const context = this.context;
-    const gain = this.gain;
-    let clip = this.clips.get(name);
-    if (!clip) {
-      clip = fetch(this.files[name])
-        .then((response) => {
+  private async load(context: AudioContext, sources: readonly string[]) {
+    for (const file of sources) {
+      let buffer = this.buffers.get(file);
+      if (!buffer) {
+        buffer = fetch(file).then(async (response) => {
           if (!response.ok) throw Error("Audio cue unavailable");
-          return response.arrayBuffer();
-        })
-        .then((data) => context.decodeAudioData(data));
-      this.clips.set(name, clip);
+          return context.decodeAudioData(await response.arrayBuffer());
+        });
+        this.buffers.set(file, buffer);
+      }
+      try {
+        return await buffer;
+      } catch {
+        if (this.buffers.get(file) === buffer) this.buffers.delete(file);
+      }
     }
-    void clip
-      .then((buffer) => {
-        if (this.muted) return;
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.connect(gain);
-        source.onended = () => source.disconnect();
-        source.start();
-      })
-      .catch(() => this.clips.delete(name));
+  }
+
+  cue(name: Cue, loop = false) {
+    const { context, gain } = this;
+    const cue: AudioCue | undefined = this.files[name];
+    if (this.muted || !context || !gain || !cue) return;
+    const sprite = typeof cue === "string" ? undefined : cue;
+    const sounds = sprite?.sources ?? [cue as string];
+    const active = this.playing.get(name) ?? new Set<Playback>();
+    const play: Playback = {};
+    active.add(play);
+    this.playing.set(name, active);
+    const ended = () => {
+      play.source?.disconnect();
+      active.delete(play);
+      if (active.size === 0 && this.playing.get(name) === active) this.playing.delete(name);
+    };
+    void this.load(context, sounds).then((buffer) => {
+      if (!buffer || !active.has(play)) { ended(); return; }
+      const offset = (sprite?.offsetMs ?? 0) / 1000;
+      const duration = Math.min(buffer.duration - offset, (sprite?.durationMs ?? Infinity) / 1000);
+      if (duration <= 0) { ended(); return; }
+      const source = context.createBufferSource();
+      play.source = source;
+      source.buffer = buffer;
+      source.loop = loop || !!sprite?.loop;
+      source.loopStart = offset;
+      source.loopEnd = offset + duration;
+      source.connect(gain);
+      source.onended = ended;
+      if (source.loop) source.start(0, offset);
+      else source.start(0, offset, duration);
+    }).catch(ended);
+  }
+
+  stop(name: Cue) {
+    const active = this.playing.get(name);
+    this.playing.delete(name);
+    if (!active) return;
+    for (const play of active) play.source?.stop();
+    active.clear();
   }
 }

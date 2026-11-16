@@ -33,7 +33,8 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   await page.locator(".opening-continue").click();
   await expect(page.locator("#spin")).toBeEnabled();
   await expect(page.locator("#balance")).toHaveText("1,000.00");
-  await page.locator("#rules").click();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await page.getByRole("button", { name: "Game Rules" }).click();
   await expect(
     page.getByRole("heading", { name: "Inside the tavern" }),
   ).toBeVisible();
@@ -236,7 +237,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   );
   await expect(
     page.getByRole("heading", { name: "DROP BONUS", exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".tavern-screen-art")).toHaveAttribute("data-spine-clip", "super_intro");
   await expect(page.locator("html")).toHaveAttribute("data-bonus-board-hidden", "true");
   expect(requests).toHaveLength(0);
@@ -271,12 +272,12 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     "data-mode",
     "drop",
   );
-  const reelsAboveChests = await page.locator("#board canvas").evaluate(
-    (canvas) => Number(getComputedStyle(canvas).zIndex) >
-      Number(getComputedStyle(document.querySelector("#chests")!).zIndex),
+  const chestsAboveReels = await page.locator("#board canvas").evaluate(
+    (canvas) => Number(getComputedStyle(document.querySelector("#chests")!).zIndex) >
+      Number(getComputedStyle(canvas).zIndex),
   );
-  expect(reelsAboveChests).toBe(true);
-  await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({
+  expect(chestsAboveReels).toBe(true);
+  await expect(page.getByRole("heading", { name: "Chest multipliers" })).toBeVisible({
     timeout: 35000,
   });
   const delays = await page.evaluate(() => {
@@ -297,8 +298,6 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(new Set(requests).size).toBe(3);
   const multipliers = page.locator(".reveal-chests .chest-multiplier");
   await expect(multipliers).toHaveText(Array(5).fill("×5"), { timeout: 24000 });
-  await expect(page.locator("#continue")).toBeEnabled({ timeout: 5000 });
-  expect(new Set(await page.evaluate(() => (window as any).featureAmounts)).size).toBeGreaterThan(2);
   for (const multiplier of await multipliers.all()) {
     await expect(multiplier).toHaveCSS("text-align", "center");
     expect(
@@ -309,6 +308,10 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       }),
     ).toBeLessThan(1);
   }
+  await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 45000 });
+  await expect(page.locator(".reveal-chests")).toHaveCount(0);
+  await expect(page.locator("#continue")).toBeEnabled();
+  expect(new Set(await page.evaluate(() => (window as any).featureAmounts)).size).toBeGreaterThan(2);
   const expected = server.state.balance;
   await page.locator("#continue").click();
   await expect(page.locator("#balance")).toHaveText(
@@ -340,24 +343,43 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
   await page.locator("#confirm-buy").click();
-  await expect(page.getByRole("heading", { name: "DROP BONUS" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "DROP BONUS" })).toBeVisible({ timeout: 15000 });
   await page.locator("#continue").click();
-  await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
   if (unlocked) {
+    await expect(page.getByRole("heading", { name: "Chest multipliers" })).toBeVisible({ timeout: 25000 });
     await expect(page.locator(".reveal-chests .chest")).toHaveCount(5);
     await expect(page.locator(".result-total")).toHaveText("1.00");
-    await page.waitForTimeout(1200);
-    await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(0);
     await expect(page.locator(".reveal-chests .chest").nth(3).locator(".chest-multiplier")).toHaveText("×2", { timeout: 5000 });
     await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(1);
     await expect(page.locator(".tavern-chest-art")).toHaveAttribute("data-spine-clip", "36_reel_3_chest_open");
-    await expect(page.locator(".result-total")).toHaveText("2.00", { timeout: 5000 });
-  } else {
-    await expect(page.locator(".reveal-chests")).toHaveCount(0);
-    await expect(page.locator(".result-total")).toHaveText("0.00");
   }
+  await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
+  await expect(page.locator(".reveal-chests")).toHaveCount(0);
+  await expect(page.locator(".result-total")).toHaveText(unlocked ? "2.00" : "0.00");
   await expect(page.locator("#continue")).toBeEnabled();
 });
+for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+  test(`autoplay and menu fit the ${viewport.width}px layout`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.locator("#spin")).toBeEnabled();
+    await page.getByRole("button", { name: "Autoplay", exact: true }).click();
+    const panel = page.locator("#auto-panel");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator("button")).toHaveText(["–", "10", "25", "50", "100", "250", "500", "1000"]);
+    await expect(panel).toBeInViewport();
+    await panel.getByRole("button", { name: "Turn autoplay off" }).click();
+    await expect(panel).toBeHidden();
+    await page.getByRole("button", { name: "Open menu" }).click();
+    await expect(page.getByRole("button", { name: "Game Rules" })).toBeInViewport();
+    if (viewport.width > 670) {
+      const before = await page.locator("#bet-track").getAttribute("aria-valuenow");
+      await page.getByRole("button", { name: "Open menu" }).click();
+      await page.getByRole("button", { name: "Increase bet" }).click();
+      await expect(page.locator("#bet-track")).toHaveAttribute("aria-valuenow", String(Number(before) + 1));
+    }
+  });
+}
 for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEGA WIN"], [100, "EPIC WIN"]] as const) {
   test(`${label} displays its celebration`, async ({ page }) => {
     const server = new MockGame(tavern, () => 0);
@@ -542,7 +564,7 @@ test("Tavern defaults to Drop with demo controls hidden and Skip preserves one r
   await page.goto("/");
   const spin = page.getByRole("button", { name: "Spin", exact: true });
   await expect(spin).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reels: Drop" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "3 × 3" })).toHaveCount(0);
   await spin.click();

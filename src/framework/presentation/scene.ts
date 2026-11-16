@@ -13,6 +13,17 @@ export interface SceneAnchor {
   y: number;
   scale: number;
 }
+
+export function zoomScene(
+  host: HTMLElement,
+  { scale, originY, durationMs }: { scale: number; originY: number; durationMs: number },
+) {
+  const transformOrigin = `50% ${100 * originY}%`;
+  return host.animate([
+    { scale: "1", transformOrigin },
+    { scale: String(scale), transformOrigin },
+  ], { duration: durationMs, easing: "ease-out", fill: "forwards" });
+}
 export function drawDimmer(
   layer: Graphics,
   width: number,

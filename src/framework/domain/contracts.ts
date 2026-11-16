@@ -85,6 +85,11 @@ export interface DropTiming {
   rowStaggerMs: number;
   holdMs: number;
 }
+export interface DropAnticipation {
+  symbolId: string;
+  count: number;
+  reelPauseMs: number;
+}
 export interface ReelPresentation {
   spinType: ReelMotion;
   cellSizePx: number;
@@ -93,11 +98,13 @@ export interface ReelPresentation {
   winDimmerOpacity?: number;
   symbolLandingEffects?: Record<string, SymbolLandingEffects>;
   loadingScreen?: BrandLoadingConfig;
+  controls?: { menu: boolean; autoRounds: number[] };
   animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };
   scene?: {
     layers: Record<string, number>;
     slots: Record<string, string>;
     openingDimmerOpacity?: number;
+    chestCamera?: { scale: number; originY: number; durationMs: number };
     backgroundCamera?: {
       width: number;
       top: number;
@@ -125,6 +132,7 @@ export interface ReelPresentation {
     bounceMs: number;
     bouncePx: number;
     turboMultiplier: number;
+    anticipation?: DropAnticipation;
   };
 }
 export interface GameDefinition {

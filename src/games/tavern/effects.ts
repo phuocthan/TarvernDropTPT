@@ -11,7 +11,7 @@ import {
   type Slot,
 } from "@esotericsoftware/spine-pixi-v8";
 import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
-import { drawDimmer, type SceneAnchor } from "../../framework/presentation/scene.ts";
+import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/presentation/scene.ts";
 import { tavernAsset } from "./art.ts";
 import { hasTavernBitmapFont } from "./typography.ts";
 
@@ -98,6 +98,7 @@ function screenBounds(
 export async function mountTavernEffects(
   stage: HTMLElement,
   frame: HTMLElement,
+  reelHost: HTMLElement,
   foreground: HTMLElement,
   sceneLayout: ReelPresentation["scene"],
   placeMascot: (anchor: SceneAnchor) => void,
@@ -124,6 +125,8 @@ export async function mountTavernEffects(
     autoUpdate: false,
   });
   const reelhouse = createReelhouse(app, true);
+  let chestZoom: Animation | undefined;
+  let reelExit: Animation | undefined;
   const openingDimmer = new Graphics();
   openingDimmer.visible = false;
   const tables = [
@@ -299,6 +302,10 @@ export async function mountTavernEffects(
 
   function setMode(next: "base" | "bonus") {
     if (next === mode) return;
+    if (next === "base") {
+      chestZoom?.cancel();
+      reelExit?.cancel();
+    }
     const was = mode;
     mode = next;
     previousFeature = null;
@@ -375,6 +382,7 @@ export async function mountTavernEffects(
     host = scene;
     screens.state.clearTracks();
     reveal.state.clearTracks();
+    reveal.skeleton.setToSetupPose();
     visibleChestSlots.clear();
     screens.visible = reveal.visible = false;
     screens.autoUpdate = reveal.autoUpdate = false;
@@ -459,14 +467,37 @@ export async function mountTavernEffects(
       reelhouse.state.setAnimation(2, "2_base_exit", false);
       await new Promise<void>((resolve) => setTimeout(resolve, 300));
     },
-    revealChests() {
-      return playClip(reelhouse, 4, "4_finalwin");
+    async revealChests() {
+      if (sceneLayout?.chestCamera)
+        chestZoom = zoomScene(stage, sceneLayout.chestCamera);
+      await Promise.all([chestZoom?.finished, playClip(reelhouse, 4, "4_finalwin")]);
     },
     async prepareTotalWin() {
+      chestZoom?.cancel();
+      layout();
       background.state.setAnimation(1, "1_zoom_in", false);
-      reelhouse.state.setAnimation(90, "2_bonus_exit", false);
-      await new Promise<void>((resolve) => setTimeout(resolve, 350));
-      reelhouse.state.setAnimation(41, "41_fade_extras", false);
+      const exit = reelhouse.skeleton.data.findAnimation("2_bonus_exit")!;
+      const reelBone = reelhouse.skeleton.findSlot("slot_symbols")?.bone
+        ?? reelhouse.skeleton.findBone("slot_symbols");
+      const distance = stage.clientHeight - frame.offsetTop;
+      const duration = exit.duration * 1000;
+      const firstY = reelBone?.worldY ?? 0;
+      const finished = playClip(reelhouse, 90, exit.name);
+      reelhouse.state.setAnimation(91, "41_fade_extras", false);
+      const followReels = () => {
+        if (reelBone) {
+          const y = (reelBone.worldY - firstY) * reelhouse.scale.y;
+          reelHost.style.translate = `0 ${y}px`;
+        }
+      };
+      if (reelBone) app.ticker.add(followReels, undefined, -10);
+      else reelExit = reelHost.animate(
+        [{ translate: "0 0" }, { translate: `0 ${distance}px` }],
+        { duration, fill: "forwards", easing: "ease-in" },
+      );
+      await finished;
+      app.ticker.remove(followReels);
+      reelHost.style.removeProperty("translate");
       reelhouse.update(0);
     },
     async showScreen(

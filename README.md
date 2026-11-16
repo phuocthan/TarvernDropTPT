@@ -39,4 +39,6 @@ See the [framework flowchart and JSON configuration standard](docs/framework-flo
 
 See the [framework class diagrams and Tavern Drop runtime](docs/framework-classes-and-tavern-runtime.md) for the responsibilities of each class and game module, plus the spin, bonus, and recovery flows.
 
+See the [Milestone 1 handoff and acceptance checklist](docs/milestone-1.md) and the [client release export procedure](docs/milestone-release.md).
+
 The fake server owns all demo outcomes and balances. It is not certified math; no real money. Sessions reset on server restart. Browser recovery retries the same command only within a live mock session. The reference asset integration is local. The approved game math, final client asset pack, and production API are pending.

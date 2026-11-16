@@ -297,6 +297,7 @@
     "cellSizePx": 102,
     "gapPx": 8,
     "symbolEdgeInsetPx": 4,
+    "controls": { "menu": true, "autoRounds": [10, 25, 50, 100, 250, 500, 1000] },
     "loadingScreen": {
       "background": "tavern-assets/assets/td_loader_bg.webp",
       "brandLogo": "tavern-assets/assets/paperclip_full_logo.webp",
@@ -312,6 +313,7 @@
     "scene": {
       "layers": { "scenery": 1, "reels": 3, "mascot": 4, "table": 5 },
       "openingDimmerOpacity": 0.55,
+      "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },
       "backgroundCamera": {
         "width": 6000,
         "top": 2060,
@@ -360,7 +362,12 @@
       },
       "bounceMs": 100,
       "bouncePx": 8,
-      "turboMultiplier": 2.24
+      "turboMultiplier": 2.24,
+      "anticipation": {
+        "symbolId": "bonus",
+        "count": 2,
+        "reelPauseMs": 800
+      }
     }
   },
   "demo": {

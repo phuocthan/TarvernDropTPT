@@ -228,7 +228,7 @@
   gap: 1%;
   padding: 0;
   margin: 0;
-  z-index: 2;
+  z-index: 5;
 }
 .tavern-shell .chest,
 .reveal-chests .chest {
@@ -741,6 +741,9 @@
 .stage[data-spine-scene] :is(.scenery, .tavern-logo, .frame-art, .reel-keys, .chest-row) {
   visibility: hidden;
 }
+.stage[data-spine-scene] .machine:has(canvas[data-win-focus]) .chest-row:not([hidden]) {
+  visibility: visible;
+}
 .tavern-spine-canvas {
   display: block;
   width: 100%;
@@ -836,7 +839,129 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
-#modal-content:has(> :is([data-spine-clip="total_win_start"], [data-spine-clip="maxwin"])[data-spine-ready]) > :is(.reveal-chests, .chest-subtotal) {
-  position: absolute;
-  clip-path: inset(50%);
+.tavern-dialog[data-look="chest"] .modal-inner {
+  width: min(80vw, 580px);
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.tavern-dialog[data-look="chest"]::backdrop {
+  background: #0004;
+}
+.tavern-dialog[data-look="chest"] .reveal-chests {
+  margin-top: 2rem;
+}
+.tavern-dialog[data-look="chest"] .reveal-chests .chest-multiplier {
+  inset: auto 0 32%;
+  width: max-content;
+  margin: auto;
+  text-align: center;
+}
+#bet-track {
+  width: 100%;
+  min-width: 26px;
+  height: 2px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: #ffffff35;
+}
+#bet-track::after {
+  content: "";
+  display: block;
+  width: max(3px, var(--bet-progress, 0%));
+  height: 100%;
+  border-radius: inherit;
+  background: #fff;
+}
+.tavern-hud:has(.hud-menu) {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.tavern-hud:has(.hud-menu) .hud-aux {
+  display: none;
+}
+.tavern-hud .hud-money strong::before {
+  content: "$";
+}
+.tavern-hud .win-value strong {
+  color: #35d8f3;
+}
+.tavern-hud #speed {
+  color: #35d8f3;
+}
+.tavern-hud #speed[aria-pressed="true"] {
+  color: #101818;
+  background: #35d8f3;
+}
+.tavern-hud-panel:popover-open {
+  position: fixed;
+  inset: auto max(4vw, calc((100vw - 800px) / 2)) max(56px, 12svh) auto;
+  width: min(215px, 86vw);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 7px;
+  border: 1px solid #ffffff40;
+  border-radius: 6px;
+  background: #191f1bed;
+  color: white;
+  text-align: center;
+}
+.tavern-hud-panel strong,
+.tavern-hud-panel > span {
+  display: block;
+  font-size: 10px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+.round-picker-options,
+.bet-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 6px;
+}
+.tavern-hud-panel button {
+  border: 0;
+  border-radius: 4px;
+  background: #090c0a;
+  color: white;
+  min-height: 25px;
+  padding: 1px 3px;
+  font: 700 11px Outfit, sans-serif;
+}
+.tavern-hud-panel button[aria-pressed="true"],
+.bet-menu-grid button[aria-pressed="true"] {
+  color: #0e1718;
+  background: #35d8f3;
+}
+#hud-menu-panel:popover-open {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  inset-inline: max(4vw, calc((100vw - 750px) / 2)) auto;
+  gap: 4px;
+}
+@media (max-width: 670px) and (orientation: portrait) {
+  .tavern-hud:has(.hud-menu) {
+    grid-template-columns: 1fr 36px auto 36px 1fr;
+    justify-items: center;
+  }
+  .tavern-hud:has(.hud-menu) :is(.hud-bar, .hud-quick) { display: contents; }
+  .tavern-hud:has(.hud-menu) :is(.hud-aux, #bet-track) { display: none; }
+  .tavern-hud .hud-menu { grid-area: 1 / 1; }
+  .tavern-hud #auto { grid-area: 1 / 2; }
+  .tavern-hud #spin { grid-area: 1 / 3; }
+  .tavern-hud #speed { grid-area: 1 / 4; }
+  .tavern-hud:has(.hud-menu) #buy { grid-area: 1 / 5; }
+  .tavern-hud:has(.hud-menu) .hud-balance { grid-area: 2 / 1; }
+  .tavern-hud:has(.hud-menu) .hud-bet { grid-area: 2 / 2 / 3 / 5; margin: 0; }
+  .tavern-hud:has(.hud-menu) .win-value { grid-area: 2 / 5; }
+  .tavern-hud:has(.hud-menu) #free-spins { grid-area: 3 / 2 / 4 / 5; margin: 0; }
+  .tavern-hud .bet-arrows { display: contents; }
+  .tavern-hud #bet-down { order: -1; }
+  .tavern-hud .hud-quick button { border: 1px solid #eaffff80; border-radius: 50%; }
+  .tavern-hud-panel:popover-open,
+  #hud-menu-panel:popover-open {
+    inset: auto auto 125px 50%;
+    transform: translateX(-50%);
+  }
 }

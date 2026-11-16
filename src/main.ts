@@ -18,7 +18,7 @@ try {
     const { mountBasicGame } =
       await import("./framework/presentation/basic-game.ts");
     loader?.update(1, 2);
-    await mountBasicGame(root, game, loader);
+    await mountBasicGame(root, game, loader, { href: "./", label: `← ${defaultGame.title}` });
   }
 } catch (error) {
   if (!loader) throw error;

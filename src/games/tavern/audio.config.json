@@ -1,0 +1,34 @@
+{
+  "base": "tavern-assets/",
+  "manifest": "tavern-assets/assets/td_sounds.json",
+  "cues": {
+    "start": "pc_shared_reel_start",
+    "win": "pc_shared_win_line_0",
+    "entry": "td_fs_intro_start",
+    "entryEnd": "td_fs_intro_end",
+    "anticipation": "pc_anticipation",
+    "retrigger": "tb_fs_win",
+    "chestIntro": "td_mult_boart_intro",
+    "count": "pc_shared_counting_pitched",
+    "countEnd": "pc_shared_counting_end",
+    "totalIntro": "tb_totalwin_intro",
+    "totalOutro": "tb_totalwin_outro",
+    "musicBase": "td_bgm_base_l0-01",
+    "musicBonus": "td_bgm_bonus_l0",
+    "bet": "shared_betlevel",
+    "click": "shared_click"
+  },
+  "sequences": {
+    "reel": ["pc_shared_reel_stop_0", "pc_shared_reel_stop_1", "pc_shared_reel_stop_2", "pc_shared_reel_stop_3", "pc_shared_reel_stop_4"],
+    "scatter": ["tb_fs_land_0", "tb_fs_land_1", "tb_fs_land_2", "tb_fs_land_3"],
+    "chest": ["td_mult_win_chest_open_0", "td_mult_win_chest_open_1", "td_mult_win_chest_open_2", "td_mult_win_chest_open_3"],
+    "multiplier": ["td_mult_win_adds_0", "td_mult_win_adds_1", "td_mult_win_adds_2", "td_mult_win_adds_3", "td_mult_win_adds_4"]
+  },
+  "tiers": {
+    "bigwin": "td_wincap_bigwin",
+    "superwin": "td_wincap_superwin",
+    "megawin": "td_wincap_megawin",
+    "epicwin": "td_wincap_epicwin",
+    "maxwin": "td_wincap_maxwin"
+  }
+}

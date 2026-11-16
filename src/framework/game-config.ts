@@ -89,10 +89,21 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   )
     invalid("presentation");
   const { normal, drop, feature, animationGrid, scene } = display;
+  const anticipation = drop?.anticipation;
+  if (anticipation !== undefined &&
+    (!anticipation || !ids.has(anticipation.symbolId) ||
+      !positiveInt(anticipation.count) || !nonNegativeInt(anticipation.reelPauseMs)))
+    invalid("presentation.drop.anticipation");
   const loading = display.loadingScreen;
   if (loading !== undefined &&
     (!loading || ![loading.background, loading.brandLogo, loading.brandName, loading.gameLogo].every(nonEmpty)))
     invalid("presentation.loadingScreen");
+  const controls = display.controls;
+  if (controls !== undefined &&
+    (!controls || typeof controls.menu !== "boolean" || !Array.isArray(controls.autoRounds) ||
+      !controls.autoRounds.length || !controls.autoRounds.every(positiveInt) ||
+      new Set(controls.autoRounds).size !== controls.autoRounds.length))
+    invalid("presentation.controls");
   if (
     display.symbolEdgeInsetPx !== undefined &&
     (!nonNegativeInt(display.symbolEdgeInsetPx) ||
@@ -116,6 +127,12 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.scene");
   const camera = scene?.backgroundCamera;
   const openingDimmer = scene?.openingDimmerOpacity;
+  const chestCamera = scene?.chestCamera;
+  if (chestCamera !== undefined &&
+      (!chestCamera || !Number.isFinite(chestCamera.scale) || chestCamera.scale < 1 ||
+       !nonNegative(chestCamera.originY) || chestCamera.originY > 1 ||
+       !positiveInt(chestCamera.durationMs)))
+    invalid("presentation.scene.chestCamera");
   if (openingDimmer !== undefined && (!nonNegative(openingDimmer) || openingDimmer > 1))
     invalid("presentation.scene.openingDimmerOpacity");
   if (

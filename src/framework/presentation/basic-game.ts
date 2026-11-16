@@ -5,10 +5,14 @@ import { HttpTransport } from "../transport/http.ts";
 import type { GameDefinition } from "../domain/contracts.ts";
 import type { BrandLoader } from "./brand-loading.ts";
 
-export async function mountBasicGame(root: HTMLElement, game: GameDefinition, loader?: BrandLoader) {
+export async function mountBasicGame(
+  root: HTMLElement,
+  game: GameDefinition,
+  loader?: BrandLoader,
+  navigation?: { href: string; label: string },
+) {
   root.innerHTML = `
     <main class="reuse-example">
-      <a href="./">← Tavern Drop</a>
       <h1></h1>
       <p class="board-details"></p>
       <div class="reel-host" id="reuse-board"></div>
@@ -16,9 +20,15 @@ export async function mountBasicGame(root: HTMLElement, game: GameDefinition, lo
       <span id="reuse-balance"></span></div>
       <p id="reuse-status" role="status">Connecting to demo server…</p>
     </main>`;
+  if (navigation) {
+    const link = document.createElement("a");
+    link.href = navigation.href;
+    link.textContent = navigation.label;
+    root.querySelector("main")!.prepend(link);
+  }
   root.querySelector("h1")!.textContent = game.title;
   root.querySelector(".board-details")!.textContent =
-    `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines`;
+    `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines · ${game.presentation.spinType} spin`;
   const symbols = new Map(game.symbols.map((symbol) => [symbol.id, symbol]));
 
   const { controller, board, mount } = createSlotSession(

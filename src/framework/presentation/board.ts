@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, RenderLayer } from "pixi.js";
 import { keepWithinVerticalViewport, reelCellCenter, type VerticalBounds } from "./grid.ts";
 import { drawDimmer } from "./scene.ts";
+import { planDropColumns } from "./drop-schedule.ts";
 import type {
   Board,
   GameDefinition,
@@ -23,6 +24,11 @@ export type SymbolFactory = (cellSizePx: number) => SymbolView;
 interface DropRound {
   exit: Promise<void>;
   skipped: boolean;
+}
+interface ReelStopEvents {
+  symbol?: (id: string, position: Position) => void;
+  reel?: (reel: number) => void;
+  anticipation?: (active: boolean) => void;
 }
 
 /** Presentation owns motion only. It never evaluates outcomes or changes wallet state. */
@@ -200,12 +206,18 @@ export class BoardView {
       this.finishDrop?.();
     }
   }
-  async stop(board: Board, playLandingEffects?: (effects: SymbolLandingEffects) => void) {
+  async stop(
+    board: Board,
+    playLandingEffects?: (effects: SymbolLandingEffects) => void,
+    events?: ReelStopEvents,
+  ) {
     const effectsBySymbol = this.game.presentation.symbolLandingEffects;
-    const onLand = effectsBySymbol && playLandingEffects && ((reel: number, row: number) => {
+    const onLand = (reel: number, row: number) => {
       const symbol = board[reel][row];
-      if (Object.hasOwn(effectsBySymbol, symbol)) playLandingEffects(effectsBySymbol[symbol]);
-    });
+      if (effectsBySymbol && Object.hasOwn(effectsBySymbol, symbol))
+        playLandingEffects?.(effectsBySymbol[symbol]);
+      events?.symbol?.(symbol, { reel, row });
+    };
     const drop = this.dropRound;
     if (drop) {
       await drop.exit;
@@ -213,7 +225,7 @@ export class BoardView {
       if (!drop.skipped) {
         board.forEach((symbols, reel) => this.setReel(reel, symbols, "idle"));
         this.strip.visible = true;
-        await this.animateDrop(true, onLand);
+        await this.animateDrop(true, { board, onLand, events });
       }
       if (this.dropRound === drop) {
         this.dropRound = null;
@@ -226,7 +238,8 @@ export class BoardView {
       await delay(this.fast ? normal.turboStopDelayMs : normal.stopDelayMs);
       this.spinning[reel] = false;
       this.setReel(reel, board[reel], this.fast ? "idle" : "land");
-      if (onLand) board[reel].forEach((_, row) => onLand(reel, row));
+      board[reel].forEach((_, row) => onLand(reel, row));
+      events?.reel?.(reel);
       // Reel-specific settling bounce while later reels are still spinning.
       const col = this.columns[reel],
         start = performance.now();
@@ -240,7 +253,11 @@ export class BoardView {
     }
     this.strip.visible = true;
   }
-  private animateDrop(entering: boolean, onLand?: (reel: number, row: number) => void) {
+  private animateDrop(entering: boolean, landing?: {
+    board: Board;
+    onLand: (reel: number, row: number) => void;
+    events?: ReelStopEvents;
+  }) {
     for (const [tile, edge] of this.edgeTiles) {
       edge.settled = false;
       if (entering) tile.view.pivot.y = edge.pivotY;
@@ -263,13 +280,20 @@ export class BoardView {
           row,
           from,
           to,
-          start:
-            reel * reelStaggerMs + (this.game.rows - 1 - row) * rowStaggerMs,
+          start: (this.game.rows - 1 - row) * rowStaggerMs,
           fall: fallMs * Math.sqrt((to - from) / boardHeight),
           landed: false,
         };
       }),
     );
+    const reelLandMs = Math.max(...moves.slice(0, this.game.rows).map((move) => move.start + move.fall));
+    const plan = landing
+      ? planDropColumns(landing.board, reelStaggerMs, reelLandMs, this.fast ? undefined : drop.anticipation)
+      : undefined;
+    for (const move of moves)
+      move.start += plan?.starts[move.reel] ?? move.reel * reelStaggerMs;
+    const landedReels = new Set<number>();
+    let anticipating = false;
     const duration =
       Math.max(...moves.map((move) => move.start + move.fall)) +
       bounce +
@@ -298,10 +322,20 @@ export class BoardView {
           const edge = this.edgeTiles.get(move.tile);
           if (edge) edge.settled = true;
           move.tile.effect?.("land");
-          onLand?.(move.reel, move.row);
+          landing?.onLand(move.reel, move.row);
         }
       }
       if (entering) this.fitEdgeSymbols();
+      if (!plan || !this.dropRound || this.dropRound.skipped) return;
+      plan.starts.forEach((start, reel) => {
+        if (time < start + reelLandMs || landedReels.has(reel)) return;
+        landedReels.add(reel);
+        landing?.events?.reel?.(reel);
+      });
+      if (!anticipating && plan.anticipationAt !== undefined && time >= plan.anticipationAt) {
+        anticipating = true;
+        landing?.events?.anticipation?.(true);
+      }
     };
 
     paint(0);
@@ -313,6 +347,7 @@ export class BoardView {
         cancelAnimationFrame(frame);
         this.finishDrop = null;
         paint(duration);
+        if (anticipating) landing?.events?.anticipation?.(false);
         resolve();
       };
       const tick = (now: number) => {
@@ -380,6 +415,7 @@ export class BoardView {
       }
     }
     this.dimmer.visible = this.winningSymbols.renderLayerChildren.length > 0;
+    this.app.canvas.toggleAttribute("data-win-focus", this.dimmer.visible);
     return Promise.all(animations);
   }
   clearHighlight() {
@@ -389,6 +425,7 @@ export class BoardView {
     }
     this.winningSymbols.detachAll();
     this.dimmer.visible = false;
+    this.app.canvas.removeAttribute("data-win-focus");
   }
   destroy() {
     this.dropRound = null;
