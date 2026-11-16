@@ -8,10 +8,10 @@ Chrome headless used SwiftShader software WebGL. Each sample measured browser an
 
 | Viewport | Idle rAF before → after | Spin rAF before → after | Spin frame-time p95 before → after |
 | --- | --- | --- | --- |
-| 1280 × 720, DPR 1 | 7.9 → 14.2 fps | 8.1 → 22.5 fps | 250 → 66.6 ms |
-| 390 × 844, DPR 2 | 3.1 → 21.5 fps | 4.5 → 22.1 fps | 533.3 → 66.7 ms |
+| 1280 × 720, DPR 1 | 7.9 → 19.8 fps | 8.1 → 21.5 fps | 250 → 66.7 ms |
+| 390 × 844, DPR 2 | 3.1 → 21.2 fps | 4.5 → 28.0 fps | 533.3 → 50.0 ms |
 
-The portrait capture recorded zero WebGL draws from a separate mascot canvas after the change. The table measures the initial performance pass before the later landscape mascot sharpness adjustment. That adjustment sizes the mascot canvas from the combined idle and win bounds and its displayed width. Repeat the performance tests with hardware acceleration on target devices.
+The portrait capture recorded zero WebGL draws from a separate mascot canvas after the change. The final capture includes the desktop sharpness adjustment, which sizes the mascot canvas from the combined idle and win bounds and its displayed width. Repeat the performance tests with hardware acceleration on target devices.
 
 ## Next checks
 
