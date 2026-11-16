@@ -4,7 +4,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npm start -- --no-animator-viewer",
+    "startCommand": "npm start",
     "healthcheckPath": "/",
     "healthcheckTimeout": 100
   }

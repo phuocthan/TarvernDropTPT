@@ -14,7 +14,7 @@ if (requested === "viewer") {
     viewer.src = "./asset-viewer/index.html";
     viewer.className = "animation-viewer-frame";
     root.append(viewer);
-  } else root.textContent = "Animation viewer is available in the local build.";
+  } else root.textContent = "Animation viewer is unavailable on this host.";
 } else {
   const query = requested === "tarvern" ? "tavern" : requested === "default" ? "reuse" : requested;
   const game = games.find(({ routing }) => routing.query === query) ?? defaultGame;

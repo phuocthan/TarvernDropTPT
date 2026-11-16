@@ -12,8 +12,6 @@ const games = new Map(catalog.map((definition) => [
 ]));
 const root = resolve("dist");
 const viewerRoot = resolve("asset-viewer");
-const loopbackPeers = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-const loopbackHost = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -85,11 +83,7 @@ createServer(async (req, res) => {
     let staticRoot = root;
     let staticPath = path === "/" ? "/index.html" : decodeURIComponent(path);
     if (staticPath.startsWith("/asset-viewer/")) {
-      if (
-        process.argv.includes("--no-animator-viewer") ||
-        !loopbackPeers.has(req.socket.remoteAddress) ||
-        !loopbackHost.test(req.headers.host ?? "")
-      ) {
+      if (process.argv.includes("--no-animator-viewer")) {
         res.writeHead(404).end("Not found");
         return;
       }

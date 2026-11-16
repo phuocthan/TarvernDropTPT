@@ -13,4 +13,4 @@ The reference runtime asset files live in `public/tavern-assets/assets/`. The re
 
 All 54 files under `assets/` matched the provider's Tavern Drop v13 CDN byte-for-byte by SHA-256. The SVGs were matched against the live HUD and then extracted from its bundle. The development repo also contains a cover image and favicon. The provider's application bundle and shared links' logos for other studios are outside the Tavern runtime asset inventory.
 
-Open `/?game=viewer` locally to play clips or browse the gallery. The viewer is disabled on the Railway deployment and stays outside the client milestone export.
+Open `/?game=viewer` locally or on the Railway deployment to play clips or browse the gallery. The client milestone export has its own file list.

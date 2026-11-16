@@ -4,7 +4,7 @@ The TypeScript/PixiJS 8 framework shares session, transport, reel rendering, ass
 
 - `/?game=tarvern` runs Tavern Drop. `/` and `/?game=tavern` also open this game.
 - `/?game=default` runs the configurable 3 × 3 example with the shared reel renderer and a separate demo wallet. `/?game=reuse` still works.
-- `/?game=viewer` opens the animation player and asset gallery in Vite and in local builds served by `npm start`. Railway disables the viewer.
+- `/?game=viewer` opens the animation player and asset gallery in Vite and on hosts that run `npm start`, including Railway. To disable the viewer on a particular host, start it with `npm start -- --no-animator-viewer`.
 
 The framework implementation lives in this repository. It uses the shared-core/game-module split as an architecture pattern and has no code or runtime dependency from Gen3. Tavern art and audio came from the Paperclip Gaming reference demo and are used here as reference assets. Spine is a separate dependency with its [runtime license](https://esotericsoftware.com/spine-runtimes-license) included under the asset viewer's vendor directory. Confirm the rights to distribute the art, audio, and Spine runtime before commercial handover.
 
