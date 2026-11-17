@@ -144,7 +144,10 @@
               "minItems": 1,
               "uniqueItems": true,
               "items": { "type": "integer", "minimum": 1 }
-            }
+            },
+            "autoUnlimited": { "type": "boolean" },
+            "autoTopUp": { "type": "integer", "minimum": 1 },
+            "betMenuCloseDelayMs": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": false
         },
@@ -155,9 +158,23 @@
             "background": { "type": "string", "pattern": "\\S" },
             "brandLogo": { "type": "string", "pattern": "\\S" },
             "brandName": { "type": "string", "pattern": "\\S" },
-            "gameLogo": { "type": "string", "pattern": "\\S" }
+            "gameLogo": { "type": "string", "pattern": "\\S" },
+            "brandIntro": {
+              "type": "object",
+              "required": ["src", "durationMs"],
+              "properties": {
+                "src": { "type": "string", "pattern": "\\S" },
+                "durationMs": { "type": "integer", "minimum": 1 },
+                "holdUntilReady": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
           },
           "additionalProperties": false
+        },
+        "reelMaskPaddingPx": {
+          "type": "integer",
+          "minimum": 0
         },
         "winDimmerOpacity": {
           "description": "Opacity of the dark overlay beneath the active winning symbols.",
@@ -204,6 +221,17 @@
               "minimum": 0,
               "maximum": 1
             },
+            "openingReveal": {
+              "type": "object",
+              "required": ["durationMs", "symbolDelayMs", "mascotDelayMs"],
+              "properties": {
+                "durationMs": { "type": "integer", "minimum": 1 },
+                "symbolDelayMs": { "type": "integer", "minimum": 0 },
+                "mascotDelayMs": { "type": "integer", "minimum": 0 },
+                "playbackRate": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "additionalProperties": false
+            },
             "chestCamera": {
               "type": "object",
               "required": ["scale", "originY", "durationMs"],
@@ -239,6 +267,15 @@
           },
           "additionalProperties": false
         },
+        "checkWinDelayMs": {
+          "type": "object",
+          "required": ["normal", "turbo"],
+          "properties": {
+            "normal": { "type": "integer", "minimum": 0 },
+            "turbo": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
         "feature": {
           "type": "object",
           "required": ["startDelayMs", "endDelayMs"],
@@ -253,7 +290,6 @@
               "type": "integer",
               "minimum": 0
             },
-            "totalWinHoldMs": { "type": "integer", "minimum": 1 },
             "hideSymbolsUntilFirstSpin": {
               "type": "boolean",
               "default": false

@@ -78,6 +78,7 @@ export interface BrandLoadingConfig {
   brandLogo: string;
   brandName: string;
   gameLogo: string;
+  brandIntro?: { src: string; durationMs: number; holdUntilReady?: boolean };
 }
 export interface DropTiming {
   fallMs: number;
@@ -95,15 +96,18 @@ export interface ReelPresentation {
   cellSizePx: number;
   gapPx: number;
   symbolEdgeInsetPx?: number;
+  reelMaskPaddingPx?: number;
   winDimmerOpacity?: number;
   symbolLandingEffects?: Record<string, SymbolLandingEffects>;
   loadingScreen?: BrandLoadingConfig;
-  controls?: { menu: boolean; autoRounds: number[] };
+  controls?: { menu: boolean; autoRounds: number[]; autoUnlimited?: boolean; autoTopUp?: number; betMenuCloseDelayMs?: number };
+  checkWinDelayMs?: { normal: number; turbo: number };
   animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };
   scene?: {
     layers: Record<string, number>;
     slots: Record<string, string>;
     openingDimmerOpacity?: number;
+    openingReveal?: { durationMs: number; symbolDelayMs: number; mascotDelayMs: number; playbackRate?: number };
     chestCamera?: { scale: number; originY: number; durationMs: number };
     sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };
     backgroundCamera?: {
@@ -117,7 +121,6 @@ export interface ReelPresentation {
   feature?: {
     startDelayMs: number;
     endDelayMs: number;
-    totalWinHoldMs?: number;
     hideSymbolsUntilFirstSpin?: boolean;
   };
   normal: {

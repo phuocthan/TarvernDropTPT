@@ -31,7 +31,7 @@ export async function mountBasicGame(
     `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines · ${game.presentation.spinType} spin`;
   const symbols = new Map(game.symbols.map((symbol) => [symbol.id, symbol]));
 
-  const { controller, board, mount } = createSlotSession(
+  const { controller, board, mount, waitAfterReels } = createSlotSession(
     game,
     new HttpTransport(game.routing.apiBase),
     (cellSizePx) => {
@@ -94,6 +94,7 @@ export async function mountBasicGame(
             chance: "standard",
           }));
       await board.stop(outcome.state.board);
+      await waitAfterReels(false);
       board.highlight(outcome.wins);
       controller.completePresentation();
       status.textContent = outcome.wins.length

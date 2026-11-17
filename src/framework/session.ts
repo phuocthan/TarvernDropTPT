@@ -22,6 +22,11 @@ export function createSlotSession(
     controller,
     board,
     prepareFeatureEntry,
+    async waitAfterReels(turbo: boolean) {
+      const timing = game.presentation.checkWinDelayMs;
+      const ms = timing ? (turbo ? timing.turbo : timing.normal) : 0;
+      if (ms) await new Promise<void>((resolve) => setTimeout(resolve, ms));
+    },
     nextSpinDelay(baseDelayMs: number) {
       const feature = controller.state?.feature;
       return baseDelayMs +
@@ -33,8 +38,8 @@ export function createSlotSession(
       if (timing?.endDelayMs)
         await new Promise<void>((resolve) => setTimeout(resolve, timing.endDelayMs));
     },
-    async mount(host: HTMLElement) {
-      await Promise.all([board.mount(host), controller.boot()]);
+    async mount(host: HTMLElement, options?: { autoStart?: boolean }) {
+      await Promise.all([board.mount(host, options), controller.boot()]);
       board.setBoard(controller.state!.board);
       if (controller.state!.feature?.played === 0) prepareFeatureEntry();
     },

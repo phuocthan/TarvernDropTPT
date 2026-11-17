@@ -328,6 +328,11 @@ button small {
   width: 100% !important;
   height: 100% !important;
 }
+.reel-host[data-mask-padding] { overflow: visible; }
+.reel-host[data-mask-padding] > canvas {
+  height: var(--reel-canvas-height) !important;
+  translate: 0 var(--reel-canvas-offset);
+}
 .board-loading {
   position: absolute;
   inset: 15px;

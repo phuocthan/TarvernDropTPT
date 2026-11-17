@@ -62,16 +62,19 @@ export class BoardView {
     this.cell = game.presentation.cellSizePx;
     this.gap = game.presentation.gapPx;
   }
-  async mount(host: HTMLElement) {
+  async mount(host: HTMLElement, { autoStart = true } = {}) {
     const width = this.game.reels * (this.cell + this.gap) - this.gap;
     const height = this.game.rows * (this.cell + this.gap) - this.gap;
+    const padding = this.game.presentation.reelMaskPaddingPx ?? 0;
+    const renderHeight = height + 2 * padding;
     const boardResolution = () => {
       const dpr = Math.min(devicePixelRatio, 2);
       return Math.min(dpr, Math.max(1, (host.clientWidth || width) * dpr / width));
     };
     await this.app.init({
       width,
-      height,
+      height: renderHeight,
+      autoStart,
       backgroundAlpha: 0,
       antialias: true,
       resolution: boardResolution(),
@@ -79,11 +82,17 @@ export class BoardView {
       preference: "webgl",
     });
     this.app.ticker.minFPS = 0;
+    if (padding) {
+      host.dataset.maskPadding = "true";
+      host.style.setProperty("--reel-canvas-height", `${100 * renderHeight / height}%`);
+      host.style.setProperty("--reel-canvas-offset", `${-100 * padding / renderHeight}%`);
+      this.app.stage.y = padding;
+    }
     host.appendChild(this.app.canvas);
     this.resizeObserver = new ResizeObserver(() => {
       const resolution = boardResolution();
       if (Math.abs(this.app.renderer.resolution - resolution) > 0.05)
-        this.app.renderer.resize(width, height, resolution);
+        this.app.renderer.resize(width, renderHeight, resolution);
     });
     this.resizeObserver.observe(host);
     this.app.canvas.setAttribute(
@@ -93,7 +102,7 @@ export class BoardView {
     const maskedReels = new Container();
     maskedReels.addChild(this.strip, this.winningSymbols);
     const mask = new Graphics()
-      .rect(0, 0, width, height)
+      .rect(0, -padding, width, renderHeight)
       .fill(0xffffff);
     this.app.stage.addChild(maskedReels, this.highlights, this.tokens, mask);
     maskedReels.mask = mask;
@@ -188,7 +197,7 @@ export class BoardView {
       if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
       const offset = keepWithinVerticalViewport(
         { top: Math.min(a, b), bottom: Math.max(a, b) },
-        this.app.screen.height, inset,
+        this.app.screen.height - 2 * (this.game.presentation.reelMaskPaddingPx ?? 0), inset,
       );
       view.pivot.y = edge.pivotY - offset / scale;
     }
@@ -252,6 +261,7 @@ export class BoardView {
       return;
     }
     const normal = this.game.presentation.normal;
+    let lastBounce: Promise<void> = Promise.resolve();
     for (let reel = 0; reel < this.game.reels; reel++) {
       await delay(this.fast ? normal.turboStopDelayMs : normal.stopDelayMs);
       this.spinning[reel] = false;
@@ -261,14 +271,20 @@ export class BoardView {
       // Reel-specific settling bounce while later reels are still spinning.
       const col = this.columns[reel],
         start = performance.now();
-      const bounce = () => {
-        const t = Math.min(1, (performance.now() - start) / normal.bounceMs);
-        col.y = Math.sin(t * Math.PI) * normal.bouncePx * (1 - t);
-        if (t < 1) requestAnimationFrame(bounce);
-        else col.y = 0;
-      };
-      bounce();
+      lastBounce = new Promise<void>((resolve) => {
+        const bounce = () => {
+          const t = Math.min(1, (performance.now() - start) / normal.bounceMs);
+          col.y = Math.sin(t * Math.PI) * normal.bouncePx * (1 - t);
+          if (t < 1) requestAnimationFrame(bounce);
+          else {
+            col.y = 0;
+            resolve();
+          }
+        };
+        bounce();
+      });
     }
+    await lastBounce;
     this.strip.visible = true;
   }
   private animateDrop(entering: boolean, landing?: {

@@ -45,7 +45,7 @@ export class MockGame {
     if (
       !["spin", "buy-tavern", "buy-drop"].includes(command.action) ||
       !["standard", "extra", "super"].includes(command.chance) ||
-      !this.game.bets.includes(command.bet)
+      (!this.state.feature && !this.game.bets.includes(command.bet))
     )
       throw Error("INVALID_COMMAND");
     const state = structuredClone(this.state),

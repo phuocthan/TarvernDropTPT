@@ -16,8 +16,8 @@ export function createMascot(app: Application) {
   return mascot;
 }
 
-export function playMascotWin(mascot: Spine) {
-  mascot.state.setAnimation(0, "win", false);
+export function playMascotWin(mascot: Spine, playbackRate = 1) {
+  mascot.state.setAnimation(0, "win", false).timeScale = playbackRate;
   mascot.state.addAnimation(0, "idle", true, 0);
 }
 
@@ -51,14 +51,13 @@ export async function mountMascot(host: HTMLElement) {
     app.canvas.className = "mascot-animation";
     host.append(app.canvas);
     host.dataset.ready = "true";
-    if (reduceMotion) {
-      app.render();
-      app.stop();
-    }
+    app.render();
     return {
       setActive(active: boolean) {
-        if (active && !reduceMotion) app.start();
-        else app.stop();
+        if (active && !reduceMotion) {
+          app.render();
+          app.start();
+        } else app.stop();
       },
       place({ x, y, scale: worldScale }: SceneAnchor) {
         const ratio = worldScale / scale;
@@ -74,9 +73,9 @@ export async function mountMascot(host: HTMLElement) {
         if (host.style.top !== top) host.style.top = top;
         if (host.style.width !== width) host.style.width = width;
       },
-      win() {
+      win(playbackRate?: number) {
         if (reduceMotion) return;
-        playMascotWin(mascot);
+        playMascotWin(mascot, playbackRate);
       },
     };
   } catch (error) {

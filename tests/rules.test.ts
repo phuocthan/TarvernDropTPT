@@ -162,11 +162,11 @@ test("paid and free spin wallet accounting, locked bet and bonus buy", () => {
   const server = new MockGame(tavern, () => 0.5);
   server.execute(command(server, "buy", "buy-tavern"));
   assert.equal(server.state.balance, 95000);
-  assert.equal(server.state.feature?.remaining, 8);
+  assert.equal(server.state.feature?.remaining, 10);
   const balance = server.state.balance;
   server.execute(command(server, "free"), board());
   assert.equal(server.state.balance, balance);
-  assert.equal(server.state.feature?.remaining, 7);
+  assert.equal(server.state.feature?.remaining, 9);
   assert.throws(
     () => server.execute({ ...command(server, "bad"), bet: 200 }),
     /FEATURE_LOCKED/,

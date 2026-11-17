@@ -98,11 +98,19 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   if (loading !== undefined &&
     (!loading || ![loading.background, loading.brandLogo, loading.brandName, loading.gameLogo].every(nonEmpty)))
     invalid("presentation.loadingScreen");
+  const brandIntro = loading?.brandIntro;
+  if (brandIntro !== undefined &&
+      (!brandIntro || !nonEmpty(brandIntro.src) || !positiveInt(brandIntro.durationMs) ||
+       (brandIntro.holdUntilReady !== undefined && typeof brandIntro.holdUntilReady !== "boolean")))
+    invalid("presentation.loadingScreen.brandIntro");
   const controls = display.controls;
   if (controls !== undefined &&
     (!controls || typeof controls.menu !== "boolean" || !Array.isArray(controls.autoRounds) ||
       !controls.autoRounds.length || !controls.autoRounds.every(positiveInt) ||
-      new Set(controls.autoRounds).size !== controls.autoRounds.length))
+      new Set(controls.autoRounds).size !== controls.autoRounds.length ||
+      (controls.autoUnlimited !== undefined && typeof controls.autoUnlimited !== "boolean") ||
+      (controls.autoTopUp !== undefined && !positiveInt(controls.autoTopUp)) ||
+      (controls.betMenuCloseDelayMs !== undefined && !nonNegativeInt(controls.betMenuCloseDelayMs))))
     invalid("presentation.controls");
   if (
     display.symbolEdgeInsetPx !== undefined &&
@@ -110,6 +118,8 @@ export function loadGameConfig(raw: unknown): GameDefinition {
       display.symbolEdgeInsetPx * 2 >= game.rows * (display.cellSizePx + display.gapPx) - display.gapPx)
   )
     invalid("presentation.symbolEdgeInsetPx");
+  if (display.reelMaskPaddingPx !== undefined && !nonNegativeInt(display.reelMaskPaddingPx))
+    invalid("presentation.reelMaskPaddingPx");
   if (
     animationGrid !== undefined &&
     (!animationGrid || !nonEmpty(animationGrid.originSlot) ||
@@ -127,6 +137,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.scene");
   const camera = scene?.backgroundCamera;
   const openingDimmer = scene?.openingDimmerOpacity;
+  const openingReveal = scene?.openingReveal;
   const chestCamera = scene?.chestCamera;
   const sideLogo = scene?.sideLogo;
   if (sideLogo !== undefined &&
@@ -140,6 +151,14 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.scene.chestCamera");
   if (openingDimmer !== undefined && (!nonNegative(openingDimmer) || openingDimmer > 1))
     invalid("presentation.scene.openingDimmerOpacity");
+  if (openingReveal !== undefined &&
+      (!openingReveal || !positiveInt(openingReveal.durationMs) ||
+       (openingReveal.playbackRate !== undefined &&
+        (!Number.isFinite(openingReveal.playbackRate) || openingReveal.playbackRate <= 0)) ||
+       ![openingReveal.symbolDelayMs, openingReveal.mascotDelayMs].every(
+         (delay) => nonNegativeInt(delay) && delay < openingReveal.durationMs,
+       )))
+    invalid("presentation.scene.openingReveal");
   if (
     camera !== undefined &&
     (!camera || ![camera.width, camera.top, camera.landscapeBottom, camera.portraitBottom].every(positiveInt) ||
@@ -152,6 +171,10 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   )
     invalid("presentation.winDimmerOpacity");
   const landing = display.symbolLandingEffects;
+  const checkWinDelay = display.checkWinDelayMs;
+  if (checkWinDelay !== undefined &&
+      (!checkWinDelay || !nonNegativeInt(checkWinDelay.normal) || !nonNegativeInt(checkWinDelay.turbo)))
+    invalid("presentation.checkWinDelayMs");
   if (
     landing !== undefined &&
     (!landing || typeof landing !== "object" || Array.isArray(landing) ||
@@ -168,7 +191,6 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     (!feature ||
       !nonNegativeInt(feature.startDelayMs) ||
       !nonNegativeInt(feature.endDelayMs) ||
-      (feature.totalWinHoldMs !== undefined && !positiveInt(feature.totalWinHoldMs)) ||
       (feature.hideSymbolsUntilFirstSpin !== undefined && typeof feature.hideSymbolsUntilFirstSpin !== "boolean"))
   )
     invalid("presentation.feature");

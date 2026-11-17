@@ -4,12 +4,21 @@ import { tavern } from "../../src/games/tavern/definition.ts";
 import { reuse } from "../../src/games/reuse/definition.ts";
 test.beforeEach(async ({ page }, testInfo) => {
   if (testInfo.title.startsWith("real demo API")) return;
-  await page.addInitScript((key) => sessionStorage.setItem(key, "seen"), tavern.id + ".opening");
+  await page.addInitScript(() => {
+    const timer = setInterval(() => {
+      const opening = document.querySelector<HTMLButtonElement>(".opening-continue");
+      if (opening && !document.querySelector(".brand-loading")) {
+        opening.click();
+        clearInterval(timer);
+      }
+    }, 50);
+  });
 });
 
 test("real demo API boots the Pixi board, spins and opens rules", async ({
   page,
 }) => {
+  test.setTimeout(60000);
   const errors: string[] = [];
   const assetRequests = new Set<string>();
   page.on("response", (response) => {
@@ -17,6 +26,18 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
       assetRequests.add(new URL(response.url()).pathname);
   });
   page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function (...args: Parameters<Element["animate"]>) {
+      if (this.classList.contains("brand-loading")) {
+        const scene = document.querySelector(".stage[data-spine-scene]");
+        document.documentElement.dataset.openingCrossfade = String(
+          Boolean(scene?.querySelector("canvas") && scene.closest("[data-opening]")),
+        );
+      }
+      return animate.apply(this, args);
+    };
+  });
   let releaseSession!: () => void;
   const sessionGate = new Promise<void>((resolve) => { releaseSession = resolve; });
   await page.route("**/api/session", async (route) => {
@@ -24,13 +45,58 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
     await route.continue();
   });
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("img", { name: "Paperclip Gaming" })).toBeVisible();
+  const intro = page.locator(".brand-loading-intro");
+  await expect(intro.getByRole("img", { name: "Paperclip Gaming" })).toHaveAttribute("src", /paperclip-rMFDawAD\.gif$/);
+  await expect(intro).toHaveCSS("background-color", "rgb(0, 0, 0)");
+  await page.waitForTimeout(tavern.presentation.loadingScreen!.brandIntro!.durationMs + 100);
+  await expect(intro).toBeVisible();
+  await expect(page.locator(".brand-loading-game")).toHaveCount(0);
   await expect(page.getByRole("progressbar", { name: "Loading progress" })).toBeVisible();
   await expect(page.locator("#app")).toHaveAttribute("aria-busy", "true");
   releaseSession();
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/Demo max/)).toHaveCount(0);
   await expect(page.locator(".brand-loading")).toHaveCount(0);
+  await expect(page.locator(".tavern-top")).toHaveText(/^\s*\d{2}:\d{2} \| Tavern Drop\s*$/);
+  await expect(page.getByRole("link", { name: "Animator Viewer" })).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-opening-crossfade", "true");
+  const mascot = page.locator("#mascot canvas");
+  await expect(mascot).toHaveCount(1);
+  await expect(mascot).toBeHidden();
+  await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>(".game-shell")!;
+    new MutationObserver((_, observer) => {
+      if (!shell.hasAttribute("data-entering")) return;
+      const board = shell.querySelector("#board canvas")!;
+      const hud = shell.querySelector<HTMLElement>(".tavern-hud")!;
+      const mascot = shell.querySelector("#mascot")!;
+      const sample = JSON.stringify({
+        boardOpacity: getComputedStyle(board).opacity,
+        hudFilter: getComputedStyle(hud).filter,
+        hudLocked: hud.inert,
+        mascotVisibility: getComputedStyle(mascot).visibility,
+        mascotFilter: getComputedStyle(mascot).filter,
+      });
+      if (shell.dataset.entering === "before-mascot")
+        document.documentElement.dataset.openingSample = sample;
+      else {
+        document.documentElement.dataset.openingMascot = sample;
+        observer.disconnect();
+      }
+    }).observe(shell, { attributes: true, attributeFilter: ["data-entering"] });
+  });
   await page.locator(".game-shell").click({ position: { x: 20, y: 20 } });
+  await expect(page.locator("html")).toHaveAttribute("data-opening-sample", JSON.stringify({
+    boardOpacity: "0",
+    hudFilter: "brightness(0.45)",
+    hudLocked: true,
+    mascotVisibility: "hidden",
+    mascotFilter: "none",
+  }));
+  await expect(page.locator("html")).toHaveAttribute("data-opening-mascot", /"mascotVisibility":"visible","mascotFilter":"none"/);
+  await expect(page.locator(".game-shell")).not.toHaveAttribute("data-entering");
+  await expect(page.locator("#board canvas")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".tavern-hud")).toHaveCSS("filter", "none");
   await expect(page.locator("#spin")).toBeEnabled();
   await expect(page.locator("#balance")).toHaveText("1,000.00");
   await page.getByRole("button", { name: "Open menu" }).click();
@@ -44,7 +110,7 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
     .poll(
       async () =>
         (await page.locator("#continue").isVisible()) ||
-        (await page.locator("#spin").textContent())?.includes("SPIN"),
+        (await page.locator("#spin").getAttribute("aria-label")) === "Spin",
       { timeout: 15000 },
     )
     .toBeTruthy();
@@ -122,6 +188,7 @@ for (const action of ["spin", "buy-drop"] as const) {
   test(`Turbo waits for Scatter win before opening the bonus intro from ${action}`, async ({
     page,
   }) => {
+    test.setTimeout(60000);
     const server = new MockGame(tavern, () => 0);
     const scatterCount = action === "spin" ? 3 : 4;
     const board = Array.from({ length: 5 }, (_, reel) =>
@@ -139,12 +206,28 @@ for (const action of ["spin", "buy-drop"] as const) {
     });
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/");
-    await expect(page.locator("#spin")).toBeEnabled();
+    await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
     await page.evaluate(async (count) => {
       const boardModule = "/src/framework/presentation/board.ts";
       const { BoardView } = await import(boardModule);
       const focusWins = BoardView.prototype.focusWins;
       const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
+      const spineUrl = performance.getEntriesByType("resource")
+        .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+      const { Spine } = await import(spineUrl);
+      let boardVisible: (() => boolean) | undefined;
+      const updateSpine = Spine.prototype.update;
+      Spine.prototype.update = function (elapsed: number) {
+        const result = updateSpine.call(this, elapsed);
+        if (this.state.getCurrent(2)?.animation?.name === "2_base_exit")
+          boardVisible = () => this.visible;
+        return result;
+      };
+      const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+      CanvasRenderingContext2D.prototype.drawImage = function (...args: unknown[]) {
+        if (dialog.open && boardVisible) dialog.dataset.frozenBoardVisible = String(boardVisible());
+        return Reflect.apply(drawImage, this, args);
+      };
       BoardView.prototype.focusWins = function (
         positions: { reel: number; row: number }[],
       ) {
@@ -178,8 +261,15 @@ for (const action of ["spin", "buy-drop"] as const) {
     ).toBeVisible({ timeout: 10000 });
     const dialog = page.locator("#dialog");
     await expect(dialog).toHaveAttribute("data-scatter-before-intro", "true");
+    await expect(dialog).toHaveAttribute("data-frozen-board-visible", "false");
+    await expect(page.locator(".machine")).toBeHidden();
+    const hud = page.locator(".tavern-hud");
+    await expect(hud).toBeHidden();
     const duration = await dialog.getAttribute("data-scatter-duration");
     expect(Number(duration)).toBeGreaterThan(300);
+    await page.locator("#continue").click();
+    await expect(hud).toBeVisible();
+    await expect(hud.locator("#feature-progress")).toHaveText("10");
   });
 }
 test.describe("touch controls", () => {
@@ -206,6 +296,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   game.demo.capMultiplier = 100000;
   const server = new MockGame(game, () => 0);
   const requests: string[] = [];
+  const spinAmounts: { win: number; total: number }[] = [];
   await page.route("**/api/session", (route) =>
     route.fulfill({ json: server.state }),
   );
@@ -218,7 +309,11 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
         for (let reel = 0; reel < 3; reel++) board[reel][0] = "bonus";
       }
     }
-    return route.fulfill({ json: server.execute(command, board) });
+    const outcome = server.execute(command, board);
+    const feature = outcome.finalFeature ?? outcome.state.feature;
+    if (command.action === "spin" && feature)
+      spinAmounts.push({ win: outcome.spinWin, total: feature.accumulated });
+    return route.fulfill({ json: outcome });
   });
   await page.goto("/");
   await expect(page.locator("#spin")).toBeEnabled();
@@ -256,7 +351,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(requests).toHaveLength(0);
   await page.evaluate(() => {
     const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
-    const status = document.querySelector("#status")!;
+    const reelCanvas = document.querySelector("#board canvas")!;
     const progress = document.querySelector("#feature-progress")!;
     const tiers: string[] = [];
     (window as any).featureTiers = tiers;
@@ -283,12 +378,12 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       performance.mark("feature-continue");
     }, { once: true });
     const finalPresentation = new MutationObserver(() => {
-      if (progress.textContent === "0" && status.textContent?.includes("WINNING")) {
+      if (progress.textContent === "0" && !reelCanvas.hasAttribute("data-win-focus")) {
         performance.mark("final-spin-presented");
         finalPresentation.disconnect();
       }
     });
-    finalPresentation.observe(status, { childList: true });
+    finalPresentation.observe(reelCanvas, { attributes: true, attributeFilter: ["data-win-focus"] });
     const stage = document.querySelector<HTMLElement>(".stage")!;
     const resultPopup = new MutationObserver(() => {
       if (stage.dataset.chestReveal === "true") {
@@ -314,6 +409,17 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", {
     timeout: 35000,
   });
+  const finalSpin = spinAmounts.at(-1)!;
+  expect(finalSpin.win).toBeGreaterThan(0);
+  expect(finalSpin.total).toBeGreaterThan(finalSpin.win);
+  await expect(page.locator("#win-value")).toBeVisible();
+  await expect(page.locator("#spin-win-amount")).toHaveText((finalSpin.win / 100).toFixed(2));
+  await expect(page.locator("#feature-total-amount")).toHaveText((finalSpin.total / 100).toFixed(2));
+  await expect(page.locator("#spin-win-label")).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(page.locator("#spin-win-amount")).toHaveCSS("color", "rgb(65, 225, 251)");
+  for (const property of ["font-size", "font-family"])
+    expect(await page.locator("#spin-win-amount").evaluate((el, property) => getComputedStyle(el).getPropertyValue(property), property))
+      .toBe(await page.locator("#balance").evaluate((el, property) => getComputedStyle(el).getPropertyValue(property), property));
   await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
   const delays = await page.evaluate(() => {
     const mark = (name: string) => performance.getEntriesByName(name, "mark")[0].startTime;
@@ -350,9 +456,16 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   const game = structuredClone(tavern);
   game.demo.featureSpins.drop = 1;
   const server = new MockGame(game, () => 0);
+  let releaseFreeSpin!: () => void;
+  let spinRequested = false;
+  const holdFreeSpin = new Promise<void>((resolve) => { releaseFreeSpin = resolve; });
   await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
-  await page.route("**/api/command", (route) => {
+  await page.route("**/api/command", async (route) => {
     const command = route.request().postDataJSON();
+    if (command.action === "spin") {
+      spinRequested = true;
+      await holdFreeSpin;
+    }
     const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
     const outcome = server.execute(command, board);
     if (unlocked && outcome.completion && outcome.finalFeature) {
@@ -362,7 +475,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     return route.fulfill({ json: outcome });
   });
   await page.goto("/");
-  await expect(page.locator("#spin")).toBeEnabled();
+  await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
   await page.evaluate(async () => {
     const spineUrl = performance.getEntriesByType("resource")
       .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
@@ -381,6 +494,9 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     const original = AnimationState.prototype.setAnimation;
     AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
       if (name === "4_finalwin" || /reel_3_chest_(open|finalwin)$/.test(name)) clips.push(name);
+      const result = document.querySelector<HTMLDialogElement>('#dialog[data-look="total-win"]');
+      if (name === "2_base_enter" && result?.open)
+        result.dataset.baseEnteredDuringOutro = String(!!result.querySelector('[data-spine-clip="total_win_end"]'));
       return original.call(this, track, name, loop);
     };
   });
@@ -389,15 +505,29 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   await page.locator("#confirm-buy").click();
   await expect(page.getByRole("heading", { name: "DROP BONUS" })).toBeVisible({ timeout: 15000 });
   await page.locator("#continue").click();
+  await expect.poll(() => spinRequested, { timeout: 15000 }).toBe(true);
+  await expect(page.locator("#feature-progress")).toHaveText("0");
+  releaseFreeSpin();
   if (unlocked) {
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", { timeout: 25000 });
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "1.00");
+    expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_finalwin")?.style.fontSize)).toBe(240);
     await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-opened", "3", { timeout: 10000 });
     expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_reel_mult_3")?.text)).toBe("x2");
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "2.00", { timeout: 10000 });
   }
   await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
+  const resultDialog = page.locator('#dialog[data-look="total-win"]');
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    expect(await resultDialog.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0);
+    const art = (await resultDialog.locator(".total-win-screen").boundingBox())!;
+    const portrait = viewport.width / viewport.height <= 0.8;
+    expect((art.y + art.height / 2) / viewport.height).toBeCloseTo(portrait ? 0.44 : 0.41, 2);
+    if (portrait) expect(art.width).toBe(viewport.width);
+    await expect(resultDialog.getByRole("button", { name: "Press to continue" })).toBeInViewport();
+  }
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
   await expect(page.locator(".result-total")).toHaveText(unlocked ? "2.00" : "0.00");
   if (unlocked) expect(await page.evaluate(() => (window as any).chestClips)).toEqual([
@@ -405,8 +535,14 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   ]);
   else expect(await page.evaluate(() => (window as any).chestClips)).toEqual([]);
   await expect(page.locator("#continue")).toBeEnabled();
+  if (!unlocked) {
+    // Wait past the previous automatic dismissal time, including the intro.
+    await page.waitForTimeout(6500);
+    await expect(page.locator("#dialog")).toBeVisible();
+  }
+  await page.mouse.click(5, 5);
+  await expect(resultDialog).toHaveAttribute("data-base-entered-during-outro", "true");
   if (unlocked) {
-    await page.mouse.click(5, 5);
     await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
     await expect.poll(() => page.evaluate(() => {
       const slots = (window as any).chestSlotObjects as Map<string, { text: string }>;
@@ -417,32 +553,126 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
   }
 });
-for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }, { width: 506, height: 812 }]) {
   test(`autoplay and menu fit the ${viewport.width}px layout`, async ({ page }) => {
     test.setTimeout(60000);
     await page.setViewportSize(viewport);
     await page.goto("/");
-    await expect(page.locator("#spin")).toBeEnabled();
+    await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
     const spin = page.locator("#spin");
     const turbo = page.getByRole("button", { name: "Turbo" });
     const width = (await spin.boundingBox())!.width;
-    expect(width).toBeCloseTo(viewport.width > 670 ? 102 : 82.875, 1);
+    expect(width).toBeCloseTo(viewport.width > 670 ? 102 : 8.5 * Math.min(10, viewport.width * 0.025), 1);
     await expect(turbo).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await turbo.click();
     await expect(turbo).toHaveCSS("background-color", "rgb(0, 0, 0)");
     await expect(turbo).toHaveCSS("color", "rgb(65, 225, 251)");
     await turbo.click();
     if (viewport.width > 670) {
+      expect(await page.locator(".hud-bar").evaluate((bar) => getComputedStyle(bar, "::before").backgroundColor))
+        .toBe("rgba(19, 23, 21, 0.82)");
+      const up = (await page.locator("#bet-up").boundingBox())!;
+      const down = (await page.locator("#bet-down").boundingBox())!;
+      expect(down.y - up.y - up.height).toBeCloseTo(18);
+      const auto = (await page.locator("#auto").boundingBox())!;
+      const speed = (await page.locator("#speed").boundingBox())!;
+      expect(speed.y - auto.y - auto.height).toBeGreaterThan(7.2);
+      await expect(page.locator("#bet-picker")).toHaveCSS("min-width", "102px");
+      await expect(page.locator("#balance")).toHaveCSS("font-size", "22px");
       await spin.hover();
-      await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(65, 225, 251)");
+      await expect(spin).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, -2)");
+      await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(0, 0, 0)");
     }
     await page.getByRole("button", { name: "Autoplay", exact: true }).click();
     const panel = page.locator("#auto-panel");
     await expect(panel).toBeVisible();
-    await expect(panel.locator("button")).toHaveText(["–", "10", "25", "50", "100", "250", "500", "1000"]);
+    await expect(panel.locator("button")).toHaveText(["∞", "10", "25", "50", "100", "250", "500", "1000"]);
     await expect(panel).toBeInViewport();
-    await panel.getByRole("button", { name: "Turn autoplay off" }).click();
+    if (viewport.width < 670) {
+      const grid = await panel.locator(".round-picker-options").evaluate((el) => getComputedStyle(el).gridTemplateColumns);
+      expect(grid.split(" ")).toHaveLength(3);
+      expect((await panel.boundingBox())!.width).toBeCloseTo(viewport.width * 0.65, 0);
+    }
+    const unlimited = panel.getByRole("button", { name: "Unlimited autoplay" });
+    await unlimited.click();
+    await expect(unlimited).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
+    await page.locator("#bet-picker").hover();
+    await expect(page.locator("#bet-picker")).toHaveCSS("transform", "none");
+    await page.locator("#bet-picker").click();
+    const betPanel = page.locator("#bet-panel");
+    await expect(betPanel).toBeInViewport();
+    await expect(betPanel.getByRole("button", { name: "$1.00", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const nextBet = betPanel.getByRole("button", { name: "$1.20", exact: true });
+    await nextBet.evaluate((button) => {
+      const panel = button.closest<HTMLElement>("#bet-panel")!;
+      button.addEventListener("click", () => {
+        const start = performance.now();
+        panel.dataset.selectionColor = getComputedStyle(button).backgroundColor;
+        panel.dataset.selectionOpen = String(panel.matches(":popover-open"));
+        panel.addEventListener("beforetoggle", () => {
+          panel.dataset.selectionDelay = String(performance.now() - start);
+        }, { once: true });
+      }, { once: true });
+    });
+    await nextBet.click();
+    await expect(betPanel).toBeHidden();
+    await expect(betPanel).toHaveAttribute("data-selection-color", "rgb(65, 225, 251)");
+    await expect(betPanel).toHaveAttribute("data-selection-open", "true");
+    expect(Number(await betPanel.getAttribute("data-selection-delay"))).toBeGreaterThanOrEqual(95);
+    await expect(page.locator("#bet")).toHaveText("1.20");
+    await expect(page.locator(".tavern-status")).toHaveCount(0);
+    await page.getByRole("button", { name: "Feature buy" }).click();
+    await expect(page.locator(".shop-balance strong")).toHaveText(/^\$[\d,.]+$/);
+    const closeShop = page.getByRole("button", { name: "Close dialog" });
+    await expect(closeShop).toHaveCSS("width", "72px");
+    await expect(closeShop).toHaveCSS("height", "72px");
+    await expect(closeShop.locator(".hud-icon-close")).toHaveCSS("width", "50px");
+    await closeShop.hover();
+    const closeBounds = (await closeShop.boundingBox())!;
+    expect(closeBounds.y).toBe(16);
+    expect(viewport.width - closeBounds.x - closeBounds.width).toBe(22);
+    const cards = page.locator(".shop-grid .shop-card");
+    for (const card of await cards.all()) {
+      const bolts = card.locator(".shop-bolts .hud-icon-turbo");
+      await expect(bolts).toHaveCount(5);
+      await expect(bolts.first()).toHaveCSS("height", viewport.width > 670 ? "18px" : "16px");
+      const tile = card.locator("..");
+      const size = (await tile.boundingBox())!;
+      await tile.hover({ position: { x: size.width / 2, y: size.height - 2 } });
+      await expect(card).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, -8.75)");
+      await expect(card).toHaveCSS("filter", "none");
+    }
+    if (viewport.width < 670) {
+      expect((await cards.nth(1).boundingBox())!.x).toBeCloseTo((await cards.first().boundingBox())!.x, 1);
+      await page.locator('[data-buy="drop"]').scrollIntoViewIfNeeded();
+      const balance = (await page.locator(".shop-balance").boundingBox())!;
+      const bet = (await page.locator(".shop-bet").boundingBox())!;
+      expect(balance.y + balance.height).toBeLessThanOrEqual(bet.y);
+      expect(balance.x + balance.width / 2).toBeCloseTo(viewport.width / 2, 0);
+      expect(bet.x + bet.width / 2).toBeCloseTo(viewport.width / 2, 0);
+    }
+    const controls = (await page.locator(".shop-controls").boundingBox())!;
+    expect(viewport.height - controls.y - controls.height).toBeLessThanOrEqual(2);
+    await page.getByRole("button", { name: "Decrease feature bet" }).click();
+    await expect(page.locator(".shop-bet strong")).toHaveText("$1.00");
+    for (const mode of ["tavern", "drop"]) {
+      const option = page.locator(`[data-buy="${mode}"]`);
+      await option.click();
+      const confirmation = page.locator(".shop-confirm");
+      await expect(confirmation.locator("p")).toHaveText(
+        "Enter a bonus game with 10 free spins. Win positions in the reel to unlock chest multipliers." +
+        (mode === "drop" ? " The minimum multiplier is 5x." : ""),
+      );
+      await expect(closeShop).toHaveCSS("width", "72px");
+      if (mode === "tavern") await closeShop.click();
+      else await page.keyboard.press("Escape");
+      await expect(page.locator(".shop-grid")).toBeVisible();
+      await expect(option).toBeFocused();
+      await expect(page.locator(".shop-bet strong")).toHaveText("$1.00");
+    }
+    await closeShop.click();
     await page.getByRole("button", { name: "Open menu" }).click();
     await expect(page.getByRole("button", { name: "Game Rules" })).toBeInViewport();
     await expect(page.getByRole("slider", { name: "Sound effects volume" })).toBeVisible();
@@ -457,6 +687,61 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     }
   });
 }
+test("finite and unlimited autoplay start on Spin and can be stopped", async ({ page }) => {
+  test.setTimeout(60000);
+  const server = new MockGame(tavern);
+  const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
+  let requests = 0;
+  let releaseFirstSpin!: () => void;
+  const firstSpin = new Promise<void>((resolve) => { releaseFirstSpin = resolve; });
+  await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+  await page.route("**/api/command", async (route) => {
+    requests++;
+    if (requests === 1) await firstSpin;
+    await route.fulfill({ json: server.execute(route.request().postDataJSON(), board) });
+  });
+  await page.goto("/");
+  const spin = page.locator("#spin");
+  const count = spin.locator(".auto-count");
+  const add = page.getByRole("button", { name: "Add 10 autoplay spins" });
+  await expect(spin).toBeEnabled({ timeout: 20000 });
+  await page.getByRole("button", { name: "Autoplay", exact: true }).click();
+  const choice = page.locator("#auto-panel").getByRole("button", { name: "25", exact: true });
+  await choice.hover();
+  await expect(choice).toHaveCSS("background-color", "rgb(60, 60, 70)");
+  await choice.click();
+  await expect(choice).toHaveCSS("background-color", "rgb(65, 225, 251)");
+  await expect(spin).toHaveAttribute("data-auto-ready", "");
+  await expect(add).toBeHidden();
+  expect(requests).toBe(0);
+  await spin.click();
+  await expect.poll(() => requests).toBe(1);
+  await expect(count).toHaveText("25");
+  await spin.hover();
+  await expect(count).toHaveCSS("background-color", "rgb(65, 225, 251)");
+  await add.hover();
+  await expect(add).toHaveCSS("background-color", "rgb(65, 225, 251)");
+  await add.click();
+  await expect(count).toHaveText("35");
+  expect(requests).toBe(1);
+  releaseFirstSpin();
+  await expect(count).toHaveText("34", { timeout: 15000 });
+  await expect.poll(() => requests).toBeGreaterThan(1);
+  await spin.click();
+  await expect(add).toBeHidden();
+  await expect(spin).toHaveAttribute("aria-label", "Spin", { timeout: 15000 });
+  const beforeUnlimited = requests;
+  await page.getByRole("button", { name: "Autoplay", exact: true }).click();
+  await page.getByRole("button", { name: "Unlimited autoplay" }).click();
+  expect(requests).toBe(beforeUnlimited);
+  await spin.click();
+  await expect(count).toHaveText("∞");
+  await expect(add).toBeHidden();
+  await expect.poll(() => requests, { timeout: 15000 }).toBeGreaterThan(beforeUnlimited + 1);
+  await expect(count).toHaveText("∞");
+  await page.getByRole("button", { name: "Stop unlimited autoplay" }).click();
+  await expect(spin).toHaveAttribute("aria-label", "Spin", { timeout: 15000 });
+});
 for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEGA WIN"], [100, "EPIC WIN"]] as const) {
   test(`${label} displays its celebration`, async ({ page }) => {
     test.setTimeout(90000);
@@ -713,8 +998,8 @@ test("lost response recovers the exact request without charging another spin", a
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Pending round found" }),
-  ).toBeVisible();
+    page.getByRole("heading", { name: "Resume Active Game?" }),
+  ).toBeVisible({ timeout: 20000 });
   await page.locator("#recover").click();
   await expect(page.locator("#spin")).toContainText("SPIN");
   await expect(page.locator("#balance")).toHaveText("999.00");
@@ -746,6 +1031,13 @@ test("desktop landscape keeps the bottom reel row and spin controls visible", as
     { width: 788, height: 510 },
   ]) {
     await page.setViewportSize(viewport);
+    const padding = await page.locator("#board canvas").evaluate((canvas) => {
+      const board = canvas.getBoundingClientRect();
+      const host = canvas.parentElement!.getBoundingClientRect();
+      return { top: host.top - board.top, bottom: board.bottom - host.bottom };
+    });
+    expect(padding.top).toBeGreaterThan(0);
+    expect(padding.bottom).toBeCloseTo(padding.top, 1);
     const bottomRowVisible = await page.locator("#board canvas").evaluate(
       (canvas) => {
         const board = canvas.getBoundingClientRect();
@@ -827,23 +1119,23 @@ test("Tavern defaults to Drop with demo controls hidden and Skip preserves one r
     tavern.id + ".reel-motion",
   );
   await page.goto("/");
-  const spin = page.getByRole("button", { name: "Spin", exact: true });
+  const spin = page.locator("#spin");
   await expect(spin).toBeEnabled();
   await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reels: Drop" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "3 × 3" })).toHaveCount(0);
   await spin.click();
   await expect.poll(() => commands.length).toBe(1);
-  await expect(spin).toContainText("SKIP");
+  await expect(spin).toHaveAttribute("aria-label", "Skip");
   await spin.click();
   releaseResult();
-  await expect(spin).toContainText("SPIN");
+  await expect(spin).toHaveAttribute("aria-label", "Spin");
   await expect(page.locator("#balance")).toHaveText("999.00");
 
   await page.reload();
   await expect(spin).toBeEnabled();
   await spin.click();
-  await expect(spin).toContainText("SPIN");
+  await expect(spin).toHaveAttribute("aria-label", "Spin");
   await expect(page.locator("#balance")).toHaveText("998.00");
   expect(new Set(commands).size).toBe(2);
   expect(commands).toHaveLength(2);
