@@ -1,5 +1,7 @@
 # Đề xuất luồng client: resume round và một lần settlement
 
+Yêu cầu KRW/exponent 0 và draft cập nhật ngày 18/11/2026 nằm trong [BE requirements và API proposal mới](backend-requirements-krw-resume-single-settlement.md). Ví dụ USD/scale 2 bên dưới giữ làm lịch sử thiết kế.
+
 **Trạng thái: đề xuất để review với team A/Yongtae; chưa triển khai và chưa phải API contract đã thống nhất.** Tài liệu tập trung vào client, checkpoint và cách trình diễn. Team A chịu trách nhiệm outcome, wallet, lưu bền vững và xử lý round khi client vắng mặt. Ví dụ dưới đây là dữ liệu giả lập; endpoint, tên trường, enum, số line, symbol mapping và ngữ nghĩa chính xác phải được hai bên xác nhận.
 
 ## 1. Quyết định đã thống nhất
