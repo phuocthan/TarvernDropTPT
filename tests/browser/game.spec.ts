@@ -182,6 +182,19 @@ for (const action of ["spin", "buy-drop"] as const) {
     expect(Number(duration)).toBeGreaterThan(300);
   });
 }
+test.describe("touch controls", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("a mobile tap leaves no native highlight or rectangular focus outline", async ({ page }) => {
+    await page.goto("/?game=tarvern");
+    const turbo = page.getByRole("button", { name: "Turbo" });
+    await turbo.tap();
+    await expect(turbo).toHaveAttribute("aria-pressed", "true");
+    await expect(turbo).toHaveCSS("-webkit-tap-highlight-color", "rgba(0, 0, 0, 0)");
+    await expect(turbo).toHaveCSS("outline-style", "none");
+    await expect(turbo).toHaveCSS("border-radius", "50%");
+  });
+});
 
 test("free spins autoplay through a retrigger and reveal centered Drop multipliers", async ({
   page,
@@ -380,6 +393,19 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     await page.setViewportSize(viewport);
     await page.goto("/");
     await expect(page.locator("#spin")).toBeEnabled();
+    const spin = page.locator("#spin");
+    const turbo = page.getByRole("button", { name: "Turbo" });
+    const width = (await spin.boundingBox())!.width;
+    expect(width).toBeCloseTo(viewport.width > 670 ? 102 : 82.875, 1);
+    await expect(turbo).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await turbo.click();
+    await expect(turbo).toHaveCSS("background-color", "rgb(0, 0, 0)");
+    await expect(turbo).toHaveCSS("color", "rgb(65, 225, 251)");
+    await turbo.click();
+    if (viewport.width > 670) {
+      await spin.hover();
+      await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(65, 225, 251)");
+    }
     await page.getByRole("button", { name: "Autoplay", exact: true }).click();
     const panel = page.locator("#auto-panel");
     await expect(panel).toBeVisible();
@@ -449,12 +475,31 @@ test("query modes mount the viewer, Tavern Drop, and the 3 × 3 game", async ({ 
   await viewer.locator("#skeleton").selectOption("reelhouse");
   await expect(viewer.locator("#animation")).toHaveValue("1_idle", { timeout: 20000 });
   await expect(viewer.locator("#player canvas")).toBeVisible();
+  await expect(viewer.locator("html")).toHaveAttribute("lang", "en");
+  await expect(viewer.locator("#status")).toContainText("animations");
   await expect(page.locator("#spin")).toHaveCount(0);
 
   await page.goto("/?game=default");
   await expect(page.locator("#reuse-board canvas")).toHaveAttribute("aria-label", "3 by 3 reel board");
   await page.goto("/?game=tarvern");
   await expect(page.locator("#board canvas")).toHaveAttribute("aria-label", "5 by 5 reel board");
+});
+
+test("the English viewer previews a sound sprite cue and stops at its boundary", async ({ page }) => {
+  await page.goto("/?game=viewer");
+  const viewer = page.frameLocator(".animation-viewer-frame");
+  await expect(viewer.getByRole("heading", { name: "Sound Sprite" })).toBeVisible();
+  await expect(viewer.locator("#sound-count")).toHaveText("66 cues");
+  await viewer.getByLabel("Sound cue").selectOption("pc_shared_reel_start");
+  await expect(viewer.locator("#sound-timing")).toHaveText("Duration 0.30 s · Offset 33.00 s");
+  await viewer.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(viewer.locator("#sound-status")).toHaveText("Finished.", { timeout: 15000 });
+  const media = await viewer.locator("#sound-sprite").evaluate((audio: HTMLAudioElement) => ({
+    paused: audio.paused, time: audio.currentTime,
+  }));
+  expect(media.paused).toBe(true);
+  expect(media.time).toBeGreaterThanOrEqual(33.30);
+  expect(media.time).toBeLessThan(33.65);
 });
 
 test("portrait renders the mascot behind the reelhouse and uses the reference HUD icons", async ({ page }) => {

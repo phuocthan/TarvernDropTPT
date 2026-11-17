@@ -6,7 +6,7 @@ export function tavernAsset(name: string) {
 
 export function hudIcon(name: "menu" | "close" | "bet-up" | "bet-down" | "spin" |
   "stop" | "autoplay" | "autoplay-ready" | "turbo" | "skip" | "feature-buy" |
-  "info" | "share") {
+  "info" | "share" | "effects" | "effects-muted" | "music" | "music-muted") {
   return `<span aria-hidden="true" class="hud-icon hud-icon-${name}" style="--icon:url('${assetUrl(`tavern-assets/hud/${name}.svg`)}')"></span>`;
 }
 

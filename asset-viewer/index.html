@@ -1,8 +1,57 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tavern Drop · Asset viewer</title><link rel="stylesheet" href="vendor/spine-player.min.css"><link rel="stylesheet" href="style.css"></head>
-<body><header><img src="../tavern-assets/assets/td_loader.webp" alt="Tavern Drop"><div><h1>Asset viewer</h1><p>Khám phá hình ảnh và hoạt ảnh của Tavern Drop</p></div></header>
-<main><section><div class="section-head"><div><h2>Spine player</h2><p>Chọn đối tượng và hoạt ảnh để xem.</p></div><span>Runtime 4.2</span></div>
-<div class="controls"><label>Đối tượng<select id="skeleton"></select></label><label>Hoạt ảnh<select id="animation" disabled></select></label><button type="button" id="replay" disabled>Phát lại</button></div><p id="status" role="status">Đang tải…</p><div id="player"></div></section>
-<section><div class="section-head"><div><h2>Hình ảnh</h2><p>Nhấn vào ảnh để mở kích thước gốc.</p></div></div><div id="gallery" class="gallery"></div></section></main>
-<script src="vendor/spine-player.min.js"></script><script src="app.js"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tavern Drop · Asset Viewer</title>
+    <link rel="stylesheet" href="vendor/spine-player.min.css">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header>
+      <img src="../tavern-assets/assets/td_loader.webp" alt="Tavern Drop">
+      <div><h1>Asset Viewer</h1><p>Preview Tavern Drop animations, sounds and images.</p></div>
+    </header>
+    <main>
+      <section aria-labelledby="spine-heading">
+        <div class="section-head">
+          <div><h2 id="spine-heading">Spine Player</h2><p>Choose a skeleton and animation to preview.</p></div>
+          <span>Runtime 4.2</span>
+        </div>
+        <div class="controls">
+          <label>Skeleton<select id="skeleton"></select></label>
+          <label>Animation<select id="animation" disabled></select></label>
+          <button type="button" id="replay" disabled>Replay</button>
+        </div>
+        <p id="status" role="status">Loading animations…</p>
+        <div id="player"></div>
+      </section>
+      <section class="sound-panel" aria-labelledby="sound-heading">
+        <div class="section-head">
+          <div><h2 id="sound-heading">Sound Sprite</h2><p>Listen to individual music and sound effect cues.</p></div>
+          <span id="sound-count"></span>
+        </div>
+        <div class="controls sound-controls">
+          <label>Sound cue<select id="sound-cue" disabled></select></label>
+          <label class="sound-volume">Volume<input id="sound-volume" type="range" min="0" max="100" value="55"></label>
+          <div class="sound-actions">
+            <button type="button" id="sound-play" disabled>Play</button>
+            <button type="button" id="sound-stop" disabled>Stop</button>
+          </div>
+        </div>
+        <p id="sound-timing"></p>
+        <p id="sound-status" role="status">Loading sound cues…</p>
+        <audio id="sound-sprite" preload="none"></audio>
+      </section>
+      <section aria-labelledby="gallery-heading">
+        <div class="section-head">
+          <div><h2 id="gallery-heading">Images</h2><p>Select an image to open it at full size.</p></div>
+        </div>
+        <div id="gallery" class="gallery"></div>
+      </section>
+    </main>
+    <script src="vendor/spine-player.min.js"></script>
+    <script src="app.js"></script>
+    <script type="module" src="sound.js"></script>
+  </body>
+</html>

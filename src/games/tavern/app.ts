@@ -81,8 +81,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
    ${gameMenuEnabled ? `<div id="hud-menu-panel" class="tavern-hud-panel" popover="auto" aria-label="Game menu">
      <button id="menu-rules" type="button" aria-label="Game Rules">${hudIcon("info")} Info</button>
      <button id="menu-share" type="button">${hudIcon("share")} Share</button>
-     <label><span aria-hidden="true">◖))</span><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></label>
-     <label><span aria-hidden="true">♫</span><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></label>
+     <label><span id="effects-icon">${hudIcon("effects-muted")}</span><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></label>
+     <label><span id="music-icon">${hudIcon("music-muted")}</span><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></label>
    </div>` : ""}
   </section>
  </main>
@@ -267,8 +267,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("win-label").textContent = feature ? "Total win" : "Win";
     $("win-amount").textContent = money(feature?.accumulated ?? displayWin);
     $<HTMLButtonElement>("auto").disabled = !!feature;
-    for (const id of ["buy", "bet-down", "bet-up"])
-      $<HTMLButtonElement>(id).disabled = busy || !!feature;
+    const betLocked = busy || !!feature;
+    $<HTMLButtonElement>("buy").disabled = betLocked;
+    $<HTMLButtonElement>("bet-down").disabled = betLocked || betIndex === 0;
+    $<HTMLButtonElement>("bet-up").disabled = betLocked || betIndex === game.bets.length - 1;
     $<HTMLButtonElement>("spin").disabled =
       nextFreeSpin ||
       controller.phase === "loading" ||
@@ -722,9 +724,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         .join("")}</div>
       <div class="shop-bet">
         <div class="hud-money"><span>Balance</span><strong>${money(controller.state!.balance)}</strong></div>
-        <button id="shop-bet-down" aria-label="Decrease feature bet" ${betIndex === 0 ? "disabled" : ""}>⌄</button>
+        <button id="shop-bet-down" aria-label="Decrease feature bet" ${betIndex === 0 ? "disabled" : ""}>${hudIcon("bet-down")}</button>
         <div class="hud-money"><span>Bet</span><strong>${money(game.bets[betIndex])}</strong></div>
-        <button id="shop-bet-up" aria-label="Increase feature bet" ${betIndex === game.bets.length - 1 ? "disabled" : ""}>⌃</button>
+        <button id="shop-bet-up" aria-label="Increase feature bet" ${betIndex === game.bets.length - 1 ? "disabled" : ""}>${hudIcon("bet-up")}</button>
       </div>`,
       true,
       "shop",
@@ -810,6 +812,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         audio.unlock();
         audio.muted = false;
         audio.setLevel(channel, Number(slider.value) / 100);
+        for (const name of ["effects", "music"] as const)
+          $(name + "-icon").innerHTML = hudIcon(audio.level(name) > 0 ? name : `${name}-muted`);
         syncMusic(!!controller.state?.feature);
       };
     }

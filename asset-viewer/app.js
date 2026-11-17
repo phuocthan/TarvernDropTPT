@@ -11,7 +11,7 @@ const container = document.querySelector("#player");
 let player;
 let generation = 0;
 for (const name of objects) skeleton.add(new Option(name, name));
-const hud = ["menu", "close", "bet-up", "bet-down", "spin", "stop", "autoplay", "autoplay-ready", "turbo", "skip", "feature-buy", "info", "share"];
+const hud = ["menu", "close", "bet-up", "bet-down", "spin", "stop", "autoplay", "autoplay-ready", "turbo", "skip", "feature-buy", "info", "share", "effects", "effects-muted", "music", "music-muted"];
 for (const name of [...images.map((name) => "assets/" + name), "assets/sd/td_master.webp", ...hud.map((name) => "hud/" + name + ".svg")]) {
   const link = document.createElement("a");
   link.href = base + name;
@@ -75,13 +75,13 @@ function playClip(loaded) {
   loaded.playButton.classList.toggle("spine-player-hidden", clip.duration === 0);
   if (clip.duration > 0) {
     loaded.play();
-    status.textContent = `${animation.options.length} hoạt ảnh · ${clip.duration.toFixed(2)} giây`;
+    status.textContent = `${animation.options.length} animations · ${clip.duration.toFixed(2)} s`;
   } else {
     loaded.animationState.apply(loaded.skeleton);
     loaded.skeleton.updateWorldTransform(spine.Physics.pose);
     loaded.timelineSlider.setValue(0);
     loaded.pause();
-    status.textContent = `${animation.options.length} hoạt ảnh · Pose tĩnh (0 giây)`;
+    status.textContent = `${animation.options.length} animations · Static pose (0 s)`;
   }
 }
 
@@ -91,7 +91,7 @@ function load() {
   container.replaceChildren();
   animation.replaceChildren();
   animation.disabled = replay.disabled = true;
-  status.textContent = "Đang tải hoạt ảnh…";
+  status.textContent = "Loading animations…";
   player = new spine.SpinePlayer(container, {
     binaryUrl: base + "assets/td_" + skeleton.value + ".skel",
     atlasUrl: base + "assets/hd/td_master.atlas",
@@ -109,11 +109,11 @@ function load() {
         animation.value = scenePreviews[skeleton.value] ?? animations[0].name;
         playClip(loaded);
       } else {
-        status.textContent = "Tệp này không có hoạt ảnh.";
+        status.textContent = "This skeleton has no animations.";
       }
     },
     error(loaded, message) {
-      if (current === generation) status.textContent = "Không tải được Spine: " + message;
+      if (current === generation) status.textContent = "Could not load Spine: " + message;
     }
   });
 }
