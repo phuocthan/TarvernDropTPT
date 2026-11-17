@@ -1,0 +1,525 @@
+{
+  "metadata": {
+    "status": "proposal, not implemented",
+    "gameConfiguration": "Illustrative 5x5, 40-line game; not the current Tavern configuration",
+    "amountScale": 2,
+    "symbolIdsAndLineDefinitions": "Illustrative; subject to agreement"
+  },
+  "login": {
+    "method": "POST",
+    "path": "/api/login",
+    "request": {},
+    "response": {
+      "code": 0,
+      "accountId": "demo-001",
+      "sessionId": "session-example",
+      "token": "token-example"
+    }
+  },
+  "start": {
+    "method": "POST",
+    "path": "/api/game/start",
+    "request": {
+      "gameCode": "n57058",
+      "sessionId": "session-example",
+      "token": "token-example"
+    },
+    "response": {
+      "code": 0,
+      "balance": 100000,
+      "settings": {
+        "currency": "USD",
+        "amountScale": 2,
+        "reels": 5,
+        "rows": 5,
+        "defaultDenomination": 2,
+        "denominations": [
+          1,
+          2,
+          5,
+          10
+        ],
+        "lines": 40
+      },
+      "symbols": [
+        10,
+        10,
+        5,
+        3,
+        8,
+        10,
+        10,
+        5,
+        9,
+        7,
+        10,
+        10,
+        3,
+        4,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ]
+    }
+  },
+  "startWithActiveFreeGame": {
+    "response": {
+      "code": 0,
+      "balance": 99920,
+      "settings": {
+        "currency": "USD",
+        "amountScale": 2,
+        "reels": 5,
+        "rows": 5,
+        "defaultDenomination": 2,
+        "denominations": [
+          1,
+          2,
+          5,
+          10
+        ],
+        "lines": 40
+      },
+      "symbols": [
+        10,
+        10,
+        5,
+        3,
+        8,
+        10,
+        10,
+        5,
+        9,
+        7,
+        10,
+        10,
+        3,
+        4,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "freeGame": {
+        "roundId": "round-002",
+        "mode": "drop",
+        "total": 10,
+        "used": 4,
+        "remaining": 6,
+        "denomination": 2,
+        "totalBet": 80,
+        "totalWin": 240,
+        "chestRows": [
+          [
+            0,
+            2
+          ],
+          [
+            1
+          ],
+          [],
+          [
+            0,
+            1,
+            3
+          ],
+          []
+        ]
+      }
+    }
+  },
+  "spinNoWin": {
+    "method": "POST",
+    "path": "/api/game/spin",
+    "request": {
+      "requestId": "request-001",
+      "gameCode": "n57058",
+      "sessionId": "session-example",
+      "token": "token-example",
+      "denomination": 2,
+      "lines": 40,
+      "totalBet": 80,
+      "freeSpin": false
+    },
+    "response": {
+      "code": 0,
+      "ticketId": "ticket-001",
+      "roundId": "round-001",
+      "balance": 99920,
+      "bet": 80,
+      "symbols": [
+        9,
+        10,
+        5,
+        3,
+        8,
+        11,
+        5,
+        9,
+        7,
+        4,
+        2,
+        7,
+        3,
+        10,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "spinWin": 0,
+      "credited": 0
+    }
+  },
+  "spinWithLineWins": {
+    "response": {
+      "code": 0,
+      "ticketId": "ticket-002",
+      "roundId": "round-002",
+      "balance": 99860,
+      "bet": 80,
+      "symbols": [
+        10,
+        10,
+        5,
+        3,
+        8,
+        10,
+        10,
+        5,
+        9,
+        7,
+        10,
+        10,
+        3,
+        4,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "lineWins": [
+        {
+          "line": 0,
+          "symbol": 10,
+          "positions": [
+            0,
+            5,
+            10
+          ],
+          "win": 10
+        },
+        {
+          "line": 1,
+          "symbol": 10,
+          "positions": [
+            1,
+            6,
+            11
+          ],
+          "win": 10
+        }
+      ],
+      "spinWin": 20,
+      "credited": 20
+    }
+  },
+  "finalFreeSpin": {
+    "response": {
+      "code": 0,
+      "ticketId": "ticket-012",
+      "roundId": "round-002",
+      "balance": 103520,
+      "bet": 0,
+      "symbols": [
+        10,
+        10,
+        5,
+        3,
+        8,
+        10,
+        10,
+        5,
+        9,
+        7,
+        10,
+        10,
+        3,
+        4,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "lineWins": [
+        {
+          "line": 0,
+          "symbol": 10,
+          "positions": [
+            0,
+            5,
+            10
+          ],
+          "win": 50
+        },
+        {
+          "line": 1,
+          "symbol": 10,
+          "positions": [
+            1,
+            6,
+            11
+          ],
+          "win": 50
+        }
+      ],
+      "freeGame": {
+        "roundId": "round-002",
+        "mode": "drop",
+        "total": 10,
+        "used": 10,
+        "remaining": 0,
+        "denomination": 2,
+        "totalBet": 80,
+        "totalWin": 600,
+        "chestRows": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            0,
+            2,
+            4
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            1
+          ],
+          []
+        ],
+        "result": {
+          "baseWin": 600,
+          "multipliers": [
+            2,
+            1,
+            3,
+            1,
+            1
+          ],
+          "totalWin": 3600,
+          "capped": false
+        }
+      },
+      "spinWin": 100,
+      "credited": 3600
+    }
+  },
+  "error": {
+    "response": {
+      "code": 1001,
+      "message": "Account not found"
+    }
+  },
+  "featureTrigger": {
+    "response": {
+      "code": 0,
+      "ticketId": "ticket-trigger",
+      "roundId": "round-002",
+      "balance": 99920,
+      "bet": 80,
+      "spinWin": 0,
+      "credited": 0,
+      "symbols": [
+        1,
+        10,
+        5,
+        3,
+        8,
+        1,
+        10,
+        5,
+        9,
+        7,
+        1,
+        10,
+        3,
+        4,
+        6,
+        1,
+        9,
+        7,
+        2,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "freeGame": {
+        "roundId": "round-002",
+        "mode": "drop",
+        "total": 10,
+        "used": 0,
+        "remaining": 10,
+        "denomination": 2,
+        "totalBet": 80,
+        "totalWin": 0,
+        "chestRows": [
+          [],
+          [],
+          [],
+          [],
+          []
+        ]
+      }
+    }
+  },
+  "freeSpinInProgress": {
+    "request": {
+      "requestId": "request-free-005",
+      "gameCode": "n57058",
+      "sessionId": "session-example",
+      "token": "token-example",
+      "denomination": 2,
+      "lines": 40,
+      "totalBet": 80,
+      "freeSpin": true
+    },
+    "response": {
+      "code": 0,
+      "ticketId": "ticket-free-005",
+      "roundId": "round-002",
+      "balance": 99920,
+      "bet": 0,
+      "spinWin": 100,
+      "credited": 0,
+      "symbols": [
+        10,
+        10,
+        5,
+        3,
+        8,
+        10,
+        10,
+        5,
+        9,
+        7,
+        10,
+        10,
+        3,
+        4,
+        6,
+        8,
+        9,
+        7,
+        1,
+        10,
+        5,
+        11,
+        2,
+        4,
+        12
+      ],
+      "lineWins": [
+        {
+          "line": 0,
+          "symbol": 10,
+          "positions": [
+            0,
+            5,
+            10
+          ],
+          "win": 50
+        },
+        {
+          "line": 1,
+          "symbol": 10,
+          "positions": [
+            1,
+            6,
+            11
+          ],
+          "win": 50
+        }
+      ],
+      "freeGame": {
+        "roundId": "round-002",
+        "mode": "drop",
+        "total": 10,
+        "used": 5,
+        "remaining": 5,
+        "denomination": 2,
+        "totalBet": 80,
+        "totalWin": 340,
+        "chestRows": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1,
+            3
+          ],
+          []
+        ]
+      }
+    }
+  }
+}

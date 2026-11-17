@@ -144,7 +144,7 @@
 }
 .tavern-shell .machine {
   --reel-top: 9.4%;
-  --reel-height: 83.75%;
+  --reel-height: 81.5%;
   position: absolute;
   top: 46%;
   left: 50%;
@@ -230,16 +230,14 @@
   margin: 0;
   z-index: 5;
 }
-.tavern-shell .chest,
-.reveal-chests .chest {
+.tavern-shell .chest {
   position: relative;
   display: block;
   aspect-ratio: 1.2;
   padding: 0;
   filter: brightness(0.72);
 }
-.tavern-shell .chest.unlocked,
-.reveal-chests .chest.unlocked {
+.tavern-shell .chest.unlocked {
   filter: brightness(1.14) drop-shadow(0 0 7px #ffdd64d9);
 }
 .tavern-chest-lid,
@@ -689,15 +687,6 @@
 .total-win-art {
   width: min(69vw, 530px);
 }
-.reveal-chests {
-  display: flex;
-  justify-content: center;
-  width: min(90%, 500px);
-  margin: 12px auto;
-}
-.reveal-chests .chest {
-  width: 20%;
-}
 .win-celebration {
   position: fixed;
   inset: 0;
@@ -707,6 +696,20 @@
   text-align: center;
   pointer-events: none;
   background: #180f1ac4;
+}
+.win-celebration .tavern-screen-art {
+  width: min(96vw, 1400px);
+  height: min(78svh, 780px);
+}
+.reel-host.returning-to-base {
+  animation: symbols-return-to-base 900ms ease-out both;
+}
+@keyframes symbols-return-to-base {
+  0%, 25% { opacity: 0; transform: translateY(18%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reel-host.returning-to-base { animation: none; }
 }
 .win-celebration strong {
   color: #ffe285;
@@ -870,9 +873,6 @@
 .stage[data-spine-scene] :is(.scenery, .tavern-logo, .frame-art, .reel-keys, .chest-row) {
   visibility: hidden;
 }
-.stage[data-spine-scene] .machine:has(canvas[data-win-focus]) .chest-row:not([hidden]) {
-  visibility: visible;
-}
 .tavern-spine-canvas {
   display: block;
   width: 100%;
@@ -882,6 +882,25 @@
   width: min(90vw, 820px);
   height: min(49svh, 400px);
   margin-inline: auto;
+  pointer-events: none;
+}
+.tavern-screen-art.bonus-intro-art {
+  width: min(90vw, 1000px);
+  height: min(65svh, 560px);
+}
+.tavern-screen-art.total-win-screen {
+  width: min(92vw, 1100px);
+  height: min(70svh, 620px);
+}
+.chest-result-fallback {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  color: #ffe3a1;
+  font-size: clamp(28px, 5vw, 54px);
+  text-shadow: 0 3px 6px #200d00;
   pointer-events: none;
 }
 .tavern-screen-art:empty {
@@ -895,26 +914,19 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
+.win-celebration:has([data-spine-clip="addfs"]) .win-celebration-value {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
 #modal-content:has(> .tavern-screen-art[data-spine-ready]) > :is(.bonus-preview, .bonus-instructions) {
   display: none;
 }
 #modal-content:has(> .tavern-screen-art[data-spine-ready]) > .free-spin-title {
   font-size: clamp(20px, 3.5vw, 36px);
   margin-block: 4px;
-}
-.reveal-chests {
-  position: relative;
-}
-.tavern-chest-art {
-  position: absolute;
-  inset: -60% 0 -40%;
-  pointer-events: none;
-}
-.reveal-chests .chest[data-spine-chest] .atlas-art {
-  visibility: hidden;
-}
-.reveal-chests .chest-multiplier {
-  z-index: 1;
 }
 .tavern-bitmap-number {
   display: inline-flex;
@@ -931,7 +943,7 @@
 }
 .opening-continue {
   position: absolute;
-  inset: auto 0 2%;
+  inset: auto 0 7%;
   z-index: 5;
   width: min(44vw, 235px);
   height: 22px;
@@ -957,7 +969,7 @@
 }
 #modal-content:has(> .tavern-screen-art[data-spine-ready]) > .scene-continue {
   position: fixed;
-  inset: auto 0 2svh;
+  inset: auto 0 7svh;
   margin: auto;
 }
 .tavern-screen-art[data-spine-amount] ~ :is(.win-celebration-value, .result-total),
@@ -967,25 +979,6 @@
   height: 1px;
   overflow: hidden;
   clip-path: inset(50%);
-}
-.tavern-dialog[data-look="chest"] .modal-inner {
-  width: min(80vw, 580px);
-  padding: 0;
-  background: none;
-  border: 0;
-  box-shadow: none;
-}
-.tavern-dialog[data-look="chest"]::backdrop {
-  background: #0004;
-}
-.tavern-dialog[data-look="chest"] .reveal-chests {
-  margin-top: 2rem;
-}
-.tavern-dialog[data-look="chest"] .reveal-chests .chest-multiplier {
-  inset: auto 0 32%;
-  width: max-content;
-  margin: auto;
-  text-align: center;
 }
 #bet-track {
   width: 100%;

@@ -1,6 +1,5 @@
 import { Application, Container, Graphics, RenderLayer, UPDATE_PRIORITY, type Ticker } from "pixi.js";
 import { keepWithinVerticalViewport, reelCellCenter, type VerticalBounds } from "./grid.ts";
-import { drawDimmer } from "./scene.ts";
 import { planDropColumns } from "./drop-schedule.ts";
 import type {
   Board,
@@ -42,8 +41,9 @@ export class BoardView {
   private highlights = new Graphics();
   private tokens = new Container();
   private strip = new Container();
-  private dimmer = new Graphics();
   private winningSymbols = new RenderLayer();
+  private animatedWinners = new Set<SymbolView>();
+  private landingAnimations = new Map<string, Promise<void>>();
   private elapsed: number[] = [];
   private fast = false;
   private dropRound: DropRound | null = null;
@@ -52,6 +52,10 @@ export class BoardView {
   private factory: SymbolFactory;
   private readonly cell: number;
   private readonly gap: number;
+  private get unfocusedTint() {
+    const channel = Math.round(255 * (1 - (this.game.presentation.winDimmerOpacity ?? 0.5)));
+    return (channel << 16) | (channel << 8) | channel;
+  }
   constructor(game: GameDefinition, factory: SymbolFactory) {
     this.game = game;
     this.factory = factory;
@@ -87,9 +91,7 @@ export class BoardView {
       `${this.game.reels} by ${this.game.rows} reel board`,
     );
     const maskedReels = new Container();
-    drawDimmer(this.dimmer, width, height, this.game.presentation.winDimmerOpacity ?? 0.5);
-    this.dimmer.visible = false;
-    maskedReels.addChild(this.strip, this.dimmer, this.winningSymbols);
+    maskedReels.addChild(this.strip, this.winningSymbols);
     const mask = new Graphics()
       .rect(0, 0, width, height)
       .fill(0xffffff);
@@ -165,7 +167,9 @@ export class BoardView {
         tile.view.pivot.y = edge.pivotY;
       }
       if (tile.view.visible) tile.set(symbols[row - 1]);
-      tile.effect?.(tile.view.visible ? phase : "idle");
+      const animation = tile.effect?.(tile.view.visible ? phase : "idle");
+      if (phase === "land" && row > 0 && row <= this.game.rows && animation)
+        this.landingAnimations.set(`${reel}:${row - 1}`, animation);
     });
   }
   private fitEdgeSymbols() {
@@ -191,6 +195,7 @@ export class BoardView {
   }
   start(turbo: boolean, motion: ReelMotion = this.game.presentation.spinType) {
     this.fast = turbo;
+    this.landingAnimations.clear();
     this.clearHighlight();
     if (motion === "drop") {
       for (const tile of this.tiles.flat()) {
@@ -338,7 +343,8 @@ export class BoardView {
           move.landed = true;
           const edge = this.edgeTiles.get(move.tile);
           if (edge) edge.settled = true;
-          move.tile.effect?.("land");
+          const animation = move.tile.effect?.("land");
+          if (animation) this.landingAnimations.set(`${move.reel}:${move.row}`, animation);
           landing?.onLand(move.reel, move.row);
           if (anticipationSymbol !== undefined &&
               landing?.board[move.reel][move.row] === anticipationSymbol) {
@@ -355,7 +361,8 @@ export class BoardView {
       });
       if (!anticipating && plan.anticipationAt !== undefined && time >= plan.anticipationAt) {
         anticipating = true;
-        this.dimmer.visible = true;
+        for (const tile of this.tiles.flat())
+          tile.view.tint = this.unfocusedTint;
         this.app.canvas.setAttribute("data-anticipation-focus", "");
         for (const tile of landedAnticipationSymbols) this.raiseAnticipationSymbol(tile);
         landing?.events?.anticipation?.(true);
@@ -424,38 +431,41 @@ export class BoardView {
       true,
     );
   }
+  async waitForLandings(positions: Position[]) {
+    await Promise.all(positions.map(({ reel, row }) => this.landingAnimations.get(`${reel}:${row}`)));
+  }
   private raiseAnticipationSymbol(tile: SymbolView) {
+    tile.view.tint = 0xffffff;
     this.winningSymbols.attach(tile.view);
-    tile.effect?.("win");
   }
   private playWinners(seen: Set<string>, dimUnmatched: boolean) {
     const animations: Promise<void>[] = [];
     for (const [reel, tiles] of this.tiles.entries()) {
       for (const [slot, tile] of tiles.entries()) {
         const matched = seen.has(reel + ":" + (slot - 1));
+        tile.view.tint = dimUnmatched && !matched ? this.unfocusedTint : 0xffffff;
         const raised = tile.view.parentRenderLayer === this.winningSymbols;
         if (matched && dimUnmatched) this.winningSymbols.attach(tile.view);
-        else if (raised) {
-          this.winningSymbols.detach(tile.view);
-          if (!matched) tile.effect?.("idle");
-        }
+        else if (raised) this.winningSymbols.detach(tile.view);
+        if (!matched && this.animatedWinners.delete(tile)) tile.effect?.("idle");
         if (matched) {
+          this.animatedWinners.add(tile);
           const animation = tile.effect?.("win");
           if (animation) animations.push(animation);
         }
       }
     }
-    this.dimmer.visible = this.winningSymbols.renderLayerChildren.length > 0;
-    this.app.canvas.toggleAttribute("data-win-focus", this.dimmer.visible);
+    this.app.canvas.toggleAttribute("data-win-focus", dimUnmatched && seen.size > 0);
     return Promise.all(animations);
   }
   clearHighlight() {
     this.highlights.clear();
     for (const tile of this.tiles.flat()) {
-      if (tile.view.parentRenderLayer === this.winningSymbols) tile.effect?.("idle");
+      tile.view.tint = 0xffffff;
+      if (this.animatedWinners.has(tile)) tile.effect?.("idle");
     }
+    this.animatedWinners.clear();
     this.winningSymbols.detachAll();
-    this.dimmer.visible = false;
     this.app.canvas.removeAttribute("data-win-focus");
     this.app.canvas.removeAttribute("data-anticipation-focus");
   }

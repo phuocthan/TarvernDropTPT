@@ -1,6 +1,7 @@
 import { Application, Assets, BitmapText, Graphics, Text } from "pixi.js";
 import {
   RegionAttachment,
+  AttachmentTimeline,
   Spine,
   type Skeleton,
   type Slot,
@@ -82,17 +83,17 @@ export async function mountTavernEffects(
     autoUpdate: false,
   });
   const reelhouse = createReelhouse(app, true);
-  const logo = sceneLayout?.sideLogo;
-  const logoBone = reelhouse.skeleton.findSlot(slots.sideLogo ?? "")?.bone;
-  let logoLeft = 0;
-  let logoUp = 0;
-  if (logoBone) {
-    reelhouse.afterUpdateWorldTransforms = () => {
-      if (stage.parentElement?.hasAttribute("data-opening")) return;
-      logoBone.worldX -= logoLeft;
-      logoBone.worldY -= logoUp;
-    };
-  }
+  const chestTotal = new BitmapText({ style: { fontFamily: "td_gold", fontSize: 480 } });
+  chestTotal.anchor.set(0.5);
+  chestTotal.visible = false;
+  reelhouse.addSlotObject("slot_finalwin", chestTotal, { followSlotColor: true });
+  const chestMultipliers = Array.from({ length: 5 }, (_, reel) => {
+    const text = new BitmapText({ style: { fontFamily: "td_gold", fontSize: 260 } });
+    text.anchor.set(0.5);
+    text.visible = false;
+    reelhouse.addSlotObject(`slot_reel_mult_${reel}`, text, { followSlotColor: true });
+    return text;
+  });
   let chestZoom: Animation | undefined;
   let reelExit: Animation | undefined;
   const openingDimmer = new Graphics();
@@ -159,14 +160,8 @@ export async function mountTavernEffects(
     // Only the exact count of ten can use the authored text sprite.
     if (spinCount.text) skeleton.findSlot("fs")?.setAttachment(null);
   };
-  const reveal = createReelhouse(app);
-  const visibleChestSlots = new Set<number>();
-  reveal.afterUpdateWorldTransforms = ({ skeleton }) => {
-    for (const slot of skeleton.slots)
-      if (!visibleChestSlots.has(slot.data.index)) slot.setAttachment(null);
-  };
-  screens.visible = reveal.visible = false;
-  app.stage.addChild(background, openingDimmer, reelhouse, screens, reveal);
+  screens.visible = false;
+  app.stage.addChild(background, openingDimmer, reelhouse, screens);
   const portraitMascot = mascotLoaded ? createMascot(app) : undefined;
   if (portraitMascot) {
     portraitMascot.visible = portraitMascot.autoUpdate = false;
@@ -186,6 +181,7 @@ export async function mountTavernEffects(
   let previousFeature: FeatureState | null = null;
   let portrait = stage.clientHeight > stage.clientWidth;
   let baseExited = false;
+  let bonusExited = false;
   let bounds = screenBounds(screens.skeleton.data, []);
   const viewports = new Map<string, typeof bounds>();
 
@@ -227,17 +223,9 @@ export async function mountTavernEffects(
     if (openingDimmer.visible)
       drawDimmer(openingDimmer, width, height, sceneLayout?.openingDimmerOpacity ?? 0);
     if (host !== scene) {
-      if (reveal.visible) {
-        const scale = width / 2860;
-        reveal.scale.set(scale);
-        reveal.position.set(
-          width / 2 + 20 * scale,
-          height * 0.53 - 1640 * scale,
-        );
-        return;
-      }
       const scale =
-        Math.min(width / bounds.width, height / bounds.height) * 0.94;
+        Math.min(width / bounds.width, height / bounds.height) *
+        (host.closest(".win-celebration") ? 1.55 : 0.94);
       screens.scale.set(scale);
       screens.position.set(
         width / 2 - (bounds.x + bounds.width / 2) * scale,
@@ -265,11 +253,6 @@ export async function mountTavernEffects(
     const sceneScale = sceneRect.width / scene.clientWidth || 1;
     const reelScale = frameRect.width / sceneScale / 3976;
     reelhouse.scale.set(reelScale);
-    const extraWidth = logo && !portrait
-      ? Math.min(height * 0.45, Math.max(0, width - height * logo.referenceAspect))
-      : 0;
-    logoLeft = reelScale ? extraWidth * (logo?.leftFactor ?? 0) / reelScale : 0;
-    logoUp = reelScale ? extraWidth * (logo?.upFactor ?? 0) / reelScale : 0;
     // The source bonus pose lifts the frame by 221 Spine units.
     reelhouse.position.set(
       (frameRect.left - sceneRect.left) / sceneScale + 1991 * reelScale,
@@ -301,6 +284,13 @@ export async function mountTavernEffects(
     }
     const was = mode;
     mode = next;
+    chestTotal.text = "";
+    chestTotal.visible = false;
+    for (const text of chestMultipliers) {
+      text.text = "";
+      text.visible = false;
+    }
+    delete stage.dataset.chestReveal;
     previousFeature = null;
     background.state.clearTracks();
     reelhouse.state.clearTracks();
@@ -322,8 +312,8 @@ export async function mountTavernEffects(
       );
       reelhouse.state.addAnimation(1, "1_idle", true, 0);
     } else if (was) {
-      if (baseExited && next === "bonus") {
-        reelhouse.state.setAnimation(2, "2_bonus_enter", false);
+      if ((baseExited && next === "bonus") || (bonusExited && next === "base")) {
+        reelhouse.state.setAnimation(2, `2_${next}_enter`, false);
       } else {
         reelhouse.state.setAnimation(2, `2_${was}_exit`, false);
         reelhouse.state.addAnimation(2, `2_${next}_enter`, false, 0);
@@ -335,6 +325,7 @@ export async function mountTavernEffects(
       entry.trackTime = entry.animation!.duration;
     }
     baseExited = false;
+    bonusExited = false;
     reelhouse.update(0);
     layout();
   }
@@ -374,11 +365,8 @@ export async function mountTavernEffects(
     host.removeAttribute("data-spine-count");
     host = scene;
     screens.state.clearTracks();
-    reveal.state.clearTracks();
-    reveal.skeleton.setToSetupPose();
-    visibleChestSlots.clear();
-    screens.visible = reveal.visible = false;
-    screens.autoUpdate = reveal.autoUpdate = false;
+    screens.visible = false;
+    screens.autoUpdate = false;
     reelhouse.visible = background.visible = true;
     reelhouse.autoUpdate = true;
     frozenScene.remove();
@@ -464,12 +452,16 @@ export async function mountTavernEffects(
       reelhouse.state.setAnimation(2, "2_base_exit", false);
       await new Promise<void>((resolve) => setTimeout(resolve, 300));
     },
-    async revealChests() {
+    async revealChests(amount: string) {
+      chestTotal.text = amount;
+      chestTotal.visible = true;
+      stage.dataset.chestReveal = "true";
       if (sceneLayout?.chestCamera)
         chestZoom = zoomScene(stage, sceneLayout.chestCamera);
       await Promise.all([chestZoom?.finished, playClip(reelhouse, 4, "4_finalwin")]);
     },
     async prepareTotalWin() {
+      bonusExited = true;
       chestZoom?.cancel();
       layout();
       background.state.setAnimation(1, "1_zoom_in", false);
@@ -495,6 +487,8 @@ export async function mountTavernEffects(
       await finished;
       app.ticker.remove(followReels);
       reelHost.style.removeProperty("translate");
+      chestTotal.text = "";
+      for (const text of chestMultipliers) text.text = "";
       reelhouse.update(0);
     },
     async showScreen(
@@ -513,8 +507,6 @@ export async function mountTavernEffects(
       } = {},
     ) {
       mountOverlay(target);
-      reveal.visible = false;
-      reveal.autoUpdate = false;
       screens.visible = true;
       screens.autoUpdate = true;
       payout.text = amount && hasTavernBitmapFont("td_gold") ? amount : "";
@@ -545,30 +537,42 @@ export async function mountTavernEffects(
       screens.update(0);
       await done;
     },
-    async openChest(target: HTMLElement, reel: number) {
-      mountOverlay(target);
-      screens.visible = false;
-      screens.autoUpdate = false;
-      reveal.visible = true;
-      reveal.autoUpdate = true;
-      const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
-      const finalWin = `${31 + reel * 2}_reel_${reel}_chest_finalwin`;
-      for (const name of [prefix + "open", prefix + "open_idle", finalWin]) {
-        for (const timeline of reveal.skeleton.data.findAnimation(name)!
-          .timelines)
-          if ("slotIndex" in timeline && typeof timeline.slotIndex === "number")
-            visibleChestSlots.add(timeline.slotIndex);
+    setScreenAmount(amount: string) {
+      payout.text = hasTavernBitmapFont("td_gold") ? amount : "";
+      payout.scale.set(1);
+      if (payout.width > 3000) payout.scale.set(3000 / payout.width);
+    },
+    winScreenTiming(name: string) {
+      const animation = screens.skeleton.data.findAnimation(name);
+      const times: Record<string, number> = {};
+      for (const timeline of animation?.timelines ?? []) {
+        if (!(timeline instanceof AttachmentTimeline)) continue;
+        const slot = screens.skeleton.data.slots[timeline.slotIndex]?.name;
+        if (slot && ["big_win_text", "super_win_text", "mega_win_text", "epic_win_text", "max_win_text"].includes(slot))
+          times[slot] = timeline.frames[0];
       }
-      layout();
-      const done = playClip(reveal, reel, prefix + "open");
-      reveal.state.addAnimation(reel, prefix + "open_idle", true, 0);
-      target.dataset.spineClip = prefix + "open";
-      reveal.update(0);
+      return { duration: animation?.duration ?? 1.5, times };
+    },
+    screenTime() {
+      return screens.state.getCurrent(0)?.trackTime ?? 0;
+    },
+    async openChest(reel: number, multiplier: number) {
+      stage.dataset.chestOpening = String(reel);
+      const text = chestMultipliers[reel];
+      text.text = `x${multiplier}`;
+      text.visible = true;
+      const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
+      const done = playClip(reelhouse, 50 + reel, prefix + "open");
+      reelhouse.state.addAnimation(50 + reel, prefix + "open_idle", true, 0);
       await done;
+      stage.dataset.chestOpened = String(reel);
     },
     finishChest(reel: number) {
       const name = `${31 + reel * 2}_reel_${reel}_chest_finalwin`;
-      return playClip(reveal, 10 + reel, name);
+      return playClip(reelhouse, 60 + reel, name);
+    },
+    setChestAmount(amount: string) {
+      chestTotal.text = amount;
     },
     async endScreen(name?: string) {
       if (host === scene) return;

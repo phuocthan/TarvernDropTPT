@@ -68,7 +68,7 @@ test("reel edge correction translates only the outlines crossing its vertical sa
   assert.equal(keepWithinVerticalViewport({ top: -20, bottom: 110 }, 542, 4), 24);
   assert.equal(keepWithinVerticalViewport({ top: 448, bottom: 561 }, 542, 4), -23);
   assert.equal(keepWithinVerticalViewport({ top: 4, bottom: 538 }, 542, 4), 0);
-  assert.equal(loadGameConfig(tavern).presentation.symbolEdgeInsetPx, 4);
+  assert.equal(loadGameConfig(tavern).presentation.symbolEdgeInsetPx, undefined);
   const game = structuredClone(tavern);
   game.presentation.symbolEdgeInsetPx = 271;
   assert.throws(() => loadGameConfig(game), /presentation.symbolEdgeInsetPx/);
@@ -171,6 +171,15 @@ test("paid and free spin wallet accounting, locked bet and bonus buy", () => {
     () => server.execute({ ...command(server, "bad"), bet: 200 }),
     /FEATURE_LOCKED/,
   );
+});
+test("Tavern retrigger adds five free spins", () => {
+  const server = new MockGame(tavern, () => 0.5);
+  server.execute(command(server, "buy-retrigger", "buy-tavern"));
+  const b = board();
+  for (let reel = 0; reel < 3; reel++) b[reel][0] = "bonus";
+  const outcome = server.execute(command(server, "retrigger"), b);
+  assert.equal(outcome.retrigger, 5);
+  assert.equal(outcome.state.feature?.remaining, tavern.demo.featureSpins.tavern - 1 + 5);
 });
 test("bonus purchases land the exact number of Scatters on distinct reels", () => {
   for (const [action, mode, count] of [

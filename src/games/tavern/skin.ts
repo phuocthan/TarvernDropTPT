@@ -134,7 +134,7 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
       if (clip !== idle && clip.duration > 0) queueIdle(spine, idle);
       spine.update(0);
       spine.autoUpdate = clip.duration > 0;
-      if (next === "win" && clip !== idle && clip.duration > 0)
+      if ((next === "win" || next === "land") && clip !== idle && clip.duration > 0)
         return winFinished(entry);
     }
 

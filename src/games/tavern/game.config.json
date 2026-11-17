@@ -296,7 +296,6 @@
     "spinType": "drop",
     "cellSizePx": 102,
     "gapPx": 8,
-    "symbolEdgeInsetPx": 4,
     "controls": { "menu": true, "autoRounds": [10, 25, 50, 100, 250, 500, 1000] },
     "loadingScreen": {
       "background": "tavern-assets/assets/td_loader_bg.webp",
@@ -314,7 +313,6 @@
       "layers": { "scenery": 1, "mascot-behind": 2, "reels": 3, "mascot": 4, "table": 5 },
       "openingDimmerOpacity": 0.55,
       "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },
-      "sideLogo": { "referenceAspect": 1.7777777778, "leftFactor": 0.68, "upFactor": 0.22 },
       "backgroundCamera": {
         "width": 6000,
         "top": 2060,
@@ -326,8 +324,7 @@
         "portraitMascot": "slot_character",
         "landscapeMascot": "slot_character",
         "baseTable": "background_normal_foreground",
-        "bonusTable": "background_bonus_foreground",
-        "sideLogo": "title"
+        "bonusTable": "background_bonus_foreground"
       }
     },
     "symbolLandingEffects": {
@@ -389,7 +386,7 @@
       "tavern": 8,
       "drop": 10
     },
-    "retriggerSpins": 3,
+    "retriggerSpins": 5,
     "maxFeatureSpins": 40,
     "chestMultipliers": {
       "tavern": [

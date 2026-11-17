@@ -30,7 +30,7 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   releaseSession();
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".brand-loading")).toHaveCount(0);
-  await page.locator(".opening-continue").click();
+  await page.locator(".game-shell").click({ position: { x: 20, y: 20 } });
   await expect(page.locator("#spin")).toBeEnabled();
   await expect(page.locator("#balance")).toHaveText("1,000.00");
   await page.getByRole("button", { name: "Open menu" }).click();
@@ -58,7 +58,7 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   );
   expect(errors).toEqual([]);
 });
-test("a lone Scatter shakes the scene and the active payline renders above the dimmer", async ({
+test("a lone Scatter shakes the scene and the active payline dims only other symbols", async ({
   page,
 }) => {
   const server = new MockGame(tavern, () => 0);
@@ -95,14 +95,13 @@ test("a lone Scatter shakes the scene and the active payline renders above the d
     const focusWins = BoardView.prototype.focusWins;
     BoardView.prototype.focusWins = function (positions: { reel: number; row: number }[]) {
       const played = focusWins.call(this, positions);
-      const { dimmer, winningSymbols, tiles } = this;
+      const { winningSymbols, tiles } = this;
       const winningViews = positions.map(({ reel, row }) => tiles[reel][row + 1].view);
       markers.winFocus = String(
-        dimmer.visible &&
-        dimmer.parent.children.indexOf(dimmer) < dimmer.parent.children.indexOf(winningSymbols) &&
         winningSymbols.renderLayerChildren.length === winningViews.length &&
-        winningViews.every((view) => view.parentRenderLayer === winningSymbols) &&
-        tiles.flat().every(({ view }: { view: { alpha: number } }) => view.alpha === 1),
+        winningViews.every((view) => view.parentRenderLayer === winningSymbols && view.tint === 0xffffff) &&
+        tiles.flat().every(({ view }: { view: { alpha: number } }) => view.alpha === 1) &&
+        tiles.flat().some(({ view }: { view: { tint: number } }) => view.tint === 0x808080),
       );
       return played;
     };
@@ -110,7 +109,8 @@ test("a lone Scatter shakes the scene and the active payline renders above the d
     BoardView.prototype.clearHighlight = function () {
       clearHighlight.call(this);
       if (markers.winFocus)
-        markers.winFocusCleared = String(!this.dimmer.visible && this.winningSymbols.renderLayerChildren.length === 0);
+        markers.winFocusCleared = String(this.winningSymbols.renderLayerChildren.length === 0 &&
+          this.tiles.flat().every(({ view }: { view: { alpha: number; tint: number } }) => view.alpha === 1 && view.tint === 0xffffff));
     };
   });
   await page.getByRole("button", { name: "Spin", exact: true }).click();
@@ -265,13 +265,21 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       for (const mutation of mutations) {
         for (const node of Array.from(mutation.addedNodes)) {
           if (node instanceof HTMLElement && node.matches(".win-celebration")) {
-            const label = node.querySelector("strong")?.textContent;
+            const title = node.querySelector("strong");
+            const label = title?.textContent;
             if (label?.endsWith(" WIN")) tiers.push(label);
+            if (title && label?.endsWith(" WIN")) {
+              (window as any).featureCelebrationCount = ((window as any).featureCelebrationCount ?? 0) + 1;
+              new MutationObserver(() => {
+                const next = title.textContent;
+                if (next?.endsWith(" WIN")) tiers.push(next);
+              }).observe(title, { childList: true });
+            }
           }
         }
       }
     }).observe(document.querySelector("#app")!, { childList: true });
-    document.querySelector("#continue")!.addEventListener("click", () => {
+    dialog.addEventListener("click", () => {
       performance.mark("feature-continue");
     }, { once: true });
     const finalPresentation = new MutationObserver(() => {
@@ -281,19 +289,19 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       }
     });
     finalPresentation.observe(status, { childList: true });
+    const stage = document.querySelector<HTMLElement>(".stage")!;
     const resultPopup = new MutationObserver(() => {
-      if (dialog.open && dialog.querySelector(".reveal-chests")) {
+      if (stage.dataset.chestReveal === "true") {
         performance.mark("feature-result-open");
-        const total = dialog.querySelector(".result-total")!;
-        const amounts = [total.textContent];
+        const amounts = [stage.dataset.chestAmount];
         (window as any).featureAmounts = amounts;
-        new MutationObserver(() => amounts.push(total.textContent)).observe(total, { childList: true });
+        new MutationObserver(() => amounts.push(stage.dataset.chestAmount)).observe(stage, { attributes: true, attributeFilter: ["data-chest-amount"] });
         resultPopup.disconnect();
       }
     });
-    resultPopup.observe(dialog, { attributes: true, attributeFilter: ["open"] });
+    resultPopup.observe(stage, { attributes: true, attributeFilter: ["data-chest-reveal"] });
   });
-  await page.locator("#continue").click();
+  await page.mouse.click(5, 5);
   await expect(page.locator(".game-shell")).toHaveAttribute(
     "data-mode",
     "drop",
@@ -303,9 +311,10 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       Number(getComputedStyle(canvas).zIndex),
   );
   expect(chestsAboveReels).toBe(true);
-  await expect(page.getByRole("heading", { name: "Chest multipliers" })).toBeVisible({
+  await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", {
     timeout: 35000,
   });
+  await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
   const delays = await page.evaluate(() => {
     const mark = (name: string) => performance.getEntriesByName(name, "mark")[0].startTime;
     const continueAt = mark("feature-continue");
@@ -322,18 +331,6 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(requests).toHaveLength(3);
   await expect(page.locator("html")).toHaveAttribute("data-first-free-spin-started", "true");
   expect(new Set(requests).size).toBe(3);
-  const multipliers = page.locator(".reveal-chests .chest-multiplier");
-  await expect(multipliers).toHaveText(Array(5).fill("×5"), { timeout: 24000 });
-  for (const multiplier of await multipliers.all()) {
-    await expect(multiplier).toHaveCSS("text-align", "center");
-    expect(
-      await multiplier.evaluate((label) => {
-        const chest = label.parentElement!.getBoundingClientRect();
-        const text = label.getBoundingClientRect();
-        return Math.abs((text.x + text.width / 2) - (chest.x + chest.width / 2));
-      }),
-    ).toBeLessThan(1);
-  }
   await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 45000 });
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
   await expect(page.locator("#continue")).toBeEnabled();
@@ -341,8 +338,9 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(await page.evaluate(() => (window as any).featureTiers)).toEqual([
     "BIG WIN", "SUPER WIN", "MEGA WIN", "EPIC WIN",
   ]);
+  expect(await page.evaluate(() => (window as any).featureCelebrationCount)).toBe(1);
   const expected = server.state.balance;
-  await page.locator("#continue").click();
+  await page.mouse.click(5, 5);
   await expect(page.locator("#balance")).toHaveText(
     (expected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
   );
@@ -365,24 +363,56 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   });
   await page.goto("/");
   await expect(page.locator("#spin")).toBeEnabled();
+  await page.evaluate(async () => {
+    const spineUrl = performance.getEntriesByType("resource")
+      .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+    const { AnimationState, Spine } = await import(spineUrl);
+    const clips: string[] = [];
+    (window as any).chestClips = clips;
+    const slotObjects = new Map<string, { text: string }>();
+    (window as any).chestSlotObjects = slotObjects;
+    const updateSlotObject = Spine.prototype.updateSlotObject;
+    Spine.prototype.updateSlotObject = function (attachment: { slot: { data: { name: string } }; container: { text: string } }) {
+      const name = attachment.slot.data.name;
+      if (name === "slot_finalwin" || name.startsWith("slot_reel_mult_"))
+        slotObjects.set(name, attachment.container);
+      return updateSlotObject.call(this, attachment);
+    };
+    const original = AnimationState.prototype.setAnimation;
+    AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
+      if (name === "4_finalwin" || /reel_3_chest_(open|finalwin)$/.test(name)) clips.push(name);
+      return original.call(this, track, name, loop);
+    };
+  });
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
   await page.locator("#confirm-buy").click();
   await expect(page.getByRole("heading", { name: "DROP BONUS" })).toBeVisible({ timeout: 15000 });
   await page.locator("#continue").click();
   if (unlocked) {
-    await expect(page.getByRole("heading", { name: "Chest multipliers" })).toBeVisible({ timeout: 25000 });
-    await expect(page.locator(".reveal-chests .chest")).toHaveCount(5);
-    await expect(page.locator(".result-total")).toHaveText("1.00");
-    await expect(page.locator(".reveal-chests .chest").nth(3).locator(".chest-multiplier")).toHaveText("×2", { timeout: 5000 });
-    await expect(page.locator(".reveal-chests .chest-multiplier")).toHaveCount(1);
-    await expect(page.locator(".tavern-chest-art")).toHaveAttribute("data-spine-clip", "36_reel_3_chest_open");
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", { timeout: 25000 });
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "1.00");
+    await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-opened", "3", { timeout: 10000 });
+    expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_reel_mult_3")?.text)).toBe("x2");
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "2.00", { timeout: 10000 });
   }
   await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
   await expect(page.locator(".result-total")).toHaveText(unlocked ? "2.00" : "0.00");
+  if (unlocked) expect(await page.evaluate(() => (window as any).chestClips)).toEqual([
+    "4_finalwin", "36_reel_3_chest_open", "37_reel_3_chest_finalwin",
+  ]);
+  else expect(await page.evaluate(() => (window as any).chestClips)).toEqual([]);
   await expect(page.locator("#continue")).toBeEnabled();
-  if (!unlocked) {
+  if (unlocked) {
+    await page.mouse.click(5, 5);
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
+    await expect.poll(() => page.evaluate(() => {
+      const slots = (window as any).chestSlotObjects as Map<string, { text: string }>;
+      return slots.size === 6 && Array.from(slots.values()).every((slot) => slot.text === "");
+    })).toBe(true);
+  } else {
     await expect(page.locator("#dialog")).toBeHidden({ timeout: 16000 });
     await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
   }
@@ -429,6 +459,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
 }
 for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEGA WIN"], [100, "EPIC WIN"]] as const) {
   test(`${label} displays its celebration`, async ({ page }) => {
+    test.setTimeout(90000);
     const server = new MockGame(tavern, () => 0);
     await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
     await page.route("**/api/command", (route) => {
@@ -441,12 +472,44 @@ for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEG
     });
     await page.goto("/");
     await expect(page.locator("#spin")).toBeEnabled();
+    await page.evaluate(async () => {
+      const events = { titles: [] as string[], values: [] as number[], clips: [] as string[], overlays: 0 };
+      (window as any).winSequence = events;
+      const spineUrl = performance.getEntriesByType("resource")
+        .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+      const { AnimationState } = await import(spineUrl);
+      const setAnimation = AnimationState.prototype.setAnimation;
+      AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
+        if (["bigwin", "superwin", "megawin", "epicwin", "maxwin"].includes(name)) events.clips.push(name);
+        return setAnimation.call(this, track, name, loop);
+      };
+      new MutationObserver((changes) => {
+        for (const change of changes) for (const node of Array.from(change.addedNodes)) {
+          if (!(node instanceof HTMLElement) || !node.matches(".win-celebration")) continue;
+          events.overlays++;
+          const title = node.querySelector("strong")!;
+          const value = node.querySelector(".win-celebration-value")!;
+          events.titles.push(title.textContent!);
+          new MutationObserver(() => events.titles.push(title.textContent!)).observe(title, { childList: true });
+          new MutationObserver(() => events.values.push(Number(value.textContent!.replaceAll(",", ""))))
+            .observe(value, { childList: true });
+        }
+      }).observe(document.querySelector("#app")!, { childList: true });
+    });
     await page.locator("#spin").click();
-    await expect(page.locator(".win-celebration strong")).toHaveText(label, { timeout: 15000 });
+    await expect(page.locator(".win-celebration strong")).toHaveText(label, { timeout: 60000 });
     await expect(page.locator(".win-celebration-value")).toHaveText(`${multiplier}.00`);
     await expect(page.locator(".win-celebration .tavern-screen-art"))
       .toHaveAttribute("data-spine-clip", label.toLowerCase().replace(/\s/g, ""));
     await expect(page.locator(".win-celebration")).toHaveCount(0, { timeout: 14000 });
+    const sequence = await page.evaluate(() => (window as any).winSequence);
+    const expected = [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEGA WIN"], [100, "EPIC WIN"]]
+      .filter(([threshold]) => multiplier >= Number(threshold)).map(([, name]) => name);
+    expect(sequence.overlays).toBe(1);
+    expect(sequence.titles).toEqual(expected);
+    expect(sequence.clips).toEqual([label.toLowerCase().replace(/\s/g, "")]);
+    expect(sequence.values.length).toBeGreaterThan(1);
+    expect(sequence.values.every((value: number, i: number, values: number[]) => i === 0 || value >= values[i - 1])).toBe(true);
   });
 }
 test("mobile layout fits 390 pixels", async ({ page }) => {
@@ -526,7 +589,7 @@ test("portrait renders the mascot behind the reelhouse and uses the reference HU
   )).toBeGreaterThanOrEqual(0.99);
 });
 
-test("Drop anticipation raises only landed Scatters above the dimmer and clears on Skip", async ({ page }) => {
+test("Drop anticipation highlights landed Scatters and clears on Skip", async ({ page }) => {
   const server = new MockGame(tavern, () => 0.5);
   const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
   board[0][0] = "bonus";
@@ -536,7 +599,7 @@ test("Drop anticipation raises only landed Scatters above the dimmer and clears 
     json: server.execute(route.request().postDataJSON(), board),
   }));
   await page.goto("/?game=tarvern");
-  await expect(page.locator("#spin")).toBeEnabled();
+  await expect(page.locator("#spin")).toBeEnabled({ timeout: 15000 });
   await page.evaluate(async () => {
     const moduleUrl = "/src/framework/presentation/board.ts";
     const { BoardView } = await import(moduleUrl);
@@ -562,6 +625,63 @@ test("Drop anticipation raises only landed Scatters above the dimmer and clears 
   await expect(spin).toContainText("SPIN", { timeout: 12000 });
   await expect(canvas).toHaveAttribute("data-raised-scatters", "0:0,1:2,");
 });
+for (const scatterCount of [2, 3]) {
+  test(`${scatterCount} Scatters play win only for a feature trigger`, async ({ page }) => {
+    const server = new MockGame(tavern, () => 0.5);
+    const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
+    for (let reel = 0; reel < scatterCount; reel++) board[reel][reel] = "bonus";
+    await page.route("**/api/session", (route) => route.fulfill({ json: server.state }));
+    await page.route("**/api/command", (route) => route.fulfill({
+      json: server.execute(route.request().postDataJSON(), board),
+    }));
+    await page.goto("/");
+    await expect(page.locator("#spin")).toBeEnabled();
+    await page.evaluate(async () => {
+      const spineUrl = performance.getEntriesByType("resource")
+        .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+      const { AnimationState } = await import(spineUrl);
+      const boardUrl = "/src/framework/presentation/board.ts";
+      const { BoardView } = await import(boardUrl);
+      const focusWins = BoardView.prototype.focusWins;
+      BoardView.prototype.focusWins = function (positions: { reel: number; row: number }[]) {
+        if (positions.length >= 3) {
+          (window as any).scatterLandedBeforeWin = positions.every(({ reel, row }) => {
+            const spine = this.tiles[reel][row + 1].view.children.find((child: any) => child.state?.getCurrent(0)?.animation?.name?.startsWith("bonus_"));
+            const current = spine?.state.getCurrent(0);
+            return current && (current.animation.name !== "bonus_land" || current.trackTime >= current.animationEnd);
+          });
+        }
+        return focusWins.call(this, positions);
+      };
+      const events: string[] = [];
+      (window as any).scatterAnimations = events;
+      const setAnimation = AnimationState.prototype.setAnimation;
+      AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
+        if (name === "bonus_land" || name === "bonus_win") events.push(name);
+        return setAnimation.call(this, track, name, loop);
+      };
+      const addAnimation = AnimationState.prototype.addAnimation;
+      AnimationState.prototype.addAnimation = function (track: number, name: string, loop: boolean, delay: number) {
+        if (name === "bonus_win") events.push(name);
+        return addAnimation.call(this, track, name, loop, delay);
+      };
+    });
+    await page.locator("#spin").click();
+    if (scatterCount === 3)
+      await expect(page.getByRole("heading", { name: "TAVERN BONUS", exact: true })).toBeVisible({ timeout: 20000 });
+    else {
+      await expect(page.locator("#spin")).toContainText("SKIP", { timeout: 10000 });
+      await expect(page.locator("#spin")).toContainText("SPIN", { timeout: 20000 });
+    }
+    const events = await page.evaluate(() => (window as any).scatterAnimations as string[]);
+    expect(events.filter((event) => event === "bonus_land")).toHaveLength(scatterCount);
+    expect(events.filter((event) => event === "bonus_win")).toHaveLength(scatterCount === 3 ? 3 : 0);
+    if (scatterCount === 3)
+      expect(events.lastIndexOf("bonus_land")).toBeLessThan(events.indexOf("bonus_win"));
+    if (scatterCount === 3)
+      expect(await page.evaluate(() => (window as any).scatterLandedBeforeWin)).toBe(true);
+  });
+}
 test("lost response recovers the exact request without charging another spin", async ({
   page,
 }) => {
