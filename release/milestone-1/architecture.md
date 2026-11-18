@@ -33,3 +33,7 @@ flowchart TD
 Source implementation is independent of Gen3. It follows shared app/resource/network/core boundaries; it is not a packaged monorepo SDK. In-place game switching/disposal, arbitrary third-party game onboarding and production wallet integration are not M1 acceptance claims.
 
 See [acceptance checklist](milestone-1.md), [API field guide](milestone-1-api.md) and [asset verification](milestone-1-asset-spec.md).
+
+## Add another configuration
+
+Run `npm run game:new -- coral-slot "Coral Slot"`. Edit `src/games/coral-slot/game.config.json`: reels/rows, symbols, lines, bets, currency and Normal/Drop timings. The scaffold registers a basic skin in the catalog. Use `npm run game:build -- coral-slot` and `npm run game:start -- coral-slot` for a standalone mock build. Custom presentation is an adapter above the shared controller/board/resource services; do not put a game's symbols or payout logic into the shared renderer. Synthetic rules must be replaced by recorded server results for production.

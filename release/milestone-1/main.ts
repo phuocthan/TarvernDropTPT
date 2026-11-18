@@ -4,7 +4,8 @@ import { mountBasicGame } from "./framework/presentation/basic-game.ts";
 
 const root = document.querySelector<HTMLElement>("#app")!;
 const query = new URLSearchParams(location.search).get("game");
-const game = query === "default" || query === "reuse" ? games[1] : defaultGame;
+const game = query === "default" ? games.find(({ id }) => id === "reuse-3x3")!
+  : games.find(({ routing }) => routing.query === query) ?? defaultGame;
 document.title = game.title;
 const other = games.find(({ id }) => id !== game.id)!;
 await mountBasicGame(root, game, undefined, {

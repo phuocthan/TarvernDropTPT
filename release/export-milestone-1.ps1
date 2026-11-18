@@ -27,8 +27,6 @@ $entries = @(
     'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',
     'docs/milestone-1-api.md', 'docs/milestone-1-v1-examples.json', 'docs/milestone-1-evidence',
     'docs/backend-localhost-v1.md', 'docs/FE-BE-Proposal.md', 'docs/framework-gen3-review.md',
-    'docs/framework-flow.md', 'docs/framework-classes-and-tavern-runtime.md', 'docs/template-architecture.md',
-    'docs/reusable-game-deployment.md', 'docs/milestone-release.md',
     'release/milestone-1/main.ts', 'release/milestone-1/catalog.ts',
     'release/milestone-1/architecture.md', 'release/milestone-1/smoke.spec.ts',
     'release/milestone-1/playwright.config.ts',
@@ -54,6 +52,10 @@ try {
     $config.presentation.PSObject.Properties.Remove('loadingScreen')
     $config.routing.skin = 'basic'
     $config | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $configPath -Encoding utf8
+    $proposalPath = Join-Path $destinationPath 'docs/FE-BE-Proposal.md'
+    $proposalText = Get-Content -LiteralPath $proposalPath -Raw -Encoding utf8
+    $proposalText.Replace('backend-mock-examples-client-review.md', 'milestone-1-api.md') |
+      Set-Content -LiteralPath $proposalPath -Encoding utf8
     Remove-Item -LiteralPath $profile
     Remove-Item -LiteralPath (Join-Path $destinationPath 'release')
     Set-Content -LiteralPath (Join-Path $destinationPath 'SOURCE_REVISION') -Value $commit
