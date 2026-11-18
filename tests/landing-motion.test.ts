@@ -23,3 +23,14 @@ test("config rejects broken landing timing and extreme deformation", () => {
   game.presentation.landing!.settleMs = 120; game.presentation.landing!.squashY = 0;
   assert.throws(() => loadGameConfig(game), /presentation.landing/);
 });
+test("framework policies validate force stop and foreground symbol configuration", () => {
+  const game = structuredClone(reuse);
+  game.presentation.foregroundWinSymbols = ["not-a-symbol"];
+  assert.throws(() => loadGameConfig(game), /foregroundWinSymbols/);
+  game.presentation.foregroundWinSymbols = ["A"];
+  game.presentation.allowForceStop = "false" as unknown as boolean;
+  assert.throws(() => loadGameConfig(game), /allowForceStop/);
+  game.presentation.allowForceStop = false;
+  game.presentation.winOverflowPaddingPx = 10000;
+  assert.throws(() => loadGameConfig(game), /winOverflowPaddingPx/);
+});

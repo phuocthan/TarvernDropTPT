@@ -30,6 +30,7 @@ export interface RoundState {
   cap: number;
 }
 export interface Snapshot {
+  resume?: { curStep: string; featureMode: FeatureState["mode"] | null; kind: string };
   version: number;
   balance: number;
   board: Board;
@@ -55,6 +56,7 @@ export interface Outcome {
   checkpoint?: {
     curStep: string;
     staticResult?: boolean;
+    resumed?: boolean;
     reel?: number;
     multiplier?: number;
     displayWinMinor: number;
@@ -104,6 +106,9 @@ export interface DropAnticipation {
   reelPauseMs: number;
 }
 export interface ReelPresentation {
+  allowForceStop?: boolean;
+  foregroundWinSymbols?: string[];
+  winOverflowPaddingPx?: number;
   landing?: LandingMotion;
   spinType: ReelMotion;
   cellSizePx: number;
@@ -121,6 +126,7 @@ export interface ReelPresentation {
     slots: Record<string, string>;
     openingDimmerOpacity?: number;
     openingReveal?: { durationMs: number; symbolDelayMs: number; mascotDelayMs: number; playbackRate?: number };
+    winScreen?: { centerY: number; paddingPx: number; landscapeFit: number; portraitFit: number };
     chestCamera?: { scale: number; originY: number; durationMs: number };
     sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };
     backgroundCamera?: {
@@ -183,7 +189,7 @@ export interface GameDefinition {
 }
 export interface GameTransport {
   hasResume?: boolean;
-  resume?(): Promise<Outcome>;
+  resume?(refresh?: boolean): Promise<Outcome>;
   completePresentation?(): Promise<Snapshot>;
   nextPresentation?(): Outcome | null;
   session(): Promise<Snapshot>;

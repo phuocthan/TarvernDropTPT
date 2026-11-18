@@ -45,12 +45,14 @@ export class GameController {
     this.storage.setItem(this.storageKey, JSON.stringify(this.pending));
     return this.send();
   }
-  async recover() {
-    if (!this.pending && this.transport.resume) {
+  async recover(refresh = true) {
+    if ((!this.pending || (!refresh && this.state?.resume)) && this.transport.resume) {
       this.phase = "pending";
       try {
-        const outcome = await this.transport.resume();
+        const outcome = await this.transport.resume(refresh || !this.state?.resume);
         this.state = outcome.state;
+        this.pending = null;
+        this.storage.removeItem(this.storageKey);
         this.phase = "presenting";
         return outcome;
       } catch (error) { this.phase = "recovery"; throw error; }

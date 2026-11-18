@@ -14,12 +14,22 @@ export interface SceneAnchor {
   scale: number;
 }
 
-export function waitForContinue(surface: HTMLElement, button: HTMLButtonElement) {
+export async function waitForContinue(surface: HTMLElement, button: HTMLButtonElement, ready?: Promise<unknown>) {
+  if (ready) {
+    button.hidden = true;
+    button.disabled = true;
+    await ready;
+    button.hidden = false;
+    button.disabled = false;
+  }
   return new Promise<void>((resolve) => {
-    surface.addEventListener("click", () => {
+    const accept = () => {
+      if (button.hidden || button.disabled) return;
+      surface.removeEventListener("click", accept);
       button.disabled = true;
       resolve();
-    }, { once: true });
+    };
+    surface.addEventListener("click", accept);
   });
 }
 

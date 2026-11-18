@@ -98,6 +98,7 @@
     "contract": "proposal-v1"
   },
   "presentation": {
+    "allowForceStop": true,
     "landing": { "compressMs": 70, "stretchMs": 90, "settleMs": 120, "leadMs": 80, "squashX": 1.1, "squashY": 0.88, "stretchX": 0.94, "stretchY": 1.06 },
     "reelMaskPaddingPx": 10,
     "spinType": "normal",

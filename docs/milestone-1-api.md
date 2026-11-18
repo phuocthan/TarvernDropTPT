@@ -1,39 +1,44 @@
-# M1 mock API · integration review
+# M1 synthetic API examples — current local v1
 
-[Sanitized JSON examples](milestone-1-api-examples.json) come from the existing mock server and synthetic fixtures. The example data does not depend on final Kai math. The numbers and IDs are for development review.
+[Concrete request/response JSON](milestone-1-v1-examples.json) is generated from the existing resumable `ProposalBackend`, not a separate demo. All outcomes, money, identities and receipts are synthetic. IDs/tokens are sanitized placeholders. This is a review candidate, not an agreed production contract or final Kai math.
 
-| Topic | Current mock |
+Regenerate with `node --experimental-strip-types tools/m1-api-examples.mjs`.
+
+## Examples provided
+
+The JSON contains session/init, game-info, normal win, duplicate wager, Drop purchase, intro ACK, a free spin, server restart and mid-feature resume, chest summary, mid-chest resume, chest completion, final result, payment status before/after settlement, duplicate final ACK and a structured missing-token error. Intermediate free-spin/chest ACKs are omitted for brevity where explicitly stated.
+
+## Requests versus confirmed values
+
+| Field | Owner and meaning |
 | --- | --- |
-| Session | `GET /api/session` returns `version`, `balance`, `board`, `feature` and `round`. A same-origin, HttpOnly cookie identifies the in-memory wallet. Base mode has `feature: null`. An active feature reports `feature.mode` as `tavern` or `drop`. The 3 × 3 demo has its own API base. |
-| Client request | `POST /api/command` sends `requestId` (client-generated UUID), `expectedVersion` from the last snapshot, `action` (`spin`, `buy-tavern` or `buy-drop`), requested base `bet`, and `chance`. In free spins the request echoes the server-confirmed round bet and uses standard chance. |
-| Server-confirmed outcome | `requestId` echoes the command. `bet`, `state`, `wins`, `spinWin`, `paidAward`, and feature fields come from the server. `state.round.id` is server-generated and is present while the paid round is open. A settled base spin or completed feature returns `state.round: null`. |
-| Amounts | Integer units at scale 2 (`100` displays as `1.00`). The wire format currently has no currency code or `chargedAmount` field. In an uninterrupted mock flow the charge can be reconciled as previous balance + `paidAward` − new balance. In these fixtures the standard 100-unit spin charges 100, the 100-unit Drop purchase charges 10,000, and the free spin charges zero. The production contract should return the authoritative charge and currency explicitly. |
-| Line win | The board is column-major `board[reel][row]`. Both indices are zero-based, left to right and top to bottom. Symbol IDs match the game config (e.g. `A`, `wild`, `bonus` for Scatter). `wins[].line` indexes the zero-based `lines` array in the config. Each win gives its ordered positions, paying symbol and amount in integer minor units. |
-| Free spins | `entry` identifies a triggered mode. State gives remaining/played counts, accumulated spin wins and one chest per reel. `collected` lists new winning positions credited to keys. On settlement, `finalFeature` holds the final chest states and `completion` contains pre-multiplier accumulation, one multiplier per reel, `product`, the bonus-only `featureAward`, the paid round's `roundAward`, and `capped`. A locked chest contributes ×1. `paidAward` is the newly credited amount for this command. |
-| Retry and refresh | The client saves a command before sending it. After a timeout, lost response or pending-command refresh, it replays the identical command body and ID. The mock returns the saved result for that ID before checking the version, without charging again. If a response was already received, refresh loads the latest snapshot and the mock does not replay its animation. |
-| Errors | Known business rejections use an HTTP status and `{ "error": "CODE" }`. The client fetches a fresh snapshot after a structured 4xx. Timeouts and ambiguous transport failures retain the pending command. `SESSION_EXPIRED` can occur after restart or cookie loss because session state and receipts are in memory. |
+| `gameCode` | Client selects the game in every JSON body; API URLs have no query parameters. |
+| `userId` | Mock test identity only. Production launch authentication belongs to A. |
+| `sessionId`, `token` | Server-issued session credentials; sent in headers after login. |
+| `Play-Token` | Server-issued entitlement for one paid spin OR bonus buy. Retry identical payload/token. Never invent another token after a lost response. |
+| `betMinor` | Client-requested original base bet; server validates it. |
+| `chanceMode`, `featureMode` | Client-selected action; server confirms the resulting step/outcome. |
+| `chargedMinor` | Server-confirmed charge, including Chance or bonus-buy price. |
+| `totalwin_amt`, `winLines[].win_amt` | Authoritative spin money amounts, not multipliers. |
+| `freegame.totalWinMinor` | Accumulated presentation amount; not proof of credited wallet balance. |
+| `wallet.confirmedBalanceMinor`, `settlement` | Backend-confirmed balance and payment status. FE must not add pending win itself. |
+| `roundId`, `stepId`, cursors | Server-owned durable round, released step and acknowledged presentation progress. |
+| `curStep` in response | Step BE has released for presentation. Receiving it does not mean its animation is complete. |
+| `curStep` + `stepId` in ACK | FE reports the released step has actually been presented. ACK does not place a wager. |
+| `reel`, `multiplier` | Chest location and dimensionless multiplier. Apply authoritative totals supplied by BE. |
 
-The current payload carries outcome fields. The client derives presentation order from them:
+## Units and coordinates
 
-1. Stop the reels on the returned board, play land and line wins, then show any Scatter trigger.
-2. Present feature entry or retrigger, then consume returned free-spin results and light newly collected keys/chests.
-3. At settlement, reveal eligible chests, transfer multipliers, run any applicable win-tier presentation and show Total Win. The client may interpolate the counter but uses the confirmed settlement amount.
+KRW, `currencyExponent = 0`: `1000` means **₩1,000**, with separators and no decimals. Currency formatting is configurable. Chance and buy price factors are dimensionless; `chargedMinor` is money. The round cap is 10,000 × the original base bet, including a bonus buy; never × the purchase price.
 
-Skip and Turbo are client presentation controls. They shorten timing or settle the animation on the same recorded board. They do not send a second spin or recalculate awards.
+Boards are flattened row-major. Numeric symbol IDs are supplied by `settings.symbolIds`; Scatter is 11 and Wild is 1 in this synthetic game. Cell positions and ordinary payline IDs are 1-based in this API. The shared adapter converts these to `board[reel][row]` and zero-based line/position objects internally. A separate Scatter payout is not fabricated by the mock.
 
-## Reproduce locally
+## Presentation, recovery and frequency
 
-Run `npm ci`, `npm run build` and `npm start`. Open the preview in a browser, or use:
+Login + game-info at startup; one paid request per wager. For a feature: one ACK after intro, each free spin, chest summary, each chest reveal, and final Total Win. No per-frame network calls. Resume reads game-info and the stored result rather than restarting the feature. Turbo/skip changes presentation timing only; the same recorded step must complete and be acknowledged. `show_stored_result` restores the after-result state without re-spinning completed free spins.
 
-```sh
-curl -c demo.cookies http://localhost:4000/api/session
-curl -b demo.cookies -H 'Content-Type: application/json' \
-  -d '{"requestId":"example-001","expectedVersion":0,"action":"spin","bet":100,"chance":"standard"}' \
-  http://localhost:4000/api/command
-```
+In the current Tavern presentation, pending `intro` replays the recorded Scatter win then bonus intro without a Resume popup. Later feature steps restore the feature scene and wait for Resume. This visual policy creates no extra wager or payout.
 
-The live mock generates a fresh outcome. The JSON examples use fixed boards so they can be reviewed reproducibly. See `server.js`, `server/mock-game.ts`, `src/framework/domain/contracts.ts` and `src/games/tavern/game.config.json`.
+The mock stores rounds, outcomes, sessions and receipts on disk. Restart retains them. Duplicate paid requests and final ACKs return recorded results. Normal rounds settle immediately; feature final ACK settles once, with expiry/startup settlement independent of a returning browser. A owns the final production credit trigger, wallet integration, expiry policy, error catalog and bet/rounding rules. Single-process JSON storage is for local development; production durability/concurrency is not claimed.
 
-## Pending a joint contract
-
-Team A will propose money fields, durable request/round IDs, duplicate and conflict handling, and recovery semantics. On the presentation side we propose stable ordered events for land, win, feature trigger, key collection, retrigger, chest reveal and settlement, plus a way to retrieve a committed result by stable ID. The mock has no durable round lookup, versioned event envelope, explicit currency or charge field, or replay cursor. We can review field ownership and recovery at the M1 integration sync and agree on a versioned contract before backend integration.
+[Local run instructions and endpoints](backend-localhost-v1.md) · [Proposal for A to review](FE-BE-Proposal.md).

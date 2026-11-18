@@ -330,8 +330,9 @@ button small {
 }
 .reel-host[data-mask-padding] { overflow: visible; }
 .reel-host[data-mask-padding] > canvas {
+  width: var(--reel-canvas-width, 100%) !important;
   height: var(--reel-canvas-height) !important;
-  translate: 0 var(--reel-canvas-offset);
+  translate: var(--reel-canvas-offset-x, 0%) var(--reel-canvas-offset);
 }
 .board-loading {
   position: absolute;

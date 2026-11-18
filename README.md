@@ -10,6 +10,8 @@ The framework implementation lives in this repository. It uses the shared-core/g
 
 ## Development
 
+See the [combined Tavern + 3×3 framework chart and handover assessment](docs/framework-shared-chart.md) for the shared services actually used by each game, game-specific presentation, config policies and remaining SDK work.
+
 The [Gen3 architecture review and resource standard](docs/framework-gen3-review.md) documents the shared app, resource, remote, network, audio, UI and slot-core boundaries. Each game can declare resource bundles/dependencies in its JSON. POST requests use clean URLs and put `gameCode` in the JSON payload. Local development watches backend changes to keep reload/login on the same API contract.
 
 The Tavern and 3×3 configurations use the resumable KRW `/api/v1` mock from [FE–BE Proposal](docs/FE-BE-Proposal.md). See [localhost backend instructions, adapter and request examples](docs/backend-localhost-v1.md). The reusable transport maps numeric boards and server checkpoints into presentation objects; the client acknowledges each completed step.

@@ -94,6 +94,11 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   )
     invalid("presentation");
   const { normal, drop, feature, animationGrid, scene } = display;
+  if (display.allowForceStop !== undefined && typeof display.allowForceStop !== "boolean") invalid("presentation.allowForceStop");
+  if (display.foregroundWinSymbols !== undefined && (!Array.isArray(display.foregroundWinSymbols) ||
+      !display.foregroundWinSymbols.every((id) => ids.has(id)))) invalid("presentation.foregroundWinSymbols");
+  if (display.winOverflowPaddingPx !== undefined && (!nonNegativeInt(display.winOverflowPaddingPx) || display.winOverflowPaddingPx > display.cellSizePx * 2))
+    invalid("presentation.winOverflowPaddingPx");
   const deformation = display.landing;
   if (deformation !== undefined && (!deformation ||
       ![deformation.compressMs, deformation.stretchMs, deformation.settleMs].every(positiveInt) ||
@@ -149,6 +154,12 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.scene");
   const camera = scene?.backgroundCamera;
   const openingDimmer = scene?.openingDimmerOpacity;
+  const winScreen = scene?.winScreen;
+  if (winScreen !== undefined && (!winScreen ||
+      !Number.isFinite(winScreen.centerY) || winScreen.centerY <= 0 || winScreen.centerY >= 1 ||
+      !nonNegativeInt(winScreen.paddingPx) ||
+      ![winScreen.landscapeFit, winScreen.portraitFit].every((fit) => Number.isFinite(fit) && fit > 0)))
+    invalid("presentation.scene.winScreen");
   const openingReveal = scene?.openingReveal;
   const chestCamera = scene?.chestCamera;
   const sideLogo = scene?.sideLogo;

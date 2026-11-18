@@ -1,4 +1,4 @@
-import { Application, BitmapText, Graphics, Text } from "pixi.js";
+import { Application, BitmapText, Container, Graphics, Text } from "pixi.js";
 import {
   RegionAttachment,
   AttachmentTimeline,
@@ -12,6 +12,7 @@ import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/present
 import { hasTavernBitmapFont } from "./typography.ts";
 import { createMascot, loadMascot, playMascotWin } from "./mascot.ts";
 import { animationBounds } from "./spine-bounds.ts";
+import { slotContentScale } from "../../framework/presentation/slot-content-fit.ts";
 import { BitmapAmount } from "../../framework/presentation/bitmap-amount.ts";
 import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 
@@ -157,7 +158,10 @@ export async function mountTavernEffects(
   });
   const payout = new BitmapAmount("td_gold", 480);
   payout.anchor.set(0.5);
-  screens.addSlotObject("slot_win", payout, { followSlotColor: true });
+  // Spine owns the slot container's transform. Keep responsive amount scaling on its child.
+  const payoutSlot = new Container();
+  payoutSlot.addChild(payout);
+  screens.addSlotObject("slot_win", payoutSlot, { followSlotColor: true });
   const spinCount = new Text({
     style: {
       fontFamily: "Outfit",
@@ -170,6 +174,17 @@ export async function mountTavernEffects(
   spinCount.anchor.set(0.5);
   screens.addSlotObject("fs", spinCount, { followSlotColor: true });
   screens.afterUpdateWorldTransforms = ({ skeleton }) => {
+    // Slot objects are absent from Skeleton.getBounds(). Fit the actual amount separately,
+    // on every authored pose and counter update, including long KRW values.
+    if (payout.text && host !== scene && !liveOverlay && host.closest(".win-celebration") && host.dataset.spineClip !== "addfs") {
+      const bone = skeleton.findSlot("slot_win")!.bone;
+      const content = payout.getLocalBounds();
+      payout.scale.set(Math.min(content.width ? 3000 / content.width : 1, slotContentScale(
+        content, bone,
+        { x: screens.x, y: screens.y, scaleX: screens.scale.x, scaleY: screens.scale.y },
+        { width: host.clientWidth, height: host.clientHeight }, sceneLayout?.winScreen?.paddingPx ?? 16,
+      )));
+    }
     // The dialog backdrop already dims the whole viewport.
     skeleton.findSlot("fade")?.setAttachment(null);
     // Only the exact count of ten can use the authored text sprite.
@@ -201,6 +216,7 @@ export async function mountTavernEffects(
   let baseExited = false;
   let bonusExited = false;
   let revealingChests = false;
+  let openingEntry: TrackEntry | undefined;
   let bounds = screenBounds(screens.skeleton.data, []);
   const viewports = new Map<string, typeof bounds>();
 
@@ -270,13 +286,16 @@ export async function mountTavernEffects(
         const totalWin = host.classList.contains("total-win-screen");
         const fit = retrigger ? 0.85
           : totalWin && mobile ? 1.4
-          : celebration ? (mobile ? 1.71 : 1.55) : 0.94;
-        const scale = Math.min(width / bounds.width, height / bounds.height) * fit;
+          : celebration ? (mobile ? sceneLayout?.winScreen?.portraitFit ?? 1.71 : sceneLayout?.winScreen?.landscapeFit ?? 1.55) : 0.94;
+        // The renderer fills the viewport; the previous art box still defines visual size.
+        const artWidth = celebration && (!mobile || retrigger) ? Math.min(width * 0.96, 1400) : width;
+        const artHeight = celebration && (!mobile || retrigger) ? Math.min(height * 0.78, 780) : height;
+        const scale = Math.min(artWidth / bounds.width, artHeight / bounds.height) * fit;
         const centerX = width * (mobile && (totalWin || (celebration && !retrigger)) ? 0.48 : 0.5);
         screens.scale.set(scale);
         screens.position.set(
           centerX - (bounds.x + bounds.width / 2) * scale,
-          height / 2 - (bounds.y + bounds.height / 2) * scale,
+          height * (celebration && !retrigger ? sceneLayout?.winScreen?.centerY ?? 0.44 : 0.5) - (bounds.y + bounds.height / 2) * scale,
         );
       }
       if (!liveOverlay) return;
@@ -364,7 +383,7 @@ export async function mountTavernEffects(
       background.state.setAnimation(0, "0_bonus_idle", true);
     }
     if (opening) {
-      reelhouse.state.setAnimation(
+      openingEntry = reelhouse.state.setAnimation(
         1,
         portrait ? "1_splash_intro_mobile" : "1_splash_intro",
         false,
@@ -517,7 +536,11 @@ export async function mountTavernEffects(
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     },
     startOpening() {
+      stage.dataset.openingAnimation = "playing";
+      const done = openingEntry?.animation && openingEntry.trackTime < openingEntry.animation.duration
+        ? waitForClip(openingEntry) : Promise.resolve();
       app.start();
+      return done.then(() => { stage.dataset.openingAnimation = "complete"; });
     },
     async enterGame(playbackRate = 1) {
       openingDimmer.visible = false;
@@ -547,6 +570,18 @@ export async function mountTavernEffects(
       if (host === scene) stage.dataset.spineScene = "true";
       startScene();
     },
+    restoreFeature(feature: FeatureState | null) {
+      openingDimmer.visible = false;
+      // The initial bonus pose is restored at its end frame; no base exit or game-enter clip.
+      mode = undefined;
+      setMode("bonus");
+      const zoom = background.state.setAnimation(1, "1_zoom_out", false);
+      zoom.trackTime = zoom.animation!.duration;
+      reelhouse.visible = background.visible = true;
+      syncFeature(feature);
+      updateBackground(0);
+      startScene();
+    },
     spin() {
       void playClip(reelhouse, 3, "3_spin_start");
       reelhouse.state.addEmptyAnimation(3, 0);
@@ -559,10 +594,11 @@ export async function mountTavernEffects(
     shake() {
       playSceneEffects({ background: "3_shake", reelhouse: "3_shake" });
     },
-    async prepareBonusIntro() {
+    async prepareBonusIntro(resumed = false) {
+      openingDimmer.visible = false;
       baseExited = true;
       background.state.setAnimation(1, "1_zoom_in", false);
-      await playClip(reelhouse, 2, "2_base_exit");
+      if (!resumed) await playClip(reelhouse, 2, "2_base_exit");
       reelhouse.visible = false;
     },
     async revealChests(amount: string) {
@@ -575,6 +611,7 @@ export async function mountTavernEffects(
       await Promise.all([chestZoom?.finished, playClip(reelhouse, 4, "4_finalwin")]);
     },
     async prepareTotalWin() {
+      openingDimmer.visible = false;
       totalWinRenderer ??= createTotalWinRenderer();
       bonusExited = true;
       chestZoom?.cancel();

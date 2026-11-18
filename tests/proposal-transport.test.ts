@@ -9,6 +9,7 @@ import { GameController } from "../src/framework/controller.ts";
 import { tavern } from "../src/games/tavern/definition.ts";
 import { reuse } from "../src/games/reuse/definition.ts";
 import { formatMoney } from "../src/framework/presentation/money.ts";
+import { resolveSessionEntry } from "../src/framework/app/session-entry.ts";
 
 function storage(): Storage {
   const data = new Map<string, string>();
@@ -103,6 +104,44 @@ test("boot reuses the prepared session without another game-info request", async
   assert.deepEqual(controller.state, initialState);
   const outcome = await controller.execute({ action: "spin", bet: f.game.defaultBet, chance: "standard" });
   assert.equal(outcome.state.board.length, f.game.reels);
+});
+
+test("landing keeps a pending bonus intro in base while retaining prepared resume intent", async (t) => {
+  const f = setup(t); const first = f.create(); await first.boot();
+  const entry = await first.execute({ action: "buy-drop", bet: 1000, chance: "standard" });
+  const transport = new ProposalTransport(f.game, f.local, f.fetcher);
+  const prepared = await transport.session();
+  assert.equal(prepared.feature, null);
+  assert.deepEqual(resolveSessionEntry(prepared), { scene: "base", featureMode: "drop", resumeStep: "intro", requiresResume: true });
+  // A lost paid response may leave a pending command. The BE's recorded feature takes precedence.
+  f.local.setItem("startup.pending", JSON.stringify({ requestId: entry.requestId, action: "buy-drop", bet: 1000, chance: "standard", expectedVersion: 0 }));
+  const controller = new GameController(transport, f.local, "startup.pending");
+  await controller.boot(prepared);
+  const count = f.requests.length;
+  const outcome = await controller.recover(false);
+  assert.equal(f.requests.length, count);
+  assert.equal(outcome.checkpoint!.resumed, true);
+  assert.equal(outcome.entry, "drop");
+  assert.equal(outcome.requestId, entry.requestId);
+  assert.equal(controller.pending, null);
+  assert.equal(f.local.getItem("startup.pending"), null);
+});
+
+test("landing reuses the prepared free-spin result and preserves its completed-spin counts", async (t) => {
+  const f = setup(t); const first = f.create(); await first.boot();
+  await first.execute({ action: "buy-tavern", bet: 1000, chance: "standard" });
+  await first.completePresentation();
+  const transport = new ProposalTransport(f.game, f.local, f.fetcher);
+  const prepared = await transport.session();
+  assert.equal(resolveSessionEntry(prepared).scene, "feature");
+  assert.equal(prepared.feature!.played, 1);
+  const controller = new GameController(transport, f.local); await controller.boot(prepared);
+  const count = f.requests.length;
+  const outcome = await controller.recover(false);
+  assert.equal(f.requests.length, count);
+  assert.equal(outcome.state.feature!.played, 1);
+  assert.equal(outcome.checkpoint!.staticResult, true);
+  assert.equal(outcome.entry, null);
 });
 
 test("FE retries a lost paid response with the original Play-Token after reload", async (t) => {

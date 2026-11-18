@@ -114,6 +114,11 @@ export class ProposalTransport implements GameTransport {
     this.hasResume = !!response.resume && (response.presentationStatus === "pending" || !!this.summaryId);
     this.queued = undefined;
     this.snapshot = this.state(response, this.hasResume ? (this.staticResult ? this.active : response.resume?.snapshot ?? this.active) : undefined);
+    if (this.hasResume) this.snapshot.resume = {
+      curStep: this.summaryId ? "free-end" : this.active!.curStep,
+      featureMode: this.active?.freegame?.featureMode ?? response.resume?.snapshot?.freegame?.featureMode ?? null,
+      kind: response.resume!.mode,
+    };
     return this.snapshot;
   }
   private outcome(response: Response, step: Step): Outcome {
@@ -135,13 +140,13 @@ export class ProposalTransport implements GameTransport {
       retrigger: step.retriggerSpins ?? 0, collected: [], finalFeature: null,
       completion: final ? { accumulated: total, multipliers: [], product: 1, featureAward: total, roundAward: total, capped: total >= response.roundCapMinor! } : null,
       paidAward: response.settlement?.creditedMinor ?? 0, capped: (final || step.curStep === "base") && total >= response.roundCapMinor!,
-      checkpoint: { curStep: step.curStep, staticResult: this.staticResult, reel: step.reel === undefined ? undefined : step.reel - 1,
+      checkpoint: { curStep: step.curStep, staticResult: this.staticResult, resumed: !!response.resume, reel: step.reel === undefined ? undefined : step.reel - 1,
         multiplier: step.multiplier, displayWinMinor: step.displayWinMinor,
         beforeWinMinor: beforeWin },
     };
   }
-  async resume(): Promise<Outcome> {
-    await this.refresh();
+  async resume(refresh = true): Promise<Outcome> {
+    if (refresh) await this.refresh();
     if (this.summaryId) {
       const amount = this.response.resume!.finalRoundAwardMinor!;
       const step: Step = { stepId: this.summaryId, curStep: "free-end", reels: this.response.lastReels!,

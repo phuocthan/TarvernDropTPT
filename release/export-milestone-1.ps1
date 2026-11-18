@@ -19,12 +19,19 @@ $commit = git -C $source rev-parse --verify "$Revision^{commit}"
 if ($LASTEXITCODE -ne 0) { throw 'Select an existing development commit.' }
 $entries = @(
     '.gitignore', 'index.html', 'package.json', 'package-lock.json',
-    'tsconfig.json', 'vite.config.ts', 'server.js', 'server/mock-game.ts', 'tools',
+    'tsconfig.json', 'vite.config.ts', 'server.js', 'server/mock-game.ts', 'server/proposal-backend.ts', 'tools',
     'src/style.css', 'src/framework', 'src/games/reuse',
     'src/games/tavern/definition.ts', 'src/games/tavern/game.config.json',
-    'tests/rules.test.ts', 'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',
-    'docs/milestone-1-api.md', 'docs/milestone-1-api-examples.json', 'docs/milestone-1-evidence',
+    'tests/rules.test.ts', 'tests/proposal-backend.test.ts', 'tests/proposal-transport.test.ts',
+    'tests/resources.test.ts', 'tests/landing-motion.test.ts', 'tests/slot-content-fit.test.ts',
+    'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',
+    'docs/milestone-1-api.md', 'docs/milestone-1-v1-examples.json', 'docs/milestone-1-evidence',
+    'docs/backend-localhost-v1.md', 'docs/FE-BE-Proposal.md', 'docs/framework-gen3-review.md',
+    'docs/framework-flow.md', 'docs/framework-classes-and-tavern-runtime.md', 'docs/template-architecture.md',
+    'docs/reusable-game-deployment.md', 'docs/milestone-release.md',
     'release/milestone-1/main.ts', 'release/milestone-1/catalog.ts',
+    'release/milestone-1/architecture.md', 'release/milestone-1/smoke.spec.ts',
+    'release/milestone-1/playwright.config.ts',
     'release/milestone-1/README.md'
 )
 $archive = Join-Path ([System.IO.Path]::GetTempPath()) ("milestone-1-" + [guid]::NewGuid() + ".zip")
@@ -36,9 +43,25 @@ try {
     Move-Item -LiteralPath (Join-Path $profile 'main.ts') -Destination (Join-Path $destinationPath 'src/main.ts')
     Move-Item -LiteralPath (Join-Path $profile 'catalog.ts') -Destination (Join-Path $destinationPath 'src/games/catalog.ts')
     Move-Item -LiteralPath (Join-Path $profile 'README.md') -Destination (Join-Path $destinationPath 'README.md')
+    Move-Item -LiteralPath (Join-Path $profile 'architecture.md') -Destination (Join-Path $destinationPath 'docs/architecture.md')
+    New-Item -ItemType Directory -Path (Join-Path $destinationPath 'tests/browser') -Force | Out-Null
+    Move-Item -LiteralPath (Join-Path $profile 'smoke.spec.ts') -Destination (Join-Path $destinationPath 'tests/browser/milestone-1.spec.ts')
+    Move-Item -LiteralPath (Join-Path $profile 'playwright.config.ts') -Destination (Join-Path $destinationPath 'playwright.config.ts')
+    # Public M1 runs the shared placeholder skin; no reference CDN dependency or asset URLs.
+    $configPath = Join-Path $destinationPath 'src/games/tavern/game.config.json'
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $config.resources = [pscustomobject]@{ assets = [pscustomobject]@{}; bundles = [pscustomobject]@{ core = [pscustomobject]@{ assets = @() } }; startup = @('core'); concurrency = 4; retries = 1 }
+    $config.presentation.PSObject.Properties.Remove('loadingScreen')
+    $config.routing.skin = 'basic'
+    $config | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $configPath -Encoding utf8
     Remove-Item -LiteralPath $profile
     Remove-Item -LiteralPath (Join-Path $destinationPath 'release')
     Set-Content -LiteralPath (Join-Path $destinationPath 'SOURCE_REVISION') -Value $commit
+    $manifest = Get-ChildItem -LiteralPath $destinationPath -Recurse -File | ForEach-Object {
+        [pscustomobject]@{ path = [System.IO.Path]::GetRelativePath($destinationPath, $_.FullName).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+    }
+    [pscustomobject]@{ milestone = 'M1'; sourceRevision = $commit; files = @($manifest) } |
+      ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destinationPath 'EXPORT_MANIFEST.json') -Encoding utf8
     Write-Output "Exported milestone 1 from $commit to $destinationPath"
 } finally {
     if (Test-Path -LiteralPath $archive) { Remove-Item -LiteralPath $archive }

@@ -14,8 +14,8 @@
 | Reference checklist | Confirm each screen, state, control, animation and asset in the inventory below. Approve which effects are authored in Spine and which are driven by code. |
 | Asset verification | Review [asset specifications and validation](milestone-1-asset-spec.md). Required files in the approved asset pack must load or play with the target runtime. Review playback evidence and close any required-asset blockers before acceptance. |
 | Initial asset specifications | Supply the [initial specification](milestone-1-asset-spec.md) within 1–2 business days of kickoff. A 17 November kickoff puts the target window at 18–19 November, subject to working days. |
-| Reusable core | Inspect TypeScript/PixiJS modules for config and schema, loading/assets, Normal and Drop reels, controls, audio, HTTP transport and session/recovery. Both demos use the same session and reel renderer. See the [current mock contract](milestone-1-api.md). |
-| 3 × 3 example | Open `/?game=reuse`, start a mock spin and verify the board, paylines and separate wallet. The example demonstrates reuse and has no separate commercial scope. |
+| Reusable core | Inspect TypeScript/PixiJS modules for config and schema, loading/assets, Normal and Drop reels, controls, audio, HTTP transport and session/recovery. Both demos use the same session and reel renderer. See the [current synthetic v1 examples](milestone-1-api.md). |
+| 3 × 3 example | Open `/?game=default` (or `/?game=reuse`), start a mock spin and verify the board, paylines and separate wallet. The example demonstrates reuse and has no separate commercial scope. |
 | First runnable build | Open `/`, press **Spin** and verify that the 5 × 5 Drop board settles, the result is visible and the mock wallet updates. Temporary art and mock outcomes are within scope. The full game is a later deliverable. |
 | Source and build steps | Clone the milestone snapshot and run `npm ci`, `npm run build`, `npm start` and `npm test`. The public delivery candidate is in the GitHub release repository. The original client GitLab review location still needs its project URL and access. |
 
@@ -32,9 +32,15 @@ The production preview was opened in Chromium with a fresh mock wallet on each r
 | Tavern Bonus and Drop Bonus | Three/Four Scatters, entry, free spins, retrigger, return to base | Bonus background and reelhouse transitions, entry/outro art, keys, chests, win effects and bonus music |
 | Bonus completion with unlocked chests | Zoom, sequential reveal, multiplier transfer, running award and win tiers | Authored reelhouse/chest and win tier clips. Code positions the camera, transfers multiplier labels and counts the displayed award. |
 | Bonus completion with zero unlocked chests | Board exits, Total Win and Continue | Bonus exit and Total Win Spine clips, win font and intro/outro cues |
-| Recovery and fallback | Failed asset or API load, retry of a saved command, session expiry | Error text, temporary visuals and mock API status. Production persistence is a separate decision. |
+| Recovery and fallback | Failed asset or API load, retry of a saved command, session expiry | Error text, temporary visuals and mock API status. Local v1 recovery is durable; production persistence and authentication remain decisions for A. |
 
 At kickoff, confirm the brand owner, logo variants, minimum clear space, splash copy, legal text, colors and typography. Supply branding before replacing the temporary public-preview skin. Confirm the approved asset package and any distribution terms before publishing that package to the client repository.
+
+## Current release boundary
+
+The public M1 profile mounts both games with the shared placeholder skin. Its Tavern preview disables natural feature triggers so a basic base-round demo never becomes stuck awaiting custom feature UI; bonus/chest/resume behavior is covered by synthetic API examples and automated tests. The complete custom Tavern presentation and original reference pack remain in the development project. This distinction is intentional scope control, not a claim that the full game has been delivered.
+
+Read [verification evidence](milestone-1-evidence/verification.md), `SOURCE_REVISION` and `EXPORT_MANIFEST.json` in the exported package. The JSON backend persists locally across restart; it is a single-process synthetic store. Team A must approve production API/wallet/recovery semantics. Asset-pack/branding approval and client GitLab access remain open acceptance items.
 
 ## Review and sign-off
 

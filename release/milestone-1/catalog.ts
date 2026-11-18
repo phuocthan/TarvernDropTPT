@@ -8,5 +8,7 @@ export const defaultGame = loadGameConfig({
   title: "Tavern Drop — Framework Preview",
   routing: { ...tavernConfig.routing, skin: "basic" },
   presentation,
+  // This milestone demonstrates the base round. Feature checkpoints are exercised by API tests/examples.
+  demo: { ...tavernConfig.demo, scatterRates: { standard: 0, extra: 0, super: 0 } },
 });
 export const games = [defaultGame, reuse];

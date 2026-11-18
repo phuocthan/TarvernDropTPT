@@ -839,8 +839,9 @@
   background: #180f1ac4;
 }
 .win-celebration .tavern-screen-art {
-  width: min(96vw, 1400px);
-  height: min(78svh, 780px);
+  /* Keep the authored art size, but let its slot amount render outside the old inset canvas. */
+  width: 100vw;
+  height: 100svh;
 }
 .tavern-shell[data-total-win="shown"] .tavern-hud { opacity: 0; }
 .tavern-shell[data-total-win="returning"] .tavern-hud {
@@ -1160,6 +1161,7 @@
   color: transparent;
   background: url("/tavern-assets/assets/continue.webp") center / contain no-repeat;
 }
+.opening-continue[hidden] { display: none !important; }
 .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue {
   width: min(44vw, 235px);
   height: 22px;

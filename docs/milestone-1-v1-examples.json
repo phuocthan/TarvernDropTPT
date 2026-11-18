@@ -1,0 +1,5588 @@
+{
+  "contract": "local-v1-review-6",
+  "synthetic": true,
+  "currency": "KRW",
+  "currencyExponent": 0,
+  "note": "Generated from ProposalBackend. Sanitized IDs are illustrative, not live credentials. Contract and production wallet semantics require review by A.",
+  "examples": [
+    {
+      "name": "session.init",
+      "note": "Synthetic identity; real launch-token authentication is owned by A.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/login",
+        "headers": {},
+        "body": {
+          "gameCode": "tavern-drop",
+          "userId": "synthetic-m1-normal"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "userId": "synthetic-m1-normal",
+          "sessionId": "synthetic-id-001",
+          "token": "synthetic-id-002"
+        }
+      }
+    },
+    {
+      "name": "game.info",
+      "note": "Settings, currency and confirmed wallet before a wager.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/game-info",
+        "headers": {
+          "Session-Id": "synthetic-id-001",
+          "Authorization": "Bearer synthetic-id-002"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 10000000,
+            "walletVersion": 0
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-003",
+          "settings": {
+            "configId": "tavern-template-b9a934199d9631a4",
+            "cols": 5,
+            "rows": 5,
+            "lineCount": 15,
+            "currency": "KRW",
+            "currencyExponent": 0,
+            "defaultBetMinor": 1000,
+            "allowedBetMinor": [
+              100,
+              500,
+              1000,
+              2000,
+              5000,
+              10000
+            ],
+            "roundCapMultiplier": 10000,
+            "symbolIds": {
+              "1": "wild",
+              "2": "crown",
+              "3": "barrel",
+              "4": "coin",
+              "5": "ale",
+              "6": "A",
+              "7": "K",
+              "8": "Q",
+              "9": "J",
+              "10": "10",
+              "11": "bonus"
+            },
+            "paylines": [
+              {
+                "lineId": 1,
+                "positions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              },
+              {
+                "lineId": 2,
+                "positions": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              },
+              {
+                "lineId": 3,
+                "positions": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ]
+              },
+              {
+                "lineId": 4,
+                "positions": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ]
+              },
+              {
+                "lineId": 5,
+                "positions": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              {
+                "lineId": 6,
+                "positions": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ]
+              },
+              {
+                "lineId": 7,
+                "positions": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ]
+              },
+              {
+                "lineId": 8,
+                "positions": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ]
+              },
+              {
+                "lineId": 9,
+                "positions": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ]
+              },
+              {
+                "lineId": 10,
+                "positions": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ]
+              },
+              {
+                "lineId": 11,
+                "positions": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ]
+              },
+              {
+                "lineId": 12,
+                "positions": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ]
+              },
+              {
+                "lineId": 13,
+                "positions": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 14,
+                "positions": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 15,
+                "positions": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ]
+              }
+            ],
+            "chancePrices": {
+              "normal": 1,
+              "extra": 2,
+              "super": 5
+            },
+            "buyPrices": {
+              "tavern": 50,
+              "drop": 100
+            }
+          },
+          "lastReels": [
+            6,
+            3,
+            7,
+            8,
+            2,
+            5,
+            8,
+            4,
+            5,
+            9,
+            7,
+            1,
+            11,
+            6,
+            4,
+            4,
+            9,
+            5,
+            2,
+            8,
+            9,
+            6,
+            8,
+            7,
+            3
+          ],
+          "resume": null,
+          "freegame": null
+        }
+      }
+    },
+    {
+      "name": "normal.win",
+      "note": "BE confirms chargedMinor and totalwin_amt. No feature settlement is split into per-spin credits.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-001",
+          "Authorization": "Bearer synthetic-id-002",
+          "Play-Token": "synthetic-id-003"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 0,
+          "betMinor": 1000,
+          "chanceMode": "normal"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 10036500,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-004",
+          "roundId": "synthetic-id-005",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 1000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 1,
+          "presentedThrough": 1,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.080Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 37500,
+            "settlementId": "award-57598bb7-c133-4e51-b638-3bbb35ab4d5c"
+          },
+          "step": {
+            "stepId": "synthetic-id-006",
+            "type": "base_spin",
+            "curStep": "base",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [
+              {
+                "type": "N",
+                "lineId": 1,
+                "winSym": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 2,
+                "winSym": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 3,
+                "winSym": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 4,
+                "winSym": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 5,
+                "winSym": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 6,
+                "winSym": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 7,
+                "winSym": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 8,
+                "winSym": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 9,
+                "winSym": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 10,
+                "winSym": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 11,
+                "winSym": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 12,
+                "winSym": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 13,
+                "winSym": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 14,
+                "winSym": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 15,
+                "winSym": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              }
+            ],
+            "totalwin_amt": 37500,
+            "retriggerSpins": 0,
+            "freegame": null,
+            "openedChests": [],
+            "displayWinMinor": 37500
+          },
+          "stepId": "synthetic-id-006",
+          "freegame": null,
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [
+            {
+              "type": "N",
+              "lineId": 1,
+              "winSym": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 2,
+              "winSym": [
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 3,
+              "winSym": [
+                11,
+                12,
+                13,
+                14,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 4,
+              "winSym": [
+                16,
+                17,
+                18,
+                19,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 5,
+              "winSym": [
+                21,
+                22,
+                23,
+                24,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 6,
+              "winSym": [
+                1,
+                7,
+                3,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 7,
+              "winSym": [
+                6,
+                12,
+                8,
+                14,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 8,
+              "winSym": [
+                11,
+                17,
+                13,
+                19,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 9,
+              "winSym": [
+                16,
+                22,
+                18,
+                24,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 10,
+              "winSym": [
+                6,
+                2,
+                8,
+                4,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 11,
+              "winSym": [
+                11,
+                7,
+                13,
+                9,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 12,
+              "winSym": [
+                16,
+                12,
+                18,
+                14,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 13,
+              "winSym": [
+                21,
+                17,
+                23,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 14,
+              "winSym": [
+                1,
+                7,
+                13,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 15,
+              "winSym": [
+                21,
+                17,
+                13,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            }
+          ],
+          "totalwin_amt": 37500
+        }
+      }
+    },
+    {
+      "name": "normal.duplicate",
+      "note": "Same Play-Token and payload return the recorded result, without another wager.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-001",
+          "Authorization": "Bearer synthetic-id-002",
+          "Play-Token": "synthetic-id-003"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 0,
+          "betMinor": 1000,
+          "chanceMode": "normal"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 10036500,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-004",
+          "roundId": "synthetic-id-005",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 1000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 1,
+          "presentedThrough": 1,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.080Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 37500,
+            "settlementId": "award-57598bb7-c133-4e51-b638-3bbb35ab4d5c"
+          },
+          "step": {
+            "stepId": "synthetic-id-006",
+            "type": "base_spin",
+            "curStep": "base",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [
+              {
+                "type": "N",
+                "lineId": 1,
+                "winSym": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 2,
+                "winSym": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 3,
+                "winSym": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 4,
+                "winSym": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 5,
+                "winSym": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 6,
+                "winSym": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 7,
+                "winSym": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 8,
+                "winSym": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 9,
+                "winSym": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 10,
+                "winSym": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 11,
+                "winSym": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 12,
+                "winSym": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 13,
+                "winSym": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 14,
+                "winSym": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 15,
+                "winSym": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              }
+            ],
+            "totalwin_amt": 37500,
+            "retriggerSpins": 0,
+            "freegame": null,
+            "openedChests": [],
+            "displayWinMinor": 37500
+          },
+          "stepId": "synthetic-id-006",
+          "freegame": null,
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [
+            {
+              "type": "N",
+              "lineId": 1,
+              "winSym": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 2,
+              "winSym": [
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 3,
+              "winSym": [
+                11,
+                12,
+                13,
+                14,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 4,
+              "winSym": [
+                16,
+                17,
+                18,
+                19,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 5,
+              "winSym": [
+                21,
+                22,
+                23,
+                24,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 6,
+              "winSym": [
+                1,
+                7,
+                3,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 7,
+              "winSym": [
+                6,
+                12,
+                8,
+                14,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 8,
+              "winSym": [
+                11,
+                17,
+                13,
+                19,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 9,
+              "winSym": [
+                16,
+                22,
+                18,
+                24,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 10,
+              "winSym": [
+                6,
+                2,
+                8,
+                4,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 11,
+              "winSym": [
+                11,
+                7,
+                13,
+                9,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 12,
+              "winSym": [
+                16,
+                12,
+                18,
+                14,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 13,
+              "winSym": [
+                21,
+                17,
+                23,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 14,
+              "winSym": [
+                1,
+                7,
+                13,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 15,
+              "winSym": [
+                21,
+                17,
+                13,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            }
+          ],
+          "totalwin_amt": 37500
+        }
+      }
+    },
+    {
+      "name": "normal.status",
+      "note": "Read-only payment/round status; no new wager or presentation ACK.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/rounds/status",
+        "headers": {
+          "Session-Id": "synthetic-id-001",
+          "Authorization": "Bearer synthetic-id-002",
+          "Play-Token": "synthetic-id-003"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 10036500,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-004",
+          "roundId": "synthetic-id-005",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 1000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 1,
+          "presentedThrough": 1,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.080Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 37500,
+            "settlementId": "award-57598bb7-c133-4e51-b638-3bbb35ab4d5c"
+          }
+        }
+      }
+    },
+    {
+      "name": "feature.init",
+      "note": "Separate synthetic player for the feature example.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/login",
+        "headers": {},
+        "body": {
+          "gameCode": "tavern-drop",
+          "userId": "synthetic-m1-feature"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "userId": "synthetic-m1-feature",
+          "sessionId": "synthetic-id-007",
+          "token": "synthetic-id-008"
+        }
+      }
+    },
+    {
+      "name": "feature.info",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/game-info",
+        "headers": {
+          "Session-Id": "synthetic-id-007",
+          "Authorization": "Bearer synthetic-id-008"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 10000000,
+            "walletVersion": 0
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-009",
+          "settings": {
+            "configId": "tavern-template-b9a934199d9631a4",
+            "cols": 5,
+            "rows": 5,
+            "lineCount": 15,
+            "currency": "KRW",
+            "currencyExponent": 0,
+            "defaultBetMinor": 1000,
+            "allowedBetMinor": [
+              100,
+              500,
+              1000,
+              2000,
+              5000,
+              10000
+            ],
+            "roundCapMultiplier": 10000,
+            "symbolIds": {
+              "1": "wild",
+              "2": "crown",
+              "3": "barrel",
+              "4": "coin",
+              "5": "ale",
+              "6": "A",
+              "7": "K",
+              "8": "Q",
+              "9": "J",
+              "10": "10",
+              "11": "bonus"
+            },
+            "paylines": [
+              {
+                "lineId": 1,
+                "positions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              },
+              {
+                "lineId": 2,
+                "positions": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              },
+              {
+                "lineId": 3,
+                "positions": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ]
+              },
+              {
+                "lineId": 4,
+                "positions": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ]
+              },
+              {
+                "lineId": 5,
+                "positions": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              {
+                "lineId": 6,
+                "positions": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ]
+              },
+              {
+                "lineId": 7,
+                "positions": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ]
+              },
+              {
+                "lineId": 8,
+                "positions": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ]
+              },
+              {
+                "lineId": 9,
+                "positions": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ]
+              },
+              {
+                "lineId": 10,
+                "positions": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ]
+              },
+              {
+                "lineId": 11,
+                "positions": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ]
+              },
+              {
+                "lineId": 12,
+                "positions": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ]
+              },
+              {
+                "lineId": 13,
+                "positions": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 14,
+                "positions": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 15,
+                "positions": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ]
+              }
+            ],
+            "chancePrices": {
+              "normal": 1,
+              "extra": 2,
+              "super": 5
+            },
+            "buyPrices": {
+              "tavern": 50,
+              "drop": 100
+            }
+          },
+          "lastReels": [
+            6,
+            3,
+            7,
+            8,
+            2,
+            5,
+            8,
+            4,
+            5,
+            9,
+            7,
+            1,
+            11,
+            6,
+            4,
+            4,
+            9,
+            5,
+            2,
+            8,
+            9,
+            6,
+            8,
+            7,
+            3
+          ],
+          "resume": null,
+          "freegame": null
+        }
+      }
+    },
+    {
+      "name": "feature.buy",
+      "note": "Purchase price differs from original base bet. Multipliers are dimensionless. Outcome is persisted before response.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/buy-feature",
+        "headers": {
+          "Session-Id": "synthetic-id-007",
+          "Authorization": "Bearer synthetic-id-008",
+          "Play-Token": "synthetic-id-009"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "betMinor": 1000,
+          "featureMode": "drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 2,
+          "presentedThrough": 1,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.090Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-011",
+            "type": "bonus_enter",
+            "curStep": "intro",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              11,
+              11,
+              11,
+              11,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [],
+            "totalwin_amt": 0,
+            "retriggerSpins": 0,
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 0,
+              "remainSpin": 10,
+              "totalWinMinor": 0,
+              "curStep": "intro",
+              "keyPositions": []
+            },
+            "openedChests": [],
+            "displayWinMinor": 0
+          },
+          "stepId": "synthetic-id-011",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 0,
+            "remainSpin": 10,
+            "totalWinMinor": 0,
+            "curStep": "intro",
+            "keyPositions": []
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            11,
+            11,
+            11,
+            11,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [],
+          "totalwin_amt": 0
+        }
+      }
+    },
+    {
+      "name": "feature.intro.complete",
+      "note": "Only send after intro was presented. This ACK releases the first free spin. It does not create a bet.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-007",
+          "Authorization": "Bearer synthetic-id-008",
+          "Play-Token": "synthetic-id-009"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "intro",
+          "stepId": "synthetic-id-011"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 3,
+          "presentedThrough": 2,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.091Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-012",
+            "type": "free_spin",
+            "curStep": "freespin",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [
+              {
+                "type": "N",
+                "lineId": 1,
+                "winSym": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 2,
+                "winSym": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 3,
+                "winSym": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 4,
+                "winSym": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 5,
+                "winSym": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 6,
+                "winSym": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 7,
+                "winSym": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 8,
+                "winSym": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 9,
+                "winSym": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 10,
+                "winSym": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 11,
+                "winSym": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 12,
+                "winSym": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 13,
+                "winSym": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 14,
+                "winSym": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 15,
+                "winSym": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              }
+            ],
+            "totalwin_amt": 37500,
+            "retriggerSpins": 0,
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 1,
+              "remainSpin": 9,
+              "totalWinMinor": 37500,
+              "curStep": "freespin",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            },
+            "openedChests": [],
+            "displayWinMinor": 37500
+          },
+          "stepId": "synthetic-id-012",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 1,
+            "remainSpin": 9,
+            "totalWinMinor": 37500,
+            "curStep": "freespin",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [
+            {
+              "type": "N",
+              "lineId": 1,
+              "winSym": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 2,
+              "winSym": [
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 3,
+              "winSym": [
+                11,
+                12,
+                13,
+                14,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 4,
+              "winSym": [
+                16,
+                17,
+                18,
+                19,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 5,
+              "winSym": [
+                21,
+                22,
+                23,
+                24,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 6,
+              "winSym": [
+                1,
+                7,
+                3,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 7,
+              "winSym": [
+                6,
+                12,
+                8,
+                14,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 8,
+              "winSym": [
+                11,
+                17,
+                13,
+                19,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 9,
+              "winSym": [
+                16,
+                22,
+                18,
+                24,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 10,
+              "winSym": [
+                6,
+                2,
+                8,
+                4,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 11,
+              "winSym": [
+                11,
+                7,
+                13,
+                9,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 12,
+              "winSym": [
+                16,
+                12,
+                18,
+                14,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 13,
+              "winSym": [
+                21,
+                17,
+                23,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 14,
+              "winSym": [
+                1,
+                7,
+                13,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 15,
+              "winSym": [
+                21,
+                17,
+                13,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            }
+          ],
+          "totalwin_amt": 37500
+        }
+      }
+    },
+    {
+      "name": "resume.reconnect.login",
+      "note": "Restarted mock process reads the same persistent round.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/login",
+        "headers": {},
+        "body": {
+          "gameCode": "tavern-drop",
+          "userId": "synthetic-m1-feature"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "userId": "synthetic-m1-feature",
+          "sessionId": "synthetic-id-013",
+          "token": "synthetic-id-014"
+        }
+      }
+    },
+    {
+      "name": "resume.mid-feature",
+      "note": "Issued free spin remains the same. Snapshot is after-result; show_stored_result does not restart completed free spins.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/game-info",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 3,
+          "presentedThrough": 2,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.091Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "settings": {
+            "configId": "tavern-template-b9a934199d9631a4",
+            "cols": 5,
+            "rows": 5,
+            "lineCount": 15,
+            "currency": "KRW",
+            "currencyExponent": 0,
+            "defaultBetMinor": 1000,
+            "allowedBetMinor": [
+              100,
+              500,
+              1000,
+              2000,
+              5000,
+              10000
+            ],
+            "roundCapMultiplier": 10000,
+            "symbolIds": {
+              "1": "wild",
+              "2": "crown",
+              "3": "barrel",
+              "4": "coin",
+              "5": "ale",
+              "6": "A",
+              "7": "K",
+              "8": "Q",
+              "9": "J",
+              "10": "10",
+              "11": "bonus"
+            },
+            "paylines": [
+              {
+                "lineId": 1,
+                "positions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              },
+              {
+                "lineId": 2,
+                "positions": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              },
+              {
+                "lineId": 3,
+                "positions": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ]
+              },
+              {
+                "lineId": 4,
+                "positions": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ]
+              },
+              {
+                "lineId": 5,
+                "positions": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              {
+                "lineId": 6,
+                "positions": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ]
+              },
+              {
+                "lineId": 7,
+                "positions": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ]
+              },
+              {
+                "lineId": 8,
+                "positions": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ]
+              },
+              {
+                "lineId": 9,
+                "positions": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ]
+              },
+              {
+                "lineId": 10,
+                "positions": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ]
+              },
+              {
+                "lineId": 11,
+                "positions": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ]
+              },
+              {
+                "lineId": 12,
+                "positions": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ]
+              },
+              {
+                "lineId": 13,
+                "positions": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 14,
+                "positions": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 15,
+                "positions": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ]
+              }
+            ],
+            "chancePrices": {
+              "normal": 1,
+              "extra": 2,
+              "super": 5
+            },
+            "buyPrices": {
+              "tavern": 50,
+              "drop": 100
+            }
+          },
+          "lastReels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "resume": {
+            "mode": "show_stored_result",
+            "roundId": "synthetic-id-010",
+            "releasedThrough": 3,
+            "presentedThrough": 2,
+            "step": {
+              "stepId": "synthetic-id-012",
+              "type": "free_spin",
+              "curStep": "freespin",
+              "reels": [
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5
+              ],
+              "winLines": [
+                {
+                  "type": "N",
+                  "lineId": 1,
+                  "winSym": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 2,
+                  "winSym": [
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 3,
+                  "winSym": [
+                    11,
+                    12,
+                    13,
+                    14,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 4,
+                  "winSym": [
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 5,
+                  "winSym": [
+                    21,
+                    22,
+                    23,
+                    24,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 6,
+                  "winSym": [
+                    1,
+                    7,
+                    3,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 7,
+                  "winSym": [
+                    6,
+                    12,
+                    8,
+                    14,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 8,
+                  "winSym": [
+                    11,
+                    17,
+                    13,
+                    19,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 9,
+                  "winSym": [
+                    16,
+                    22,
+                    18,
+                    24,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 10,
+                  "winSym": [
+                    6,
+                    2,
+                    8,
+                    4,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 11,
+                  "winSym": [
+                    11,
+                    7,
+                    13,
+                    9,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 12,
+                  "winSym": [
+                    16,
+                    12,
+                    18,
+                    14,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 13,
+                  "winSym": [
+                    21,
+                    17,
+                    23,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 14,
+                  "winSym": [
+                    1,
+                    7,
+                    13,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 15,
+                  "winSym": [
+                    21,
+                    17,
+                    13,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                }
+              ],
+              "totalwin_amt": 37500,
+              "retriggerSpins": 0,
+              "freegame": {
+                "featureMode": "drop",
+                "totalSpins": 10,
+                "curSpin": 1,
+                "remainSpin": 9,
+                "totalWinMinor": 37500,
+                "curStep": "freespin",
+                "keyPositions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              "openedChests": [],
+              "displayWinMinor": 37500
+            },
+            "snapshot": {
+              "stepId": "synthetic-id-012",
+              "type": "free_spin",
+              "curStep": "freespin",
+              "reels": [
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5
+              ],
+              "winLines": [
+                {
+                  "type": "N",
+                  "lineId": 1,
+                  "winSym": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 2,
+                  "winSym": [
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 3,
+                  "winSym": [
+                    11,
+                    12,
+                    13,
+                    14,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 4,
+                  "winSym": [
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 5,
+                  "winSym": [
+                    21,
+                    22,
+                    23,
+                    24,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 6,
+                  "winSym": [
+                    1,
+                    7,
+                    3,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 7,
+                  "winSym": [
+                    6,
+                    12,
+                    8,
+                    14,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 8,
+                  "winSym": [
+                    11,
+                    17,
+                    13,
+                    19,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 9,
+                  "winSym": [
+                    16,
+                    22,
+                    18,
+                    24,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 10,
+                  "winSym": [
+                    6,
+                    2,
+                    8,
+                    4,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 11,
+                  "winSym": [
+                    11,
+                    7,
+                    13,
+                    9,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 12,
+                  "winSym": [
+                    16,
+                    12,
+                    18,
+                    14,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 13,
+                  "winSym": [
+                    21,
+                    17,
+                    23,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 14,
+                  "winSym": [
+                    1,
+                    7,
+                    13,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 15,
+                  "winSym": [
+                    21,
+                    17,
+                    13,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                }
+              ],
+              "totalwin_amt": 37500,
+              "retriggerSpins": 0,
+              "freegame": {
+                "featureMode": "drop",
+                "totalSpins": 10,
+                "curSpin": 1,
+                "remainSpin": 9,
+                "totalWinMinor": 37500,
+                "curStep": "freespin",
+                "keyPositions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              "openedChests": [],
+              "displayWinMinor": 37500
+            }
+          },
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 1,
+            "remainSpin": 9,
+            "totalWinMinor": 37500,
+            "curStep": "freespin",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "feature.free-spin.complete",
+      "note": "Differentiate server-released result from FE-confirmed presentation. ACK once per meaningful step.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "freespin",
+          "stepId": "synthetic-id-012",
+          "kind": "shown_as_result"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 4,
+          "presentedThrough": 3,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.095Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-015",
+            "type": "free_spin",
+            "curStep": "freespin",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [
+              {
+                "type": "N",
+                "lineId": 1,
+                "winSym": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 2,
+                "winSym": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 3,
+                "winSym": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 4,
+                "winSym": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 5,
+                "winSym": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 6,
+                "winSym": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 7,
+                "winSym": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 8,
+                "winSym": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 9,
+                "winSym": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 10,
+                "winSym": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 11,
+                "winSym": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 12,
+                "winSym": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 13,
+                "winSym": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 14,
+                "winSym": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 15,
+                "winSym": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              }
+            ],
+            "totalwin_amt": 37500,
+            "retriggerSpins": 0,
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 2,
+              "remainSpin": 8,
+              "totalWinMinor": 75000,
+              "curStep": "freespin",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            },
+            "openedChests": [],
+            "displayWinMinor": 75000
+          },
+          "stepId": "synthetic-id-015",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 2,
+            "remainSpin": 8,
+            "totalWinMinor": 75000,
+            "curStep": "freespin",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [
+            {
+              "type": "N",
+              "lineId": 1,
+              "winSym": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 2,
+              "winSym": [
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 3,
+              "winSym": [
+                11,
+                12,
+                13,
+                14,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 4,
+              "winSym": [
+                16,
+                17,
+                18,
+                19,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 5,
+              "winSym": [
+                21,
+                22,
+                23,
+                24,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 6,
+              "winSym": [
+                1,
+                7,
+                3,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 7,
+              "winSym": [
+                6,
+                12,
+                8,
+                14,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 8,
+              "winSym": [
+                11,
+                17,
+                13,
+                19,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 9,
+              "winSym": [
+                16,
+                22,
+                18,
+                24,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 10,
+              "winSym": [
+                6,
+                2,
+                8,
+                4,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 11,
+              "winSym": [
+                11,
+                7,
+                13,
+                9,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 12,
+              "winSym": [
+                16,
+                12,
+                18,
+                14,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 13,
+              "winSym": [
+                21,
+                17,
+                23,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 14,
+              "winSym": [
+                1,
+                7,
+                13,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 15,
+              "winSym": [
+                21,
+                17,
+                13,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            }
+          ],
+          "totalwin_amt": 37500
+        }
+      }
+    },
+    {
+      "name": "feature.chest-summary.released",
+      "note": "Intermediate free-spin ACKs omitted for brevity; released by the preceding ACK.",
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 13,
+          "presentedThrough": 12,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.107Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-016",
+            "type": "chest_summary",
+            "curStep": "show-chest",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "winLines": [
+              {
+                "type": "N",
+                "lineId": 1,
+                "winSym": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 2,
+                "winSym": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 3,
+                "winSym": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 4,
+                "winSym": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 5,
+                "winSym": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 6,
+                "winSym": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 7,
+                "winSym": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 8,
+                "winSym": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 9,
+                "winSym": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 10,
+                "winSym": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 11,
+                "winSym": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 12,
+                "winSym": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 13,
+                "winSym": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 14,
+                "winSym": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ],
+                "win_amt": 2500
+              },
+              {
+                "type": "N",
+                "lineId": 15,
+                "winSym": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ],
+                "win_amt": 2500
+              }
+            ],
+            "totalwin_amt": 37500,
+            "retriggerSpins": 0,
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 10,
+              "remainSpin": 0,
+              "totalWinMinor": 375000,
+              "curStep": "show-chest",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            },
+            "openedChests": [],
+            "displayWinMinor": 375000,
+            "eligibleReels": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          },
+          "stepId": "synthetic-id-016",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 10,
+            "remainSpin": 0,
+            "totalWinMinor": 375000,
+            "curStep": "show-chest",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [
+            {
+              "type": "N",
+              "lineId": 1,
+              "winSym": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 2,
+              "winSym": [
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 3,
+              "winSym": [
+                11,
+                12,
+                13,
+                14,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 4,
+              "winSym": [
+                16,
+                17,
+                18,
+                19,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 5,
+              "winSym": [
+                21,
+                22,
+                23,
+                24,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 6,
+              "winSym": [
+                1,
+                7,
+                3,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 7,
+              "winSym": [
+                6,
+                12,
+                8,
+                14,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 8,
+              "winSym": [
+                11,
+                17,
+                13,
+                19,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 9,
+              "winSym": [
+                16,
+                22,
+                18,
+                24,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 10,
+              "winSym": [
+                6,
+                2,
+                8,
+                4,
+                10
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 11,
+              "winSym": [
+                11,
+                7,
+                13,
+                9,
+                15
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 12,
+              "winSym": [
+                16,
+                12,
+                18,
+                14,
+                20
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 13,
+              "winSym": [
+                21,
+                17,
+                23,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 14,
+              "winSym": [
+                1,
+                7,
+                13,
+                19,
+                25
+              ],
+              "win_amt": 2500
+            },
+            {
+              "type": "N",
+              "lineId": 15,
+              "winSym": [
+                21,
+                17,
+                13,
+                9,
+                5
+              ],
+              "win_amt": 2500
+            }
+          ],
+          "totalwin_amt": 37500
+        }
+      }
+    },
+    {
+      "name": "feature.chest-summary.complete",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "show-chest",
+          "stepId": "synthetic-id-016"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 14,
+          "presentedThrough": 13,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.108Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-017",
+            "type": "chest_reveal",
+            "curStep": "open-chest",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "reel": 1,
+            "multiplier": 25,
+            "displayWinMinor": 9375000,
+            "displayWinAfterMinor": 9375000,
+            "openedChests": [
+              {
+                "reel": 1,
+                "multiplier": 25
+              }
+            ],
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 10,
+              "remainSpin": 0,
+              "totalWinMinor": 9375000,
+              "curStep": "open-chest",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            }
+          },
+          "stepId": "synthetic-id-017",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 10,
+            "remainSpin": 0,
+            "totalWinMinor": 9375000,
+            "curStep": "open-chest",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [],
+          "totalwin_amt": 0
+        }
+      }
+    },
+    {
+      "name": "resume.mid-chest",
+      "note": "Only the unfinished chest step may replay from its safe boundary.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/game-info",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 14,
+          "presentedThrough": 13,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.108Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "settings": {
+            "configId": "tavern-template-b9a934199d9631a4",
+            "cols": 5,
+            "rows": 5,
+            "lineCount": 15,
+            "currency": "KRW",
+            "currencyExponent": 0,
+            "defaultBetMinor": 1000,
+            "allowedBetMinor": [
+              100,
+              500,
+              1000,
+              2000,
+              5000,
+              10000
+            ],
+            "roundCapMultiplier": 10000,
+            "symbolIds": {
+              "1": "wild",
+              "2": "crown",
+              "3": "barrel",
+              "4": "coin",
+              "5": "ale",
+              "6": "A",
+              "7": "K",
+              "8": "Q",
+              "9": "J",
+              "10": "10",
+              "11": "bonus"
+            },
+            "paylines": [
+              {
+                "lineId": 1,
+                "positions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ]
+              },
+              {
+                "lineId": 2,
+                "positions": [
+                  6,
+                  7,
+                  8,
+                  9,
+                  10
+                ]
+              },
+              {
+                "lineId": 3,
+                "positions": [
+                  11,
+                  12,
+                  13,
+                  14,
+                  15
+                ]
+              },
+              {
+                "lineId": 4,
+                "positions": [
+                  16,
+                  17,
+                  18,
+                  19,
+                  20
+                ]
+              },
+              {
+                "lineId": 5,
+                "positions": [
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              {
+                "lineId": 6,
+                "positions": [
+                  1,
+                  7,
+                  3,
+                  9,
+                  5
+                ]
+              },
+              {
+                "lineId": 7,
+                "positions": [
+                  6,
+                  12,
+                  8,
+                  14,
+                  10
+                ]
+              },
+              {
+                "lineId": 8,
+                "positions": [
+                  11,
+                  17,
+                  13,
+                  19,
+                  15
+                ]
+              },
+              {
+                "lineId": 9,
+                "positions": [
+                  16,
+                  22,
+                  18,
+                  24,
+                  20
+                ]
+              },
+              {
+                "lineId": 10,
+                "positions": [
+                  6,
+                  2,
+                  8,
+                  4,
+                  10
+                ]
+              },
+              {
+                "lineId": 11,
+                "positions": [
+                  11,
+                  7,
+                  13,
+                  9,
+                  15
+                ]
+              },
+              {
+                "lineId": 12,
+                "positions": [
+                  16,
+                  12,
+                  18,
+                  14,
+                  20
+                ]
+              },
+              {
+                "lineId": 13,
+                "positions": [
+                  21,
+                  17,
+                  23,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 14,
+                "positions": [
+                  1,
+                  7,
+                  13,
+                  19,
+                  25
+                ]
+              },
+              {
+                "lineId": 15,
+                "positions": [
+                  21,
+                  17,
+                  13,
+                  9,
+                  5
+                ]
+              }
+            ],
+            "chancePrices": {
+              "normal": 1,
+              "extra": 2,
+              "super": 5
+            },
+            "buyPrices": {
+              "tavern": 50,
+              "drop": 100
+            }
+          },
+          "lastReels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "resume": {
+            "mode": "play_step",
+            "roundId": "synthetic-id-010",
+            "releasedThrough": 14,
+            "presentedThrough": 13,
+            "step": {
+              "stepId": "synthetic-id-017",
+              "type": "chest_reveal",
+              "curStep": "open-chest",
+              "reels": [
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5
+              ],
+              "reel": 1,
+              "multiplier": 25,
+              "displayWinMinor": 9375000,
+              "displayWinAfterMinor": 9375000,
+              "openedChests": [
+                {
+                  "reel": 1,
+                  "multiplier": 25
+                }
+              ],
+              "freegame": {
+                "featureMode": "drop",
+                "totalSpins": 10,
+                "curSpin": 10,
+                "remainSpin": 0,
+                "totalWinMinor": 9375000,
+                "curStep": "open-chest",
+                "keyPositions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              }
+            },
+            "snapshot": {
+              "stepId": "synthetic-id-016",
+              "type": "chest_summary",
+              "curStep": "show-chest",
+              "reels": [
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5,
+                5
+              ],
+              "winLines": [
+                {
+                  "type": "N",
+                  "lineId": 1,
+                  "winSym": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 2,
+                  "winSym": [
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 3,
+                  "winSym": [
+                    11,
+                    12,
+                    13,
+                    14,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 4,
+                  "winSym": [
+                    16,
+                    17,
+                    18,
+                    19,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 5,
+                  "winSym": [
+                    21,
+                    22,
+                    23,
+                    24,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 6,
+                  "winSym": [
+                    1,
+                    7,
+                    3,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 7,
+                  "winSym": [
+                    6,
+                    12,
+                    8,
+                    14,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 8,
+                  "winSym": [
+                    11,
+                    17,
+                    13,
+                    19,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 9,
+                  "winSym": [
+                    16,
+                    22,
+                    18,
+                    24,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 10,
+                  "winSym": [
+                    6,
+                    2,
+                    8,
+                    4,
+                    10
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 11,
+                  "winSym": [
+                    11,
+                    7,
+                    13,
+                    9,
+                    15
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 12,
+                  "winSym": [
+                    16,
+                    12,
+                    18,
+                    14,
+                    20
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 13,
+                  "winSym": [
+                    21,
+                    17,
+                    23,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 14,
+                  "winSym": [
+                    1,
+                    7,
+                    13,
+                    19,
+                    25
+                  ],
+                  "win_amt": 2500
+                },
+                {
+                  "type": "N",
+                  "lineId": 15,
+                  "winSym": [
+                    21,
+                    17,
+                    13,
+                    9,
+                    5
+                  ],
+                  "win_amt": 2500
+                }
+              ],
+              "totalwin_amt": 37500,
+              "retriggerSpins": 0,
+              "freegame": {
+                "featureMode": "drop",
+                "totalSpins": 10,
+                "curSpin": 10,
+                "remainSpin": 0,
+                "totalWinMinor": 375000,
+                "curStep": "show-chest",
+                "keyPositions": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12,
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18,
+                  19,
+                  20,
+                  21,
+                  22,
+                  23,
+                  24,
+                  25
+                ]
+              },
+              "openedChests": [],
+              "displayWinMinor": 375000,
+              "eligibleReels": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            }
+          },
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 10,
+            "remainSpin": 0,
+            "totalWinMinor": 9375000,
+            "curStep": "open-chest",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "feature.first-chest.complete",
+      "note": "Response confirms the next chest and authoritative displayed total.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "open-chest",
+          "stepId": "synthetic-id-017"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 15,
+          "presentedThrough": 14,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.111Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-018",
+            "type": "chest_reveal",
+            "curStep": "open-chest",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "reel": 2,
+            "multiplier": 25,
+            "displayWinMinor": 10000000,
+            "displayWinAfterMinor": 10000000,
+            "openedChests": [
+              {
+                "reel": 1,
+                "multiplier": 25
+              },
+              {
+                "reel": 2,
+                "multiplier": 25
+              }
+            ],
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 10,
+              "remainSpin": 0,
+              "totalWinMinor": 10000000,
+              "curStep": "open-chest",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            }
+          },
+          "stepId": "synthetic-id-018",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 10,
+            "remainSpin": 0,
+            "totalWinMinor": 10000000,
+            "curStep": "open-chest",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [],
+          "totalwin_amt": 0
+        }
+      }
+    },
+    {
+      "name": "feature.final-result.released",
+      "note": "Recorded final result; wallet confirmation is separate from accumulated presentation win.",
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 19,
+          "presentedThrough": 18,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.117Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          },
+          "step": {
+            "stepId": "synthetic-id-019",
+            "type": "total_win",
+            "curStep": "free-end",
+            "reels": [
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5,
+              5
+            ],
+            "displayWinMinor": 10000000,
+            "finalRoundAwardMinor": 10000000,
+            "openedChests": [
+              {
+                "reel": 1,
+                "multiplier": 25
+              },
+              {
+                "reel": 2,
+                "multiplier": 25
+              },
+              {
+                "reel": 3,
+                "multiplier": 25
+              },
+              {
+                "reel": 4,
+                "multiplier": 25
+              },
+              {
+                "reel": 5,
+                "multiplier": 25
+              }
+            ],
+            "freegame": {
+              "featureMode": "drop",
+              "totalSpins": 10,
+              "curSpin": 10,
+              "remainSpin": 0,
+              "totalWinMinor": 10000000,
+              "curStep": "free-end",
+              "keyPositions": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25
+              ]
+            }
+          },
+          "stepId": "synthetic-id-019",
+          "freegame": {
+            "featureMode": "drop",
+            "totalSpins": 10,
+            "curSpin": 10,
+            "remainSpin": 0,
+            "totalWinMinor": 10000000,
+            "curStep": "free-end",
+            "keyPositions": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25
+            ]
+          },
+          "reels": [
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          "winLines": [],
+          "totalwin_amt": 0
+        }
+      }
+    },
+    {
+      "name": "feature.before-settlement.status",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/rounds/status",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 9900000,
+            "walletVersion": 1
+          },
+          "canStartPaidRound": false,
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 19,
+          "presentedThrough": 18,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.117Z",
+          "presentationStatus": "pending",
+          "settlement": {
+            "status": "pending",
+            "creditedMinor": 0,
+            "settlementId": null
+          }
+        }
+      }
+    },
+    {
+      "name": "feature.total-win.complete",
+      "note": "In this mock the final ACK settles once. Server expiry settlement also operates without a returning browser. A must approve production credit timing.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "free-end",
+          "stepId": "synthetic-id-019"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 19900000,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-020",
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 19,
+          "presentedThrough": 19,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.120Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 10000000,
+            "settlementId": "award-fa3dba5c-de7f-4a0c-bc8f-281dacfa6ad2"
+          },
+          "freegame": null,
+          "resume": null
+        }
+      }
+    },
+    {
+      "name": "feature.final-ack.duplicate",
+      "note": "Lost-response retry returns the same receipt without another credit.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 1,
+          "curStep": "free-end",
+          "stepId": "synthetic-id-019"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 19900000,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-020",
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 19,
+          "presentedThrough": 19,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.120Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 10000000,
+            "settlementId": "award-fa3dba5c-de7f-4a0c-bc8f-281dacfa6ad2"
+          },
+          "freegame": null,
+          "resume": null
+        }
+      }
+    },
+    {
+      "name": "feature.after-settlement.status",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/rounds/status",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "code": 0,
+          "synthetic": true,
+          "contractVersion": "v1-review-6",
+          "currency": "KRW",
+          "currencyExponent": 0,
+          "wallet": {
+            "confirmedBalanceMinor": 19900000,
+            "walletVersion": 2
+          },
+          "canStartPaidRound": true,
+          "playToken": "synthetic-id-020",
+          "roundId": "synthetic-id-010",
+          "originalBaseBetMinor": 1000,
+          "chargedMinor": 100000,
+          "roundCapMinor": 10000000,
+          "configId": "tavern-template-b9a934199d9631a4",
+          "releasedThrough": 19,
+          "presentedThrough": 19,
+          "inactivityDeadlineAt": "2026-12-18T15:37:48.120Z",
+          "presentationStatus": "completed",
+          "settlement": {
+            "status": "paid",
+            "creditedMinor": 10000000,
+            "settlementId": "award-fa3dba5c-de7f-4a0c-bc8f-281dacfa6ad2"
+          }
+        }
+      }
+    },
+    {
+      "name": "error.missing-play-token",
+      "note": "No Play-Token after reconnect: structured rejection; never treat ambiguous network loss as a confirmed rejected wager.",
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/spin",
+        "headers": {
+          "Session-Id": "synthetic-id-013",
+          "Authorization": "Bearer synthetic-id-014"
+        },
+        "body": {
+          "gameCode": "tavern-drop",
+          "isFreespin": 0,
+          "betMinor": -1,
+          "chanceMode": "normal"
+        }
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "PLAY_TOKEN_REQUIRED",
+          "synthetic": true
+        }
+      }
+    }
+  ]
+}

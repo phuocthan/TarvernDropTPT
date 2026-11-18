@@ -97,8 +97,7 @@ export async function mountBasicGame(
     await runtime.prepare(loader);
     textures = await loadTextures(images, runtime.resources);
     await mount(host);
-    const contentHeight = board.app.screen.height - 2 * (game.presentation.reelMaskPaddingPx ?? 0);
-    host.style.aspectRatio = `${board.app.screen.width} / ${contentHeight}`;
+    host.style.aspectRatio = `${board.contentWidth} / ${board.contentHeight}`;
     sync();
     status.textContent = "";
     loader?.ready();
@@ -109,7 +108,12 @@ export async function mountBasicGame(
   }
 
   button.onclick = async () => {
-    button.disabled = true;
+    if (controller.phase === "pending" || controller.phase === "presenting") {
+      board.skip();
+      return;
+    }
+    button.disabled = !board.allowForceStop;
+    button.textContent = board.allowForceStop ? "Stop" : "Spinning";
     board.start(false);
     try {
       const outcome = await (controller.phase === "recovery"

@@ -103,10 +103,15 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     await expect(page.locator('dialog[data-look="bonus"]')).toBeVisible({ timeout: 30000 });
     expect(requests.filter((req) => req.curStep === "intro")).toHaveLength(0);
     await page.reload();
-    await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 45000 });
     await expect(page.locator(".brand-loading")).toHaveCount(0, { timeout: 45000 });
+    await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator("#recover")).toHaveCount(0);
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-opening", "true");
     await page.locator(".opening-continue").click();
-    await page.locator("#recover").click();
+    await expect(page.locator("canvas[data-foreground-win-focus]")).toHaveCount(1, { timeout: 15000 });
+    await expect(page.locator("#recover")).toHaveCount(0);
+    await expect(page.locator(".game-shell")).toHaveAttribute("data-entry-scene", "base");
+    await expect(page.locator(".game-shell")).not.toHaveAttribute("data-opening", "true");
     await expect(page.locator('dialog[data-look="bonus"]')).toBeVisible({ timeout: 30000 });
     await page.locator("#continue").click();
     await expect(page.locator('dialog[data-look="total-win"]')).toBeVisible({ timeout: 90000 });

@@ -338,6 +338,9 @@
     "contract": "proposal-v1"
   },
   "presentation": {
+    "allowForceStop": false,
+    "foregroundWinSymbols": ["bonus"],
+    "winOverflowPaddingPx": 72,
     "landing": { "compressMs": 70, "stretchMs": 90, "settleMs": 120, "leadMs": 80, "squashX": 1.1, "squashY": 0.88, "stretchX": 0.94, "stretchY": 1.06 },
     "spinType": "drop",
     "cellSizePx": 102,
@@ -371,6 +374,7 @@
     "scene": {
       "layers": { "scenery": 1, "mascot-behind": 2, "reels": 3, "mascot": 4, "table": 5 },
       "openingDimmerOpacity": 0.55,
+      "winScreen": { "centerY": 0.44, "paddingPx": 16, "landscapeFit": 1.55, "portraitFit": 1.71 },
       "openingReveal": { "durationMs": 900, "symbolDelayMs": 288, "mascotDelayMs": 225, "playbackRate": 0.8 },
       "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },
       "backgroundCamera": {

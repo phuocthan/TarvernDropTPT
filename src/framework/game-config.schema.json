@@ -127,6 +127,9 @@
         "drop"
       ],
       "properties": {
+        "allowForceStop": { "type": "boolean", "default": true },
+        "foregroundWinSymbols": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "winOverflowPaddingPx": { "type": "integer", "minimum": 0 },
         "landing": {
           "type": "object",
           "required": ["compressMs", "stretchMs", "settleMs", "leadMs", "squashX", "squashY", "stretchX", "stretchY"],
@@ -256,6 +259,17 @@
                 "symbolDelayMs": { "type": "integer", "minimum": 0 },
                 "mascotDelayMs": { "type": "integer", "minimum": 0 },
                 "playbackRate": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "additionalProperties": false
+            },
+            "winScreen": {
+              "type": "object",
+              "required": ["centerY", "paddingPx", "landscapeFit", "portraitFit"],
+              "properties": {
+                "centerY": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+                "paddingPx": { "type": "integer", "minimum": 0 },
+                "landscapeFit": { "type": "number", "exclusiveMinimum": 0 },
+                "portraitFit": { "type": "number", "exclusiveMinimum": 0 }
               },
               "additionalProperties": false
             },

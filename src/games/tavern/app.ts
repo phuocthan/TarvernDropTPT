@@ -1,6 +1,7 @@
 import "./theme.css";
 import { createSlotSession } from "../../framework/slot-core/index.ts";
 import { gameRuntime } from "../../framework/app/game-runtime.ts";
+import { resolveSessionEntry } from "../../framework/app/session-entry.ts";
 import { createGameTransport } from "../../framework/transport/proposal.ts";
 import { formatMoney } from "../../framework/ui/index.ts";
 import { loadTavernSymbols, paytableIcon } from "./skin.ts";
@@ -326,13 +327,15 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $<HTMLButtonElement>("bet-up").disabled = betLocked || betIndex === game.bets.length - 1;
     $<HTMLButtonElement>("spin").disabled =
       nextFreeSpin ||
+      (busy && view.isMoving && !view.allowForceStop && !autoRunning) ||
       controller.phase === "loading" ||
       controller.phase === "recovery";
     $("spin").classList.toggle(
       "spinning",
       busy && controller.phase !== "recovery",
     );
-    const skip = (busy && shell.dataset.totalWin !== "returning") || nextFreeSpin;
+    const blockedStop = busy && view.isMoving && !view.allowForceStop;
+    const skip = !blockedStop && ((busy && shell.dataset.totalWin !== "returning") || nextFreeSpin);
     const spin = $("spin");
     const unlimited = autoRemaining === Infinity;
     spin.innerHTML = autoRunning
@@ -340,7 +343,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       : skip ? hudIcon("spin") : hudIcon("spin") + hudIcon("autoplay-ready");
     spin.setAttribute("aria-label", autoRunning
       ? (unlimited ? "Stop unlimited autoplay" : `Stop autoplay, ${autoRemaining} spins left`)
-      : skip ? "Skip" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
+      : blockedStop ? "Spinning" : skip ? "Skip" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
     $("auto-add").hidden = !autoRunning || unlimited || !controls?.autoTopUp;
     autoPicker.setSelected(autoRunning ? 0 : autoRemaining);
     $("speed").setAttribute("aria-pressed", String(turbo));
@@ -508,77 +511,92 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     let noWinReelsStoppedAt: number | undefined;
     const tier = winTier(outcome.spinWin, outcome.bet);
     if (isSpinStep) {
-      let scatterLanded = 0;
-      if (checkpoint?.staticResult) view.setBoard(outcome.state.board);
-      else await view.stop(outcome.state.board, effects?.playSceneEffects, {
-        reel: (reel) => audio.cue(`reel${reel}`),
-        symbol: (id) => {
-          if (id === game.presentation.drop.anticipation?.symbolId)
-            audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
-        },
-        anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
-      });
-      const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
-        !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
-      noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
-      if (!plainNoWin) await waitAfterReels(spinTurbo);
-      const scatter =
-        outcome.entry || outcome.retrigger
-          ? outcome.state.board.flatMap((column, reel) =>
-              column.flatMap((id, row) =>
-                id === "bonus" ? [{ reel, row }] : [],
-              ),
-            )
-          : (outcome.scatterPositions ?? []);
-      displayWin = 0;
-      countingFeatureBase = presentingFeature
-        ? Math.max(0, presentingFeature.accumulated - outcome.spinWin)
-        : undefined;
-      sync();
-      if (outcome.wins.length) audio.cue("win");
-      const animateWins = async () => {
-        const lineDuration = turbo
-          ? 304
-          : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
-        for (const win of outcome.wins) {
-          if (skipped) break;
-          view.focusWins(win.positions);
-          await payline.play(
-            win,
-            game.lines[win.line],
-            money(win.amount),
-            win.amount >= outcome.bet * 20,
-            lineDuration,
-            () => skipped,
-          );
-        }
-        if (scatter.length && (outcome.entry || !skipped)) {
-          await view.waitForLandings(scatter);
+      const resumeIntro = checkpoint?.resumed && checkpoint.curStep === "intro";
+      if (resumeIntro) {
+        // Re-present the recorded trigger without spinning or releasing another server step.
+        view.setBoard(outcome.state.board);
+        sync();
+        const scatter = outcome.state.board.flatMap((column, reel) =>
+          column.flatMap((id, row) => id === "bonus" ? [{ reel, row }] : []),
+        );
+        if (scatter.length) {
           await view.focusWins(scatter);
           celebrate();
         }
         view.clearHighlight();
-      };
-      const from = performance.now();
-      const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
-        const tick = () => {
-          const t = skipped
-            ? 1
-            : Math.min(1, (performance.now() - from) / (turbo ? 179 : 650));
-          displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
-          syncWin(presentingFeature);
-          if (t < 1) requestAnimationFrame(tick);
-          else resolve();
+      } else {
+        let scatterLanded = 0;
+        if (checkpoint?.staticResult) view.setBoard(outcome.state.board);
+        else await view.stop(outcome.state.board, effects?.playSceneEffects, {
+          reel: (reel) => audio.cue(`reel${reel}`),
+          symbol: (id) => {
+            if (id === game.presentation.drop.anticipation?.symbolId)
+              audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
+          },
+          anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
+        });
+        const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
+          !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
+        noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
+        if (!plainNoWin) await waitAfterReels(spinTurbo);
+        const scatter =
+          outcome.entry || outcome.retrigger
+            ? outcome.state.board.flatMap((column, reel) =>
+                column.flatMap((id, row) =>
+                  id === "bonus" ? [{ reel, row }] : [],
+                ),
+              )
+            : (outcome.scatterPositions ?? []);
+        displayWin = 0;
+        countingFeatureBase = presentingFeature
+          ? Math.max(0, presentingFeature.accumulated - outcome.spinWin)
+          : undefined;
+        sync();
+        if (outcome.wins.length) audio.cue("win");
+        const animateWins = async () => {
+          const lineDuration = turbo
+            ? 304
+            : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
+          for (const win of outcome.wins) {
+            if (skipped) break;
+            view.focusWins(win.positions);
+            await payline.play(
+              win,
+              game.lines[win.line],
+              money(win.amount),
+              win.amount >= outcome.bet * 20,
+              lineDuration,
+              () => skipped,
+            );
+          }
+          if (scatter.length && (outcome.entry || !skipped)) {
+            await view.waitForLandings(scatter);
+            await view.focusWins(scatter);
+            celebrate();
+          }
+          view.clearHighlight();
         };
-        tick();
-      });
-      await Promise.all([animateWins(), countWin]);
-      countingFeatureBase = undefined;
-      syncWin(presentingFeature);
-      if (outcome.retrigger) {
-        audio.cue("retrigger");
-        effects?.shake();
-        await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
+        const from = performance.now();
+        const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
+          const tick = () => {
+            const t = skipped
+              ? 1
+              : Math.min(1, (performance.now() - from) / (turbo ? 179 : 650));
+            displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
+            syncWin(presentingFeature);
+            if (t < 1) requestAnimationFrame(tick);
+            else resolve();
+          };
+          tick();
+        });
+        await Promise.all([animateWins(), countWin]);
+        countingFeatureBase = undefined;
+        syncWin(presentingFeature);
+        if (outcome.retrigger) {
+          audio.cue("retrigger");
+          effects?.shake();
+          await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
+        }
       }
       if (outcome.entry) {
         stopAuto();
@@ -783,8 +801,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   async function run(
     action: "spin" | "buy-tavern" | "buy-drop",
     recover = false,
+    startupResume = false,
   ) {
     if (!recover && controller.phase !== "ready") {
+      if (view.isMoving && !view.allowForceStop) return;
       skipped = true;
       view.skip();
       effects?.skip();
@@ -802,15 +822,27 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       audio.cue("start");
     }
     const work = recover
-      ? controller.recover()
+      ? controller.recover(!startupResume)
       : controller.execute({
           action,
           bet: controller.state?.round?.bet || game.bets[betIndex],
           chance: controller.state?.feature ? "standard" : chance,
         });
-    sync();
+    if (!startupResume) sync();
     try {
-      await present(await work, spinTurbo);
+      const outcome = await work;
+      if (startupResume) {
+        const shell = stage.parentElement!;
+        delete shell.dataset.opening;
+        shell.querySelector(".opening-continue")?.remove();
+        view.app.start();
+        if (!outcome.entry && outcome.state.feature) {
+          presentingFeature = outcome.state.feature;
+          effects?.restoreFeature(outcome.state.feature);
+        } else if (!outcome.entry) view.hideSymbols();
+        shell.querySelector<HTMLElement>(".tavern-hud")!.inert = false;
+      }
+      await present(outcome, spinTurbo);
     } catch (error) {
       stopAuto();
       if (controller.state) {
@@ -824,7 +856,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       );
       $("retry").onclick = () => {
         dialog.close();
-        if (pending) void run("spin", true);
+        if (pending) void run("spin", true, startupResume);
       };
       sync();
     }
@@ -1061,6 +1093,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   });
   try {
     await mount($("board"), { autoStart: false, initialState });
+    const entry = resolveSessionEntry(controller.state!);
     view.app.ticker.maxFPS = 60;
     loader?.update(85, 100);
     const [reelhouse, fonts] = await paylineAssets;
@@ -1077,6 +1110,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       opening.type = "button";
       opening.className = "opening-continue";
       opening.textContent = "Press to continue";
+      opening.hidden = true;
+      opening.disabled = true;
       shell.dataset.opening = "true";
       hud.inert = true;
       if (controller.state) $("balance").textContent = money(controller.state.balance);
@@ -1085,14 +1120,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       await landing;
       loader?.update(95, 100);
       await loader?.ready();
-      const continued = waitForContinue(shell, opening);
       const mascotReady = (async () => {
         // Paint the interactive landing before warming an invisible extra renderer.
         await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-        effects?.startOpening();
+        const openingFinished = effects?.startOpening();
         if (!effects && !reducedMotion) placeOverlayMascot();
         if (!reducedMotion && !stage.hasAttribute("data-mascot-behind-board"))
           await prepareOverlayMascot();
+        await openingFinished;
       })();
       void resources.loadBundle("ui").catch((error) => console.warn("Tavern UI font unavailable", error));
       for (const { image } of shopOptions) {
@@ -1100,6 +1135,42 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         preview.decoding = "async";
         preview.src = asset(image);
       }
+      if (entry.scene !== "base") {
+        shell.dataset.entryScene = entry.scene;
+        await waitForContinue(shell, opening, mascotReady);
+        await mascotReady;
+        opening.remove();
+        delete shell.dataset.opening;
+        shell.dataset.mode = entry.featureMode ?? "base";
+        if (entry.scene === "feature") {
+          if (controller.state!.feature) sync();
+          effects?.restoreFeature(controller.state!.feature);
+          if (entry.resumeStep === "intro") view.hideSymbols();
+        } else {
+          view.hideSymbols();
+          await effects?.prepareTotalWin();
+        }
+        view.app.start();
+        view.app.render();
+        modal(
+          '<h2>Resume Active Game?</h2><p>You have an active round in progress</p><button id="recover" class="primary">Resume</button>',
+          false, "resume",
+        );
+        $("recover").onclick = () => {
+          dialog.close();
+          if (controller.phase === "ready" && controller.state?.feature) {
+            delete shell.dataset.opening;
+            opening.remove();
+            effects?.restoreFeature(controller.state.feature);
+            view.app.start();
+            hud.inert = false;
+            sync();
+            scheduleNextSpin();
+          } else void run("spin", true, true);
+        };
+        return;
+      }
+      const continued = waitForContinue(shell, opening, mascotReady);
       await continued;
       await mascotReady;
       // The landing hides the reels and mascot. Upload them only when entering,
@@ -1107,6 +1178,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       view.app.render();
       overlayMascot?.prepare();
       opening.remove();
+      shell.dataset.entryScene = "base";
       const reveal = scene?.openingReveal;
       const celebrateOpening = !controller.state?.feature && controller.phase === "ready";
       let revealed: Promise<void> | undefined;
@@ -1137,7 +1209,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       hud.inert = false;
     }
     sync();
-    if (controller.phase === "recovery" || controller.state?.feature) {
+    if (entry.resumeStep === "intro" && controller.phase === "recovery") {
+      void run("spin", true, true);
+    } else if (controller.phase === "recovery" || controller.state?.feature) {
       modal(
         '<h2>Resume Active Game?</h2><p>You have an active round in progress</p><button id="recover" class="primary">Resume</button>',
         false,
@@ -1145,7 +1219,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       );
       $("recover").onclick = () => {
         dialog.close();
-        if (controller.phase === "recovery") void run("spin", true);
+        if (controller.phase === "recovery") void run("spin", true, entry.requiresResume);
       };
     } else {
       scheduleNextSpin();

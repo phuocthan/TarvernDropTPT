@@ -43,6 +43,8 @@ export class BoardView {
   private tokens = new Container();
   private strip = new Container();
   private winningSymbols = new RenderLayer();
+  private foregroundSymbols = new RenderLayer();
+  private displayedBoard: Board;
   private animatedWinners = new Set<SymbolView>();
   private landingAnimations = new Map<string, Promise<void>>();
   private elapsed: number[] = [];
@@ -65,18 +67,26 @@ export class BoardView {
     this.factory = factory;
     this.cell = game.presentation.cellSizePx;
     this.gap = game.presentation.gapPx;
+    this.displayedBoard = structuredClone(game.initialBoard);
   }
+  get allowForceStop() { return this.game.presentation.allowForceStop !== false; }
+  get isMoving() { return this.spinning.some(Boolean) || this.dropRound !== null; }
+  get contentWidth() { return this.game.reels * (this.cell + this.gap) - this.gap; }
+  get contentHeight() { return this.game.rows * (this.cell + this.gap) - this.gap; }
   async mount(host: HTMLElement, { autoStart = true } = {}) {
     const width = this.game.reels * (this.cell + this.gap) - this.gap;
     const height = this.game.rows * (this.cell + this.gap) - this.gap;
     const padding = this.game.presentation.reelMaskPaddingPx ?? 0;
-    const renderHeight = height + 2 * padding;
+    const overflow = this.game.presentation.winOverflowPaddingPx ?? 0;
+    const renderPadding = Math.max(padding, overflow);
+    const renderWidth = width + 2 * overflow;
+    const renderHeight = height + 2 * renderPadding;
     const boardResolution = () => {
       const dpr = Math.min(devicePixelRatio, 2);
       return Math.min(dpr, Math.max(1, (host.clientWidth || width) * dpr / width));
     };
     await this.app.init({
-      width,
+      width: renderWidth,
       height: renderHeight,
       autoStart,
       backgroundAlpha: 0,
@@ -86,17 +96,19 @@ export class BoardView {
       preference: "webgl",
     });
     this.app.ticker.minFPS = 0;
-    if (padding) {
+    if (renderPadding || overflow) {
       host.dataset.maskPadding = "true";
       host.style.setProperty("--reel-canvas-height", `${100 * renderHeight / height}%`);
-      host.style.setProperty("--reel-canvas-offset", `${-100 * padding / renderHeight}%`);
-      this.app.stage.y = padding;
+      host.style.setProperty("--reel-canvas-width", `${100 * renderWidth / width}%`);
+      host.style.setProperty("--reel-canvas-offset-x", `${-100 * overflow / renderWidth}%`);
+      host.style.setProperty("--reel-canvas-offset", `${-100 * renderPadding / renderHeight}%`);
+      this.app.stage.position.set(overflow, renderPadding);
     }
     host.appendChild(this.app.canvas);
     this.resizeObserver = new ResizeObserver(() => {
       const resolution = boardResolution();
       if (Math.abs(this.app.renderer.resolution - resolution) > 0.05)
-        this.app.renderer.resize(width, renderHeight, resolution);
+        this.app.renderer.resize(renderWidth, renderHeight, resolution);
     });
     this.resizeObserver.observe(host);
     this.app.canvas.setAttribute(
@@ -106,9 +118,9 @@ export class BoardView {
     const maskedReels = new Container();
     maskedReels.addChild(this.strip, this.winningSymbols);
     const mask = new Graphics()
-      .rect(0, -padding, width, renderHeight)
+      .rect(0, -padding, width, height + 2 * padding)
       .fill(0xffffff);
-    this.app.stage.addChild(maskedReels, this.highlights, this.tokens, mask);
+    this.app.stage.addChild(maskedReels, this.highlights, this.foregroundSymbols, this.tokens, mask);
     maskedReels.mask = mask;
     for (let reel = 0; reel < this.game.reels; reel++) {
       const column = new Container();
@@ -186,6 +198,7 @@ export class BoardView {
     this.strip.visible = false;
   }
   private setReel(reel: number, symbols: string[], phase: SymbolPhase) {
+    this.displayedBoard[reel] = [...symbols];
     this.tiles[reel].forEach((tile, row) => {
       tile.view.y = (row - 1) * (this.cell + this.gap);
       tile.view.alpha = 1;
@@ -205,7 +218,7 @@ export class BoardView {
     if (!this.strip.visible || !this.edgeTiles.size) return;
     const inset = this.game.presentation.symbolEdgeInsetPx!;
     for (const [tile, edge] of this.edgeTiles) {
-      if (!edge.settled || !tile.view.visible) continue;
+      if (!edge.settled || !tile.view.visible || tile.view.parentRenderLayer === this.foregroundSymbols) continue;
       const { view } = tile;
       const authored = tile.verticalBounds?.();
       const origin = this.columns[edge.reel].y + view.y;
@@ -217,7 +230,7 @@ export class BoardView {
       if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
       const offset = keepWithinVerticalViewport(
         { top: Math.min(a, b), bottom: Math.max(a, b) },
-        this.app.screen.height - 2 * (this.game.presentation.reelMaskPaddingPx ?? 0), inset,
+        this.contentHeight, inset,
       );
       view.pivot.y = edge.pivotY - offset / scale;
     }
@@ -250,6 +263,7 @@ export class BoardView {
     });
   }
   skip() {
+    if (!this.allowForceStop && this.isMoving) return false;
     this.fast = true;
     this.skipLanding = true;
     this.resetLanding();
@@ -257,6 +271,7 @@ export class BoardView {
       this.dropRound.skipped = true;
       this.finishDrop?.();
     }
+    return true;
   }
   async stop(
     board: Board,
@@ -494,9 +509,17 @@ export class BoardView {
       for (const [slot, tile] of tiles.entries()) {
         const matched = seen.has(reel + ":" + (slot - 1));
         tile.view.tint = dimUnmatched && !matched ? this.unfocusedTint : 0xffffff;
-        const raised = tile.view.parentRenderLayer === this.winningSymbols;
-        if (matched && dimUnmatched) this.winningSymbols.attach(tile.view);
-        else if (raised) this.winningSymbols.detach(tile.view);
+        const foreground = matched && this.game.presentation.foregroundWinSymbols?.includes(this.displayedBoard[reel]?.[slot - 1]);
+        const layer = foreground ? this.foregroundSymbols : this.winningSymbols;
+        const previous = tile.view.parentRenderLayer;
+        if (previous && (previous !== layer || !matched || !dimUnmatched)) previous.detach(tile.view);
+        if (matched && dimUnmatched) {
+          layer.attach(tile.view);
+          if (foreground) {
+            const edge = this.edgeTiles.get(tile);
+            if (edge) tile.view.pivot.y = edge.pivotY;
+          }
+        }
         if (!matched && this.animatedWinners.delete(tile)) tile.effect?.("idle");
         if (matched) {
           this.animatedWinners.add(tile);
@@ -506,6 +529,7 @@ export class BoardView {
       }
     }
     this.app.canvas.toggleAttribute("data-win-focus", dimUnmatched && seen.size > 0);
+    this.app.canvas.toggleAttribute("data-foreground-win-focus", this.tiles.flat().some((tile) => tile.view.parentRenderLayer === this.foregroundSymbols));
     return Promise.all(animations);
   }
   clearHighlight() {
@@ -516,8 +540,11 @@ export class BoardView {
     }
     this.animatedWinners.clear();
     this.winningSymbols.detachAll();
+    this.foregroundSymbols.detachAll();
+    this.app.canvas.removeAttribute("data-foreground-win-focus");
     this.app.canvas.removeAttribute("data-win-focus");
     this.app.canvas.removeAttribute("data-anticipation-focus");
+    this.fitEdgeSymbols();
   }
   destroy() {
     this.motionGeneration++;

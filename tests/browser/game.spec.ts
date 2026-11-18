@@ -7,14 +7,14 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.route("**/src/games/*/definition.ts*", async (route) => {
     const response = await route.fetch();
     const body = (await response.text()).replace("loadGameConfig(config)",
-      "loadGameConfig({ ...config, routing: { ...config.routing, contract: undefined } })");
+      "loadGameConfig({ ...config, routing: { ...config.routing, contract: undefined }, presentation: { ...config.presentation, allowForceStop: true } })");
     await route.fulfill({ response, body });
   });
   if (testInfo.title.startsWith("real demo API")) return;
   await page.addInitScript(() => {
     const timer = setInterval(() => {
       const opening = document.querySelector<HTMLButtonElement>(".opening-continue");
-      if (opening && !document.querySelector(".brand-loading")) {
+      if (opening && !opening.hidden && !opening.disabled && !document.querySelector(".brand-loading")) {
         opening.click();
         clearInterval(timer);
       }
