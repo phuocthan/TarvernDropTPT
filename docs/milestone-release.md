@@ -2,6 +2,10 @@
 
 Development continues in `phuocthan/TarvernDropTPT`. The client reviews published snapshots in [phuocthan/DropTarvernRelease](https://github.com/phuocthan/DropTarvernRelease). Its `main` branch holds the latest review candidate and milestone tags preserve earlier delivery points. Each snapshot records the source implementation commit in `SOURCE_REVISION`.
 
+## User-controlled publishing policy
+
+Push development changes to `TarvernDropTPT` when requested. Push `DropTarvernRelease` only when the user explicitly names that release destination, and include only the milestone/files/features they specify. A development push must never automatically trigger a release export, commit or push. The user reaffirmed this policy on 18 November 2026. Existing milestone tags must remain unchanged.
+
 ## Milestone 1 package
 
 The explicit file list is in [export-milestone-1.ps1](../release/export-milestone-1.ps1). It includes the shared TypeScript/PixiJS core, Tavern 5 × 5 JSON and 3 × 3 reuse configuration, durable synthetic v1 mock API, 22 sanitized request/response examples, shared tests and production browser smoke, a package lock and build configuration, the client README and M1 documents, and clean-preview desktop/portrait screenshots. The release entry points mount both configurations using the shared placeholder skin.

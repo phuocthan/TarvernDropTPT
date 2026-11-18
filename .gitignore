@@ -3,3 +3,6 @@ dist/
 playwright-report/
 test-results/
 .runtime/
+
+# Temporary performance captures and downloaded provider bundles
+output/load-audit/
