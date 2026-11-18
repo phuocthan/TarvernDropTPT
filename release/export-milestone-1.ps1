@@ -23,7 +23,7 @@ $entries = @(
     'src/style.css', 'src/framework', 'src/games/reuse',
     'src/games/tavern/definition.ts', 'src/games/tavern/game.config.json',
     'tests/rules.test.ts', 'tests/proposal-backend.test.ts', 'tests/proposal-transport.test.ts',
-    'tests/resources.test.ts', 'tests/landing-motion.test.ts', 'tests/slot-content-fit.test.ts',
+    'tests/resources.test.ts', 'tests/milestone-config.test.ts', 'tests/landing-motion.test.ts', 'tests/slot-content-fit.test.ts',
     'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',
     'docs/milestone-1-api.md', 'docs/milestone-1-v1-examples.json', 'docs/milestone-1-evidence',
     'docs/backend-localhost-v1.md', 'docs/FE-BE-Proposal.md', 'docs/framework-gen3-review.md',
@@ -47,7 +47,7 @@ try {
     Move-Item -LiteralPath (Join-Path $profile 'playwright.config.ts') -Destination (Join-Path $destinationPath 'playwright.config.ts')
     # Public M1 runs the shared placeholder skin; no reference CDN dependency or asset URLs.
     $configPath = Join-Path $destinationPath 'src/games/tavern/game.config.json'
-    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $config = Get-Content -LiteralPath $configPath -Raw -Encoding utf8 | ConvertFrom-Json
     $config.resources = [pscustomobject]@{ assets = [pscustomobject]@{}; bundles = [pscustomobject]@{ core = [pscustomobject]@{ assets = @() } }; startup = @('core'); concurrency = 4; retries = 1 }
     $config.presentation.PSObject.Properties.Remove('loadingScreen')
     $config.routing.skin = 'basic'
