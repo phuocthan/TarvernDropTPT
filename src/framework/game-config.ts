@@ -39,6 +39,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
         nonEmpty(symbol.id) &&
         nonEmpty(symbol.label) &&
         nonEmpty(symbol.glyph) &&
+        (symbol.image === undefined || nonEmpty(symbol.image)) &&
         typeof symbol.color === "string" &&
         /^#[\da-f]{6}$/i.test(symbol.color) &&
         ["royal", "premium", "wild", "bonus"].includes(symbol.kind) &&

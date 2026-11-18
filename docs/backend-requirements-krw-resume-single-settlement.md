@@ -1,5 +1,7 @@
 # BE requirements and proposed API — KRW, mid-round resume, single settlement
 
+**Bản tham khảo trước khi khách chốt.** Dùng [bản BE/FE hiện tại](game-and-api-flow-krw.md) cho lần review tiếp theo. Bản mới phát riêng kết quả từng rương, thanh toán sau khi presentation hoàn tất và tự đóng round sau 30 ngày không hoạt động thật.
+
 **Cập nhật format symbol/line.** Draft review mới dùng `reels` phẳng theo hàng và `winLines` với vị trí ô từ 1. Các ví dụ board hai chiều bên dưới thuộc bản trước. [Quy ước BE–FE hiện tại](game-and-api-flow-krw.md#format-reels-và-winlines)
 
 **Luồng đề nghị dùng cho buổi review hiện tại** nằm trong [Game flow và API](game-and-api-flow-krw.md). Bản đó dùng login → gameInfo, gộp snapshot resume vào gameInfo và xác định checkpoint cho từng rương. Các ví dụ dưới đây lưu lại phương án trước để đối chiếu field và yêu cầu.

@@ -1,9 +1,10 @@
 import "./basic-game.css";
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import { createSlotSession } from "../session.ts";
 import { HttpTransport } from "../transport/http.ts";
 import type { GameDefinition } from "../domain/contracts.ts";
 import type { BrandLoader } from "./brand-loading.ts";
+import { loadTextures } from "./assets.ts";
 
 export async function mountBasicGame(
   root: HTMLElement,
@@ -30,6 +31,8 @@ export async function mountBasicGame(
   root.querySelector(".board-details")!.textContent =
     `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines · ${game.presentation.spinType} spin`;
   const symbols = new Map(game.symbols.map((symbol) => [symbol.id, symbol]));
+  const images = Object.fromEntries(game.symbols.flatMap(({ id, image }) => image ? [[id, image]] : []));
+  let textures = new Map<string, Texture>();
 
   const { controller, board, mount, waitAfterReels } = createSlotSession(
     game,
@@ -42,18 +45,35 @@ export async function mountBasicGame(
       });
       text.anchor.set(0.5);
       text.position.set(cellSizePx / 2);
+      const sprite = textures.size ? new Sprite() : undefined;
+      if (sprite) {
+        sprite.anchor.set(0.5);
+        sprite.position.copyFrom(text.position);
+      }
       view.addChild(
         new Graphics()
           .roundRect(2 * scale, 2 * scale, 98 * scale, 98 * scale, 10 * scale)
           .fill(0x352735),
         text,
       );
+      if (sprite) view.addChild(sprite);
       return {
         view,
         set(id) {
           const symbol = symbols.get(id)!;
-          text.text = symbol.glyph;
-          text.style.fill = symbol.color;
+          const texture = textures.get(id);
+          text.visible = !texture;
+          if (sprite) {
+            sprite.visible = !!texture;
+            if (texture && sprite.texture !== texture) {
+              sprite.texture = texture;
+              sprite.scale.set(cellSizePx * 0.82 / Math.max(texture.width, texture.height));
+            }
+          }
+          if (!texture) {
+            text.text = symbol.glyph;
+            text.style.fill = symbol.color;
+          }
         },
       };
     },
@@ -71,6 +91,7 @@ export async function mountBasicGame(
   }
   try {
     const host = root.querySelector<HTMLElement>("#reuse-board")!;
+    textures = await loadTextures(images);
     await mount(host);
     host.style.aspectRatio = `${board.app.screen.width} / ${board.app.screen.height}`;
     sync();

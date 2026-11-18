@@ -3,14 +3,27 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { MockGame } from "./server/mock-game.ts";
-import { games as catalog } from "./src/games/catalog.ts";
+import { gamePaths, readGameConfig } from "./tools/game-profile.ts";
+
+const target = process.env.GAME_TARGET;
+const profile = target ? gamePaths(target) : null;
+let catalog;
+if (profile) {
+  try {
+    catalog = [readGameConfig(profile.builtConfig)];
+  } catch (error) {
+    throw Error(`Cannot open built game "${target}". Run npm run game:build -- ${target} first.`, { cause: error });
+  }
+} else {
+  ({ games: catalog } = await import("./src/games/catalog.ts"));
+}
 
 // Each demo has its own sessions and cookies.
 const games = new Map(catalog.map((definition) => [
   definition.routing.apiBase,
   { definition, cookie: `${definition.routing.query}-session`, sessions: new Map() },
 ]));
-const root = resolve("dist");
+const root = profile?.dist ?? resolve("dist");
 const viewerRoot = resolve("asset-viewer");
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -83,7 +96,7 @@ createServer(async (req, res) => {
     let staticRoot = root;
     let staticPath = path === "/" ? "/index.html" : decodeURIComponent(path);
     if (staticPath.startsWith("/asset-viewer/")) {
-      if (process.argv.includes("--no-animator-viewer")) {
+      if (profile || process.argv.includes("--no-animator-viewer")) {
         res.writeHead(404).end("Not found");
         return;
       }

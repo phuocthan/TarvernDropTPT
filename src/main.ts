@@ -1,6 +1,6 @@
 import "./style.css";
 import { defaultGame, games } from "./games/catalog.ts";
-import { mountBrandLoader } from "./framework/presentation/brand-loading.ts";
+import { launchGame } from "./framework/presentation/launch-game.ts";
 
 const root = document.querySelector<HTMLElement>("#app")!;
 const requested = new URLSearchParams(location.search).get("game")?.toLowerCase();
@@ -18,11 +18,7 @@ if (requested === "viewer") {
 } else {
   const query = requested === "tarvern" ? "tavern" : requested === "default" ? "reuse" : requested;
   const game = games.find(({ routing }) => routing.query === query) ?? defaultGame;
-  document.title = game.title;
-  const loader = game.presentation.loadingScreen
-    ? mountBrandLoader(root, game.presentation.loadingScreen, game.title)
-    : undefined;
-  try {
+  await launchGame(root, game, async (loader) => {
     if (game.routing.skin === "tavern") {
       const { mountTavern } = await import("./games/tavern/app.ts");
       loader?.update(1, 4);
@@ -32,9 +28,5 @@ if (requested === "viewer") {
       loader?.update(1, 2);
       await mountBasicGame(root, game, loader, { href: "./?game=tarvern", label: `← ${defaultGame.title}` });
     }
-  } catch (error) {
-    if (!loader) throw error;
-    loader.fail();
-    console.error(error);
-  }
+  });
 }

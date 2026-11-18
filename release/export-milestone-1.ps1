@@ -19,7 +19,7 @@ $commit = git -C $source rev-parse --verify "$Revision^{commit}"
 if ($LASTEXITCODE -ne 0) { throw 'Select an existing development commit.' }
 $entries = @(
     '.gitignore', 'index.html', 'package.json', 'package-lock.json',
-    'tsconfig.json', 'vite.config.ts', 'server.js', 'server/mock-game.ts',
+    'tsconfig.json', 'vite.config.ts', 'server.js', 'server/mock-game.ts', 'tools',
     'src/style.css', 'src/framework', 'src/games/reuse',
     'src/games/tavern/definition.ts', 'src/games/tavern/game.config.json',
     'tests/rules.test.ts', 'docs/milestone-1.md', 'docs/milestone-1-asset-spec.md',

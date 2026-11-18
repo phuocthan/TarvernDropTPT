@@ -69,6 +69,7 @@ export interface SymbolDefinition {
   kind: "royal" | "premium" | "wild" | "bonus";
   color: string;
   glyph: string;
+  image?: string;
   pays: Record<number, number>;
 }
 export type ReelMotion = "normal" | "drop";

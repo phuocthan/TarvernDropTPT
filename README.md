@@ -37,6 +37,16 @@ See the [reference audit and unresolved rules](docs/reference-analysis.md) for t
 
 See the [framework flowchart and JSON configuration standard](docs/framework-flow.md) for adding a game to the shared catalog.
 
+## Start a new game
+
+```sh
+npm run game:new -- coral-slot "Coral Slot"
+npm run game:build -- coral-slot
+npm run game:start -- coral-slot
+```
+
+Edit `src/games/coral-slot/game.config.json` for the board, symbols, paylines and reel motion. The standalone build opens the selected game at `/` and includes its own mock API. See the [deployment guide and reuse audit](docs/reusable-game-deployment.md) for custom art, hosting commands and the production backend work.
+
 See the [framework class diagrams and Tavern Drop runtime](docs/framework-classes-and-tavern-runtime.md) for the responsibilities of each class and game module, plus the spin, bonus, and recovery flows.
 
 See the [Milestone 1 handoff and acceptance checklist](docs/milestone-1.md) and the [client release export procedure](docs/milestone-release.md).

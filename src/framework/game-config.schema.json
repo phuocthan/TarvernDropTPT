@@ -604,6 +604,10 @@
           "type": "string",
           "minLength": 1
         },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
         "kind": {
           "enum": [
             "royal",

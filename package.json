@@ -7,6 +7,9 @@
     "dev": "concurrently -k \"node --experimental-strip-types server.js\" \"vite --host 0.0.0.0\"",
     "start": "node --experimental-strip-types server.js",
     "build": "tsc --noEmit && vite build",
+    "game:new": "node --experimental-strip-types tools/game.mjs new",
+    "game:build": "node --experimental-strip-types tools/game.mjs build",
+    "game:start": "node --experimental-strip-types tools/game.mjs start",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:browser": "playwright test"
   },

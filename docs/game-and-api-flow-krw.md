@@ -1,274 +1,330 @@
-# Tavern Drop · Luồng game và API cho một paid round
+# Tavern Drop · BE/FE API và luồng game
 
-**Bản đề xuất để Than, Yongtae và team A review · 18/11/2026.** Mình đề xuất giữ thứ tự **login → gameInfo → kiểm tra round trước đó**. Khi người chơi bấm Spin hoặc Buy, A nhận một lệnh đặt cược, lưu kết quả cả round và phát kết quả từng bước. Cùng lúc đó A chịu trách nhiệm hoàn tất thanh toán, kể cả khi người chơi đóng game. Phía game chỉ báo bước nào đã trình diễn xong.
+**Quy tắc game đầu tiên đã được khách duyệt.** Các endpoint, field và enum dưới đây là đề xuất để Team A chốt contract. BE production chưa được xác nhận triển khai theo bản này.
 
-**Quyết định cần Yongtae và A chốt trước tiên** là ranh giới của một free spin “đã hoàn thành” khi hình ảnh và checkpoint trên server cách nhau một lần truyền mạng. Mục 5 đưa ra cách xử lý cụ thể để hai bên thử với tình huống mất mạng thật.
+Team A sở hữu outcome, số dư, settlement, trạng thái round, hạn 30 ngày và quyền nhận cược. FE dựng đúng màn từ response và gửi xác nhận khi bước trình diễn đã xong. Quy tắc tính hoạt động thật và cơ chế ghi deadline thuộc A.
 
-## 1. Game flow và API đi cùng
+## 1. Tổng hợp API
 
-Mở từng sơ đồ để phóng to hoặc chia sẻ trong buổi review. [Game và API](flow-game-api.svg) · [Resume](flow-resume.svg) · [BE và wallet](flow-wallet.svg)
+Prefix đề xuất là `/api/v1`. Sau login, FE dùng `sessionId` và `token` do BE cấp theo cơ chế xác thực A định nghĩa. Bảng này là bản đang review.
 
-```mermaid
-sequenceDiagram
-    actor P as Người chơi
-    participant G as Game
-    participant A as Game API
-    participant W as Wallet
-    P->>G: Mở game
-    G->>A: POST login
-    A-->>G: Session của account
-    G->>A: GET gameInfo theo gameCode
-    A-->>G: Settings, balance, previousRound tại checkpoint
-    alt Có presentation dở
-        G->>G: Dựng lại đúng màn và chạy bước còn dở
-        G->>A: POST progress cho cùng round
-        A-->>G: Checkpoint đã lưu và bước kế
-    else Normal game sẵn sàng
-        P->>G: Spin, Chance hoặc Buy
-        G->>A: POST rounds với requestId và bet gốc
-        A->>W: Debit theo mã giao dịch của round
-        W-->>A: Receipt của debit
-        A->>A: Lưu outcome và việc cần settlement
-        A-->>G: Base board, charge, roundId và bước đầu
-    end
-    par Trình diễn theo các bước còn lại
-        opt Trigger hoặc mua feature
-            G->>G: Hiện bonus intro khi đến bước này
-            loop Mỗi free spin còn lại, gồm retrigger
-                G->>A: progress xác nhận bước trước
-                A-->>G: Free spin, win, số lượt và key theo reel
-                G->>G: Chạy reels, win, cập nhật keys và lượt
-            end
-            G->>G: Total Win hiện mức trước chest
-            opt Có ít nhất một chest đủ điều kiện
-                G->>G: Hiện 5 chest, đợi 2 giây
-                loop Từng chest đủ điều kiện theo thứ tự đã lưu
-                    G->>G: Mở chest, đưa win về số hiện tại
-                    G->>A: progress khi đã hiện xong amount
-                    A-->>G: Checkpoint và bước kế
-                end
-            end
-        end
-        G->>A: progress cho bước cuối đã xem
-        A-->>G: Presentation hoàn tất và payment status hiện tại
-        G->>G: Trở về normal game
-    and Thanh toán độc lập
-        A->>W: Khi đến hạn theo policy, settle bằng ID của round
-        W-->>A: Receipt hoặc trạng thái cần đối soát
-    end
-```
+| API | Mục đích | FE gửi | BE trả | FE xử lý |
+| --- | --- | --- | --- | --- |
+| `POST /login` | Mở phiên cho đúng tài khoản | **Mock:** gửi `userId` đã được server xác thực trước đó để vào đúng tài khoản test, hoặc gửi body rỗng để BE chọn tài khoản demo ngẫu nhiên. **Server thật:** gửi `launchToken` do operator cấp | `sessionId`, `token`, và `userId` nếu BE trả kèm. Nên trả `userId` trong mock để dễ kiểm tra resume đúng tài khoản demo đã chọn | Dùng phiên vừa nhận để gọi `gameInfo`. Quyền truy cập tài khoản do BE xác thực. |
+| `GET /game-info` · `gameInfo` | Lấy game settings và tiến độ hiện tại của user | `gameCode` và thông tin xác thực của phiên | `settings`, `lastReels`, `wallet`, `canStartPaidRound`, `playToken` khi được cược và `resume` nếu có | BE tìm tiến độ theo tài khoản đã xác thực và game. FE dùng response để vào normal game, resume spin/bonus/chest hoặc hiện Total Win của round tự đóng. |
+| `POST /spin` · paid | Đặt cược và lấy kết quả normal spin | `isFreespin: 0`, `betMinor`, `chanceMode: normal / extra / super`. Header `Play-Token` do BE cấp | `chargedMinor`, `reels`, `winLines`, `spinWinMinor`, bước hiện tại và `freegame` nếu trigger | Hiện base spin rồi vào bonus nếu BE trả `intro`. Retry giữ nguyên token và payload. |
+| `POST /buy-feature` | Mua và vào bonus trực tiếp | `betMinor`, `featureMode: tavern / drop`. Header `Play-Token` do BE cấp | `chargedMinor`, `freegame.curStep: intro`, số lượt và bước trình diễn đầu | Tiếp tục bằng `/spin` với `isFreespin: 1`. Retry giữ nguyên token và payload. |
+| `POST /spin` · freegame | Xác nhận bước vừa hoàn tất và lấy bước kế | `isFreespin: 1`, `curStep` vừa trình diễn, `stepId` do BE cấp. Có thể thêm `kind: shown_as_result` khi resume bằng kết quả tĩnh | `freegame` đã cập nhật, `stepId` mới và dữ liệu ở bước kế. Với rương chỉ trả multiplier và Total Win của rương đến lượt | BE trả `freespin` thì quay reels. BE trả `show-chest`, `open-chest` hoặc `free-end` thì hiển thị đúng màn. Xác nhận một rương sau khi animation và số mới đều đã hiện. |
+| `GET /rounds/status` | Kiểm tra payout khi còn chờ hoặc cần đối soát | `gameCode` nếu phiên chưa gắn game | `settlement.status`, receipt nếu có, `wallet`, `canStartPaidRound` và có thể có `retryAfterMs` | Cập nhật Balance từ số đã xác nhận. Bật Spin khi BE cho phép. Polling chạy nền không kéo dài mốc 30 ngày. |
+| `POST /spin` · đóng tổng kết | Xác nhận đã đóng màn Total Win của round tự đóng sau 30 ngày | `isFreespin: 0`, `curStep: final-summary` và `summaryId` do BE cấp | `resume: null` nếu đã ghi nhận, `wallet` và `canStartPaidRound` | Khi nhận response, FE cập nhật quyền Spin. |
 
-Sơ đồ minh họa đường chạy thành công. Khi resume, game đi thẳng vào bước còn dở trong phần trình diễn. Nếu base spin không trigger thì chính base spin là bước cuối. Với bonus, ACK của free spin cuối được gửi trước khi bắt đầu phần chest. Trạng thái ví có thể chuyển sang đã trả ở bất kỳ bước trình diễn nào sau khi A chốt outcome. Với round thắng bằng 0, cách ghi nhận hoàn tất phía wallet do A quy định.
+### Một endpoint Spin cho lượt cược và bước freegame
 
-| Người chơi đang ở đâu | Game đọc hoặc gửi gì | Quyết định hiển thị |
-| --- | --- | --- |
-| Vừa login | `gameInfo.settings`, `wallet`, `lastReels`, `previousRound` | Khi `previousRound = null` thì hiện normal game với board gần nhất hoặc board mặc định. Khi có round thì đọc phase và checkpoint. |
-| Normal game | Một `POST rounds` cho một thao tác trả tiền | Hiện board, line wins và base win do A trả. Spin thường không thắng kết thúc tại đây. Có trigger thì chuyển tới intro của cùng round. |
-| Giữa freegame | `progress` xác nhận spin trước và lấy spin kế | Hiện board, win của spin, tổng tích lũy, keys và bộ đếm sau spin. Retrigger cập nhật tổng số lượt trong cùng round. |
-| Spin cuối vừa xong | Step cuối có `chest` cùng kết quả cuối theo reel | Vào màn Total Win, hiện mức trước chest. Nếu có rương đủ điều kiện, hiện cả 5 và mở lần lượt sau 2 giây. Nếu cả 5 đều khóa, đi thẳng tới tổng cuối. |
-| Đang mở chest thì thoát | Login lại rồi gọi `gameInfo` | Dựng lại các rương đã mở và số tiền sau rương gần nhất. Chỉ tiếp tục rương còn dở. Mục 4 có ví dụ số cụ thể. |
-| Đã xem tổng cuối | `progress` cuối trả trạng thái thanh toán và balance mới nhất đã xác nhận | Về normal game. Nếu tiền còn pending, UI giữ balance đã xác nhận. Khả năng nhận cược mới trong lúc đó do A/operator chốt. |
+**Hai dạng request tại `/spin`.** BE chỉ nhận cược mới khi `isFreespin: 0` đi với `betMinor` và `Play-Token`, trước khi có `stepId`. Request xác nhận bước gửi `curStep` và `stepId` do BE cấp, riêng màn tổng kết dùng `summaryId`. Request xác nhận không mang cược mới. `isFreespin: 1` dùng suốt feature, kể cả khi `remainSpin` đã bằng 0 và đang ở chest hoặc Total Win.
 
-## 2. Vì sao chọn cách này
+**Ý nghĩa của `curStep`.** Trong request, đây là bước FE báo đã hiển thị xong. Trong response, đây là bước **BE cấp để FE thực hiện tiếp**. BE kiểm tra bước FE gửi dựa trên `stepId` đã phát và cập nhật tiến độ ở server. FE lấy `curStep` mới từ response thay vì tự tăng bước. Các rương dùng chung giá trị `open-chest`, mỗi rương có `stepId` riêng. Gửi lại cùng `stepId` phải trả lại cùng kết quả đã cấp cho lần xác nhận đó, hoặc báo tiến độ BE đã xác nhận, kể cả khi lần phản hồi trước bị mất.
 
-| Phương án | Lợi ích | Điểm đánh đổi |
-| --- | --- | --- |
-| Mỗi free spin là một lệnh chơi như mock | Gần với code hiện tại | Nếu lệnh kế mới sinh outcome, A cần thêm cơ chế hoàn tất feature cho người đã thoát. Retry và khôi phục sau debit phức tạp hơn. |
-| Một response trả toàn bộ feature như HAR mẫu | Một lần lấy toàn bộ board và multiplier | Vẫn cần lưu tiến độ đã xem. Response lớn hơn và client biết trước chuỗi kết quả. HAR chỉ ghi nhận balance ở `play` và `end-round`, không xác định được thời điểm ledger đổi. |
-| **Đề xuất cho game đầu** · A lưu outcome cả round, release từng spin, gửi chest cùng spin cuối | A có đủ dữ liệu settle lúc client offline. Một request ở ranh giới spin vừa lưu checkpoint vừa lấy kết quả kế. Dễ xác định chính xác màn cần resume. | Cần A/math xác nhận khả năng chốt cả outcome từ đầu và latency cho round dài. Nếu chậm, A có thể trả trạng thái đang xử lý rồi hoàn tất bằng worker với cùng roundId. |
+### Trạng thái freegame
 
-Yêu cầu của Yongtae là outcome bền vững, resume giữa chừng, một final payout và cap cả round. Việc chốt toàn bộ outcome sớm, tên endpoint và checkpoint mỗi rương là lựa chọn thiết kế để review. Ví dụ thực tế của hai game tham khảo cũng khác nhau. Log `n57058` cho thấy balance tăng theo free spin. HAR Tavern cho thấy một response chứa toàn bộ feature, với chênh lệch balance cuối bằng payout cả round. [Phân tích HAR Tavern](tavern-reference-har-analysis.md)
-
-## 3. Contract gọn cho FE và BE
-
-Đề xuất dùng prefix `/api/v1` và cùng một contract version do A trả trong `gameInfo`. Bản này thay thế **luồng khởi động** `session → resume` của draft trước bằng **login → gameInfo có snapshot**. Tất cả lời gọi dùng session đã xác thực. `code: 0` là thành công, mã lỗi khác do A cấp. Ví dụ sau là dữ liệu review, số tiền do BE có thẩm quyền xác nhận.
-
-| API | Input | Output tối thiểu | Khi nào gọi |
-| --- | --- | --- | --- |
-| `POST /login` | Launch credential và `accountId` nếu có | Account đã xác thực và session/token theo cơ chế A | Khi mở phiên hoặc xác thực lại. Login thiếu accountId có thể chọn account trong pool demo đã cho phép. Production phải liên kết với đúng tài khoản operator. |
-| `GET /game-info?gameCode=…` · **gameInfo** | Session và gameCode | `settings`, `wallet`, `lastReels`, `previousRound`. Khi có vấn đề tiền chưa xử lý, trả tham chiếu giao dịch đang chờ kể cả khi UI round cũ đã xong | Một lần khi vào game hoặc reconnect. Nếu session còn hiệu lực thì dùng lại. |
-| `POST /rounds` · **spin/buy** | `requestId`, `gameCode`, `betMinor`, `mode`, `chance` nếu dùng | `roundId`, `originalBaseBetMinor`, `chargedMinor`, step đầu, checkpoint, `settlement`, `wallet`. Nếu debit đang được đối soát thì trả trạng thái xử lý với ID để tra cứu | Một lần cho mỗi paid round. Normal spin, Chance và bonus buy cùng đi qua cửa này. |
-| `POST /rounds/{roundId}/progress` | `requestId`, `expectedPresentedThrough`, `presentedThrough` | Cursor đã lưu, bước kế hoặc batch đã được phép phát, payment status hiện tại. Có thể gửi hai cursor bằng nhau để lấy bước đã ghi | Sau mỗi checkpoint. A kiểm tra quyền sở hữu round, thứ tự và bước đã release. |
-| `GET /rounds/{roundId}/status` | Session và roundId | Trạng thái settlement, receipt khi có, balance và walletVersion mới nhất | Chỉ khi cần refresh, theo `retryAfterMs` do A trả. Có thể dùng status đi kèm response khác. |
-| `GET /requests/{requestId}` | Session và ID của request bị mất response | Trạng thái xử lý và roundId/receipt nếu đã nhận | Đường phục hồi tùy chọn nếu retry cùng ID hoặc gameInfo chưa đủ để xác định kết quả. |
-
-**Đơn vị tiền.** `gameInfo` trả currency, exponent, mức bet hợp lệ, bet mặc định, số line và bảng giá Chance/Buy cho mức bet đang chọn hoặc tham chiếu config giá có version. A kiểm tra tất cả khi nhận cược. Ví dụ `currency = "KRW"`, `currencyExponent = 0`, `betMinor = 1000` hiển thị **₩1,000**. Áp dụng cùng formatter cho balance, bet, Chance, buy và tất cả win, kể cả số dài trên mobile. Hệ số rương `5` hiển thị **5×**. Nếu operator chỉ cho một game và line cố định trong session, FE có thể bỏ các tham số trùng như line, denomination, totalBet và freeSpin khỏi từng request.
-
-### Format `reels` và `winLines`
-
-Áp dụng cùng format cho normal spin, free spin, `gameInfo.lastReels` và `previousRound.snapshotAtPresented.reels`. BE và FE dùng config của game để biết `cols` (số reel), `rows` (số hàng), bảng symbol và bảng payline. `configId` được khóa theo paid round để khi resume vẫn giải mã đúng sau khi game cập nhật.
-
-**Một mảng cho cả màn hình.** `reels` có đúng `cols × rows` số nguyên. Đọc hết hàng trên từ trái qua phải, rồi xuống hàng tiếp theo. **Vị trí trên wire bắt đầu từ 1**, giống cách đánh số trên ảnh. Với hàng và cột cũng tính từ 1, `pos = (row - 1) * cols + col`. FE đọc symbol tại `reels[pos - 1]`, suy ra `col = ((pos - 1) % cols) + 1` và `row = floor((pos - 1) / cols) + 1`.
-
-| Kích thước (cột × hàng) | Số phần tử | Hàng trên | Hàng dưới cùng |
-| --- | ---: | --- | --- |
-| 3×3 | 9 | 1–3 | 7–9 |
-| 5×3 | 15 | 1–5 | 11–15 |
-| 5×5 | 25 | 1–5 | 21–25 |
-
-**Mã symbol.** `1` luôn là Wild. ID cao nhất **trong danh mục symbol của game** luôn là Scatter, kể cả khi lượt quay không xuất hiện Scatter. Đề xuất ID cho Tavern theo thứ tự high → low hiện có. Mỗi game khác có thể có danh mục riêng.
-
-| Symbol ID | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Tavern | Wild | Feast | Roast | Potion | Ale | A | K | Q | J | 10 | Scatter |
-
-**Line thắng.** `winLines` là một array. Mỗi object gồm `lineId` (ID từ 1 trong bảng payline), `winSym` (danh sách **vị trí ô** tham gia thắng theo thứ tự của line) và `winMinor` (tiền thắng của riêng line). FE lấy các symbol thực tế từ `reels`, kể cả Wild thay thế. Một ô có thể thuộc nhiều line. FE highlight riêng từng line, dùng amount của BE và hiển thị tổng spin từ `spinWinMinor`. Khi không có line thắng, gửi `"winLines":[]`. Nếu game có khoản thưởng ngoài payline, khoản đó vẫn có thể nằm trong tổng spin.
-
-Ví dụ 5×5 sau dùng đúng bố cục của fixture `normalWin`. Ba ô đầu là A, nên line 1 highlight các vị trí 1, 2 và 3. Số ₩200 minh họa cho draft KRW.
+Response của Buy Feature hoặc Spin trúng freegame báo mode và tiến độ bonus ngay từ đầu. `gameInfo` dùng cùng cấu trúc khi khôi phục. Spin thường trả `freegame: null`. Ví dụ khi vừa trúng Drop với 10 lượt:
 
 ```json
 {
-  "reels": [
-    6, 6, 6, 7, 8,
-    7, 10, 2, 10, 9,
-    8, 4, 3, 4, 10,
-    9, 5, 4, 9, 4,
-    10, 9, 8, 5, 3
-  ],
-  "winLines": [{"lineId": 1, "winSym": [1, 2, 3], "winMinor": 200}],
-  "spinWinMinor": 200
+  "freegame": {
+    "featureMode": "drop",
+    "totalSpins": 10,
+    "curSpin": 0,
+    "remainSpin": 10,
+    "totalWinMinor": 0,
+    "curStep": "intro"
+  }
 }
 ```
 
-Ví dụ cách đọc một đường chéo trong config Tavern: line 14 đi qua `[1,7,13,19,25]`. Nếu chỉ ba ô đầu thắng, BE gửi `"winSym":[1,7,13]`. Khi mỗi lượt có hai đường thắng, gửi hai object kể cả khi chúng dùng chung vị trí 1.
+`totalSpins` là tổng số lượt đã cấp, gồm retrigger. Mình đề xuất dùng tên này thay cho `totalGains` để tách rõ số lượt với tiền. `curSpin` là số lượt đã tính trong trạng thái BE đang trả. `remainSpin = totalSpins - curSpin`. `totalWinMinor` là Total Win đang trình diễn do BE cung cấp, tách với Balance. Các giá trị này phải cùng thuộc một mốc. Ví dụ khi BE trả kết quả lượt 5 để resume, cả số lượt, win và keys đều là trạng thái sau lượt 5. BE vẫn theo dõi riêng bước đã phát và bước FE đã xác nhận.
 
-**Mapping mock → wire.** Với mock dùng `board[reel][row]` và tọa độ từ 0, FE/adapter duyệt **row ngoài, reel trong**. Mỗi `wins[].positions` đổi thành `winSym` theo `row * cols + reel + 1`. `wins[].line + 1` ra `lineId`. Kiểm tra số ô, ID symbol theo config, lineId hợp lệ và các vị trí nằm trên payline tương ứng trước khi vẽ. Với chest, `reel` là số **cột** từ 1, nên rương cột 3 dùng `chest[2]`.
+| `curStep` | FE hiển thị | Khi chuyển bước |
+| --- | --- | --- |
+| `intro` | Màn giới thiệu Tavern hoặc Drop và số lượt được cấp | Sau Continue và intro hoàn tất, FE xác nhận để lấy free spin đầu. Nếu chưa xem intro thì lần sau mở lại màn này. |
+| `freespin` | Reel, win, keys, retrigger và số lượt còn lại | FE xác nhận mỗi bước. Khi resume gặp lượt đã phát, hiện kết quả tĩnh rồi lấy lượt kế. |
+| `show-chest` | Total Win trước mở; hiển thị 5 rương nếu có rương đủ điều kiện | Đến mốc mở, FE xác nhận để BE phát kết quả rương đầu tiên. Nếu không có rương đủ điều kiện, BE chuyển thẳng sang `free-end`. |
+| `open-chest` | Animation rương đến lượt và Total Win sau khi mở do BE trả | FE xác nhận sau khi cả animation và số tiền đã hiện xong. BE cấp rương kế hoặc `free-end`. |
+| `free-end` | Màn Total Win cuối | FE xác nhận sau khi trình diễn hoàn tất. BE xử lý payout và trả quyền cược tiếp. |
 
-**Dữ liệu để vẽ game.** Step base/free spin mang `stepId`, loại step, `reels`, `spinWinMinor`, `winLines`, và duy nhất một mảng `chest` gồm 5 hệ số. Giá trị mặc định là `[1,1,1,1,1]`. Spin cuối thực tế, kể cả khi chạm cap sớm theo luật math, mang multiplier cuối. Trong freegame, trả tổng lượt, đã dùng, còn lại, win tích lũy và key mới. Snapshot resume trả board đầy đủ và tập key đã thu tại checkpoint. A cung cấp thứ tự các step mở rương đủ điều kiện, kể cả khi một rương mở có thể nhận ×1 theo luật được duyệt.
+Nếu sản phẩm cần nút **Open All**, đề xuất dùng `open-all` làm thao tác chạy nhanh, vẫn đi qua các bước `open-chest` theo thứ tự BE cấp. A cần xác nhận thao tác này được phép và mốc checkpoint tương ứng. Khi round tự đóng sau 30 ngày, `gameInfo` chỉ dẫn mở màn tổng kết cuối theo nhánh riêng.
 
-**Tần suất dự kiến.** Normal spin độc lập dùng 1 start + 1 ACK hoàn tất. Đề xuất cho bonus có `N` free spins thực tế và `K` rương mở là 1 start + `N + K + 3` lần progress, tương ứng base, bonus intro, N spins, K rương và total win. Ví dụ 10 spins, 2 rương là **1 start + 15 progress**, ngoài login/gameInfo và retry bất thường. Một progress gộp xác nhận bước trước với lấy bước kế. Không có request theo mỗi frame, line, key, đồng tiền bay hoặc để random lại chest. Gửi cả batch bước chest trong response cuối giảm số lần fetch riêng. Muốn giảm cả số ACK, cần thống nhất mức resume chi tiết có thể giữ được khi mất thiết bị.
+### Dữ liệu dùng chung
 
-## 4. Một round KRW xuyên suốt
+**Mã do BE cấp.** A trả một `playToken` khi người chơi được cược, gắn với tài khoản, game và một lần cược. FE lưu token cùng payload trước khi gửi. BE giữ token và liên kết với round một cách nguyên tử trước khi trừ tiền. Hai tab dùng cùng token chỉ tạo được một lần cược. Khi mất response, FE dùng lại token cũ cho đúng lệnh đó. Khi round đã hoàn tất và người chơi được cược tiếp, BE cấp token mới qua `gameInfo`, `spin` hoặc `status`. FE chỉ dùng token mới khi người chơi chủ động cược tiếp. Nếu token đã hết hạn hoặc không còn receipt, A trả trạng thái để đối soát, giữ nguyên số tiền đã ghi.
 
-Các JSON dưới đây là **trích đoạn field liên quan**. Payload thực tế dùng chung cấu trúc step ở mục 3 và bổ sung board, line, keys theo step. Có thể đối chiếu board và line đầy đủ trong [fixture mock hiện có](milestone-1-api-examples.json).
+**Round và step.** Khi phiên đã gắn đúng game, FE gửi trực tiếp lệnh và mức cược. Nếu một phiên dùng cho nhiều game, A có thể đặt `gameCode` ở URL. BE quản lý `roundId` để lưu và đối soát. `stepId` trong response là mã duy nhất do BE cấp, khác với số thứ tự của step trong round. FE gửi lại mã này để xác nhận. `summaryId` làm nhiệm vụ tương tự với màn tổng kết. Nếu một xác nhận cũ đến muộn, BE đối chiếu đúng round cũ.
 
-**Khởi động.** `POST /login` với credential của operator nhận session. `GET /game-info?gameCode=tavern-drop` trả kết quả sau cho một account mới.
+**Trạng thái.** `releasedThrough` là bước cuối BE đã cấp. `presentedThrough` là bước cuối BE đã lưu xác nhận. Đề xuất chỉ phát **một bước chưa xác nhận** tại một thời điểm, nhất là chest. Mất response vẫn lấy lại cùng bước đã cấp. `settlement.status` độc lập với hai cursor. `canStartPaidRound` do BE quyết định theo presentation, settlement và màn tổng kết còn chờ. BE kiểm tra quyền đó lại khi nhận lệnh cược, kể cả từ tab khác.
+
+**Tiền.** KRW dùng `currencyExponent:0`. `betMinor:1000` là ₩1,000. FE dùng formatter theo currency và exponent của game. Đơn giá cược và số tiền thực trừ có thể khác khi dùng Chance/Buy. Giới hạn toàn round là 10.000× base bet gốc, kể cả mua bonus. BE trả tất cả amount dùng để hiển thị, gồm Total Win sau từng rương. Multiplier là hệ số.
+
+### Format reels và winLines
+
+#### ID symbol
+
+`reels` chứa **ID của symbol** tại từng ô. ID `1` là Wild. ID cao nhất trong danh mục symbol của game là Scatter, kể cả ở lượt không xuất hiện Scatter. `gameInfo.settings.configId` xác định đúng bảng symbol và bảng đường thắng mà BE/FE dùng. Giữ nguyên config đó trong suốt round để kết quả resume vẫn giải mã đúng.
+
+| ID Tavern đề xuất | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Symbol | Wild | Feast | Roast | Potion | Ale | A | K | Q | J | 10 | Scatter |
+
+#### Vị trí ô trên reels
+
+`reels` là một mảng có đúng `cols × rows` phần tử, đọc từ trái sang phải rồi xuống hàng. Vị trí ô trên API bắt đầu từ **1**. Với `row` và `col` cũng bắt đầu từ 1, công thức là `pos = (row - 1) * cols + col`. FE lấy ID của symbol ở ô `pos` bằng `reels[pos - 1]`.
+
+| Lưới (cột × hàng) | Độ dài `reels` | Vị trí theo từng hàng |
+| --- | ---: | --- |
+| 3×3 | 9 | 1–3 · 4–6 · 7–9 |
+| 5×3 | 15 | 1–5 · 6–10 · 11–15 |
+| 5×5 | 25 | 1–5 · 6–10 · 11–15 · 16–20 · 21–25 |
+
+Ví dụ hàng đầu trên bảng 5×5 có `reels` bắt đầu bằng `[6,1,6,7,8,...]` thì **ô 2** chứa Wild, vì `reels[1] = 1`. Các dấu `...` chỉ rút gọn ví dụ, payload thật có đủ 25 số.
+
+#### ID đường thắng và ô cần highlight
+
+Mỗi object trong `winLines` tương ứng với một đường thắng. `lineId` là **ID payline từ 1** trong config, giữ nguyên cho mọi lượt. `winSym` là **các vị trí ô thực sự tham gia thắng** theo thứ tự trên payline. `winMinor` là số tiền BE trả cho đường đó. Một ô có thể xuất hiện trong nhiều đường thắng. Khi không có đường thắng, trả `"winLines":[]`.
+
+Trong config Tavern 5×5, đường ngang trên cùng là line 1 và đường chéo từ góc trên trái là line 14.
+
+| `lineId` | Đường đi đầy đủ | `winSym` nếu ba ô đầu thắng |
+| ---: | --- | --- |
+| 1 | `[1,2,3,4,5]` | `[1,2,3]` |
+| 14 | `[1,7,13,19,25]` | `[1,7,13]` |
+| 15 | `[21,17,13,9,5]` | `[21,17,13]` |
 
 ```json
-{"code":0,"contractVersion":"v1-review-3","settings":{"currency":"KRW","currencyExponent":0,"allowedBetMinor":[1000,2000],"defaultBetMinor":1000,"line":15,"cols":5,"rows":5,"configId":"tavern-grid-v1"},"wallet":{"confirmedBalanceMinor":100000,"walletVersion":40},"lastReels":null,"previousRound":null}
+{
+  "winLines": [
+    {"lineId": 1, "winSym": [1, 2, 3], "winMinor": 200},
+    {"lineId": 14, "winSym": [1, 7, 13], "winMinor": 300}
+  ],
+  "spinWinMinor": 500
+}
 ```
 
-**Normal spin.** Người chơi gửi `POST /rounds`. Giả sử base win ₩400 và trigger 10 free spins. Giá trị ₩99,000 là balance sau debit. Base win đã hiện trong game nhưng còn nằm trong payout của round.
+Mock dùng `board[reel][row]` và `wins[].line` từ 0. Khi chuyển sang đề xuất API, adapter duyệt row ngoài, reel trong, đổi vị trí thắng bằng `row * cols + reel + 1` và đổi line ID bằng `wins[].line + 1`. [Fixture mock hiện có](backend-mock-examples-client-review.md)
+
+## 2. Luồng game và API
+
+[Sơ đồ game và API](flow-game-api.svg) · [Sơ đồ resume](flow-resume.svg) · [Sơ đồ BE và wallet](flow-wallet.svg)
+
+```mermaid
+sequenceDiagram
+    actor U as Người chơi
+    participant F as FE Game
+    participant B as BE Team A
+    participant W as Wallet
+    U->>F: Mở game
+    F->>B: login, sau đó gameInfo
+    B-->>F: Settings, balance và màn cần hiển thị
+    U->>F: Spin hoặc Buy
+    F->>B: spin với isFreespin 0 hoặc buy-feature
+    B->>W: Debit một lần
+    B-->>F: Kết quả đã ghi của bước đầu
+    F->>F: Dựng board và chạy kết quả
+    alt Có freegame
+        loop Từng bước intro và free spin
+            F->>B: spin với isFreespin 1 và curStep vừa xong
+            B-->>F: Bước kế, win, keys và retrigger nếu có
+            F->>F: Trình diễn bước nhận được
+        end
+        opt Có rương đủ điều kiện mở
+            loop Mỗi rương được mở
+                F->>B: spin với isFreespin 1 và curStep vừa xong
+                B-->>F: Multiplier của rương hiện tại và Total Win sau mở
+                F->>F: Hoàn tất animation và hiện số tiền mới
+            end
+            F->>B: spin xác nhận rương cuối
+            B-->>F: Total Win cuối
+        end
+        F->>F: Hoàn tất màn Total Win
+        F->>B: spin xác nhận free-end
+    else Normal spin không trigger
+        B->>B: Tự hoàn tất round theo quy tắc A
+    end
+    B->>W: Settle một lần theo award đã ghi
+    B-->>F: Settlement và balance đã xác nhận nếu có
+    opt Còn pending
+        F->>B: status theo thời gian BE chỉ định
+        B-->>F: Payment đã xác nhận, balance và quyền chơi tiếp
+    end
+    F->>F: Bật Spin theo quyền BE trả
+```
+
+Sơ đồ trình bày đường chơi từ trạng thái sẵn sàng. Khi mở game mà `gameInfo` trả round dở hoặc có tổng kết cần xem, FE xử lý nhánh resume trước. A có thể trả `pending` rồi tiếp tục settlement ở server. Với freegame, một thao tác skip được phép đi qua cùng mốc xác nhận cuối. Với normal spin không trigger, A tự đóng round mà không đợi FE xác nhận animation.
+
+## 3. Ví dụ request và response
+
+Các JSON là ví dụ rút gọn theo từng tình huống. Những response `gameInfo` bên dưới chỉ trích các field liên quan đến nhánh đang bàn.
+
+### 3.1 Login và mở game
 
 ```json
-{"requestId":"play-17","gameCode":"tavern-drop","betMinor":1000,"mode":"base","chance":"standard"}
+{"launchToken":"operator-issued-token"}
 ```
 
 ```json
-{"code":0,"roundId":"r17","originalBaseBetMinor":1000,"chargedMinor":1000,"presentedThrough":0,"releasedThrough":1,"steps":[{"stepId":1,"type":"base_spin","spinWinMinor":400,"chest":[1,1,1,1,1],"trigger":{"mode":"drop","freeSpins":10}}],"settlement":{"status":"pending"},"wallet":{"confirmedBalanceMinor":99000,"walletVersion":41}}
+{"code":0,"sessionId":"session-example","accountId":"player-17"}
 ```
 
-**Giữa freegame.** Step 2 là bonus intro. Đã trình diễn spin thứ tư thì FE gửi checkpoint 6. A lưu ACK và phát spin thứ năm, step 7. Nếu mất response, retry cùng body, cùng `requestId` sẽ lấy đúng step 7. Trong ví dụ này, win feature tăng từ ₩600 lên ₩900.
+FE gọi `GET /api/v1/game-info?gameCode=tavern-drop`.
 
 ```json
-{"requestId":"ack-r17-6","expectedPresentedThrough":5,"presentedThrough":6}
+{"code":0,"contractVersion":"v1-review-6","settings":{"configId":"tavern-grid-v1","cols":5,"rows":5,"lineCount":15,"currency":"KRW","currencyExponent":0,"defaultBetMinor":1000,"allowedBetMinor":[1000,2000]},"lastReels":null,"resume":null,"wallet":{"confirmedBalanceMinor":100000,"walletVersion":40},"canStartPaidRound":true,"playToken":"play-be-17"}
+```
+
+### 3.2 Normal spin và settlement
+
+`POST /api/v1/spin` với header `Play-Token: play-be-17`. Header mang token FE nhận từ `gameInfo`. Body gửi chế độ và mức cược. Mua Drop dùng `POST /api/v1/buy-feature` với `featureMode: "drop"` và cùng format bet.
+
+```json
+{"isFreespin":0,"betMinor":1000,"chanceMode":"normal"}
 ```
 
 ```json
-{"code":0,"roundId":"r17","presentedThrough":6,"releasedThrough":7,"steps":[{"stepId":7,"type":"free_spin","spinWinMinor":300,"chest":[1,1,1,1,1],"featureAfter":{"total":10,"played":5,"remaining":5,"accumulatedMinor":900}}]}
+{"code":0,"roundId":"r17","originalBaseBetMinor":1000,"chargedMinor":1000,"freegame":null,"step":{"type":"base_spin","reels":[6,6,6,7,8,7,10,2,10,9,8,4,3,4,10,9,5,4,9,4,10,9,8,5,3],"winLines":[{"lineId":1,"winSym":[1,2,3],"winMinor":200}],"spinWinMinor":200},"settlement":{"status":"pending"},"wallet":{"confirmedBalanceMinor":99000,"walletVersion":41},"canStartPaidRound":false}
 ```
 
-Nếu người chơi reload khi spin thứ năm đang chạy, `gameInfo.previousRound` trả phase `free_spins`, cursor 6/7, board và keys ở cuối spin thứ tư, `played:4`, `remaining:6`, `accumulatedMinor:600` và cùng step 7 ở trên. FE dựng màn từ snapshot ₩600 rồi áp step 7 đúng một lần để đến ₩900. Khi đã ACK 7, snapshot kế tiếp phải chứa ₩900 và 5 lượt còn lại.
+Normal spin không trigger dùng một lệnh đặt cược. BE tự hoàn tất round và xử lý payout theo quy tắc của A. Nếu response còn báo `pending`, FE có thể đọc status để cập nhật Balance và quyền cược tiếp. Khi reload, `gameInfo` trả kết quả đã lưu để FE hiển thị trực tiếp.
 
-**Spin cuối và rương.** Giả sử win tích lũy trước rương là ₩1,200. FE bắt đầu màn Total Win từ ₩1,600 gồm ₩400 base + ₩1,200 feature. Rương chỉ nhân phần feature trong ví dụ này. A trả các mốc tiền để FE chạy animation chính xác kể cả khi math áp cap. Thứ tự sau đây dùng số cột từ 1.
+`GET /api/v1/rounds/status` trả khi ví xác nhận:
 
 ```json
-{"code":0,"roundId":"r17","presentedThrough":11,"releasedThrough":15,"steps":[
-  {"stepId":12,"type":"free_spin","reels":[6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10],"winLines":[],"spinWinMinor":0,"chest":[5,1,10,1,1],"featureAfter":{"total":10,"played":10,"remaining":0,"accumulatedMinor":1200}},
-  {"stepId":13,"type":"chest_reveal","reel":1,"displayWinAfterMinor":6400},
-  {"stepId":14,"type":"chest_reveal","reel":3,"displayWinAfterMinor":60400},
-  {"stepId":15,"type":"total_win","finalRoundAwardMinor":60400}
-],"displayWinBeforeChestMinor":1600,"settlement":{"status":"pending"}}
+{"code":0,"roundId":"r17","presentationStatus":"completed","settlement":{"status":"paid","settlementId":"award-r17","creditedMinor":200},"wallet":{"confirmedBalanceMinor":99200,"walletVersion":42},"canStartPaidRound":true,"playToken":"play-be-next"}
 ```
 
-**Thoát giữa rương thứ hai.** FE đã ACK 13 sau khi tiền rương đầu bay xong. Người chơi thoát khi step 14 đang chạy. Lần vào sau, `gameInfo.previousRound` trả snapshot 13 và **cùng payload step 14–15**. Số free spin còn lại bằng 0 nhưng phase vẫn là chest. Đích của animation còn lại là ₩60,400. Ví dụ A đã settle lúc người chơi vắng mặt.
+Nếu mất response lệnh spin, retry cùng `Play-Token` và body. BE trả về cùng round và charge, kể cả khi outcome đã ghi trước khi FE nhận. Nếu round thắng 0, A cần một trạng thái xác nhận cuối như `no_payout` để FE biết điều kiện tài chính đã hoàn tất.
+
+### 3.3 Resume giữa free spin
+
+Người chơi đã xác nhận 4/10 lượt rồi thoát khi lượt 5 đang quay. Step 1 là base, step 2 là intro. Step 7 tương ứng lượt 5. BE đã phát step 7, nên `gameInfo` trả chỉ dẫn hiện kết quả tĩnh của ngay step này. Ví dụ lượt 5 thắng ₩300 và retrigger thêm 5 lượt:
 
 ```json
-{"code":0,"previousRound":{"roundId":"r17","phase":"chest","presentedThrough":13,"releasedThrough":15,"snapshotAtPresented":{"reels":[6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10],"originalBaseBetMinor":1000,"baseWinMinor":400,"feature":{"total":10,"played":10,"remaining":0,"accumulatedMinor":1200},"chest":[5,1,10,1,1],"openedReels":[1],"displayWinMinor":6400},"steps":[{"stepId":14,"type":"chest_reveal","reel":3,"displayWinAfterMinor":60400},{"stepId":15,"type":"total_win","finalRoundAwardMinor":60400}],"settlement":{"status":"paid","settlementId":"award-r17","creditedMinor":60400}},"wallet":{"confirmedBalanceMinor":159400,"walletVersion":42}}
+{"code":0,"resume":{"roundId":"r18","mode":"show_stored_result","releasedThrough":7,"presentedThrough":6,"step":{"stepId":"step-be-7","type":"free_spin","curStep":"freespin","reels":[6,6,6,11,8,7,11,2,10,9,8,4,3,4,11,9,5,11,9,4,10,9,8,5,3],"winLines":[{"lineId":1,"winSym":[1,2,3],"winMinor":300}],"spinWinMinor":300,"featureAfter":{"played":5,"total":15,"remaining":10,"accumulatedMinor":900,"keyPositions":[1,2,3,11],"retriggerSpins":5}}},"settlement":{"status":"pending"},"wallet":{"confirmedBalanceMinor":99000,"walletVersion":41},"canStartPaidRound":false}
 ```
 
-**Hoàn tất.** Sau step 15, FE gửi `progress` với `expectedPresentedThrough:14` và `presentedThrough:15`. Receipt `award-r17` vẫn có giá trị ₩60,400 dù FE đọc status nhiều lần. Nếu khi đó payment vẫn pending, A có thể trả `presentationStatus:"completed"` cùng `settlement.status:"pending"` rồi cập nhật qua status. Client lấy balance mới nhất theo `walletVersion`. Với ví dụ này, balance cuối là ₩100,000 − ₩1,000 + ₩60,400 = **₩159,400**.
+FE hiện board, cumulative win, keys và số lượt sau retrigger. Sau đó gọi `/spin` để tiếp tục lượt 6.
 
-**Cap và bonus buy.** Với base ₩1,000, kể cả mua bonus giá ₩100,000 thì cap cho toàn round vẫn là **₩10,000,000**. Nếu base win ₩400 và feature sau chest là ₩12,000,000, payout toàn round tối đa ₩10,000,000. A/math phải chốt rounding, giá buy/Chance, xử lý retrigger và mốc show win nếu chạm trần giữa các rương.
+```json
+{"isFreespin":1,"curStep":"freespin","stepId":"step-be-7","kind":"shown_as_result"}
+```
 
-## 5. Resume ở đúng ranh giới
+BE trả cursor 7 và step 8 nếu sẵn sàng. Nếu lượt 5 chưa được phát tại thời điểm reconnect, `gameInfo` chỉ dẫn chạy nó bình thường khi BE cấp kết quả. Nếu intro bonus chưa được xem, resume vào intro. Một ACK có thể vừa lưu bước hiện tại vừa lấy bước kế. Retry phải trả cùng dữ liệu của bước đã được cấp và FE đối chiếu cursor chính thức trước khi vẽ.
+
+### 3.4 Free spin cuối, rương và thoát giữa rương
+
+Free spin cuối chỉ cho biết có phần chest tiếp theo. FE hiện Total Win ban đầu, hiện cả 5 rương nếu có rương đủ điều kiện mở và dùng khoảng chờ 2 giây theo thiết kế game. Nếu cả 5 rương đều khóa, đi tới Total Win cuối và bỏ qua phần mở rương. Kết quả từng rương được release riêng, theo thứ tự do BE lưu.
+
+```json
+{"code":0,"roundId":"r19","releasedThrough":12,"presentedThrough":11,"step":{"stepId":"step-be-12","type":"free_spin","curStep":"freespin","reels":[6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10,6,7,8,9,10],"winLines":[],"spinWinMinor":0,"featureAfter":{"played":10,"total":10,"remaining":0,"accumulatedMinor":1200},"chestPhase":{"available":true,"displayWinBeforeMinor":1600}}}
+```
+
+Sau xác nhận step 12, BE cấp step 13 với `curStep: "show-chest"`. FE hiển thị hàng rương và Total Win trước mở, rồi gửi request sau để lấy rương đầu tiên:
+
+```json
+{"isFreespin":1,"curStep":"show-chest","stepId":"step-be-13"}
+```
+
+Cột tính từ 1. Số trước rương trong ví dụ là ₩400 base + ₩1,200 feature, và BE xác nhận ₩6,400 sau rương 5×.
+
+```json
+{"code":0,"roundId":"r19","releasedThrough":14,"presentedThrough":13,"step":{"stepId":"step-be-14","type":"chest_reveal","curStep":"open-chest","reel":1,"multiplier":5,"displayWinAfterMinor":6400}}
+```
+
+Sau khi **cả animation và số ₩6,400 đã hiện**, FE gửi:
+
+```json
+{"isFreespin":1,"curStep":"open-chest","stepId":"step-be-14"}
+```
+
+Giả sử BE đã phát rương thứ hai, FE thoát giữa animation trước khi ACK. `gameInfo` trả:
+
+```json
+{"code":0,"resume":{"roundId":"r19","mode":"play_step","releasedThrough":15,"presentedThrough":14,"snapshot":{"openedChests":[{"reel":1,"multiplier":5}],"displayWinMinor":6400},"step":{"stepId":"step-be-15","type":"chest_reveal","curStep":"open-chest","reel":3,"multiplier":10,"displayWinAfterMinor":60400}},"settlement":{"status":"pending"},"wallet":{"confirmedBalanceMinor":99000,"walletVersion":41},"canStartPaidRound":false}
+```
+
+Dựng rương cột 1 đã mở, giữ số ₩6,400 rồi chạy rương cột 3 đến ₩60,400. Nếu ACK của rương cuối đã ghi, lần reconnect đi tới Total Win. Nếu rương đã hiện xong nhưng ACK chưa ghi, resume từ rương đó. Replay chỉ trình diễn lại **cùng kết quả và amount**, tránh cộng lặp. Sau ACK rương cuối, BE phát step Total Win với số tiền cuối. Xác nhận step đó đóng presentation và làm round đủ điều kiện settle.
+
+## 4. Resume và round tự đóng sau 30 ngày
 
 ```mermaid
 flowchart TD
-    I["Login → gameInfo"] --> Q{"Có previousRound?"}
-    Q -->|Không| N["Normal game và balance đã xác nhận"]
-    Q -->|Có| S["Dựng snapshot tại presentedThrough"]
-    S --> U{"Có ACK đang chờ từ lần trước?"}
-    U -->|Có| A["Retry cùng ID và body, lấy cursor chính thức"]
-    U -->|Không| P{"Phase tại checkpoint?"}
-    A --> P
-    P -->|Base hoặc intro| B["Hoàn tất phần base hoặc intro còn dở"]
-    P -->|Free spin| F["Hiện board đã lưu, tiếp tục step chưa xong"]
-    P -->|Chest| C["Khôi phục các rương đã mở và displayWin"]
-    P -->|Total Win| T["Hiện tổng cuối rồi trở về normal"]
-    B --> K["progress xác nhận và lấy bước kế"]
-    F --> K
-    C --> K
-    T --> K
-    K --> X{"Còn bước để xem?"}
-    X -->|Có| P
-    X -->|Không| N
+    I["FE gọi gameInfo"] --> P{"BE chỉ dẫn màn nào?"}
+    P -->|Sẵn sàng| N["Normal game theo canStartPaidRound"]
+    P -->|Bonus chưa xem| B["Mở intro"]
+    P -->|Normal spin có kết quả đã lưu| M["Hiện kết quả tĩnh và đọc quyền Spin từ BE"]
+    P -->|Free spin đã phát, bị ngắt| R["Hiện board, win, keys và retrigger đã lưu"]
+    P -->|Spin chưa phát| F["Lấy và trình diễn free spin kế"]
+    P -->|Chest dở| C["Dựng rương đã xác nhận rồi mở rương đầu chưa xác nhận"]
+    P -->|Presentation xong, cần xác nhận ví| W["Loading ngắn, Spin bị khóa"]
+    P -->|Round tự đóng đã settle| S["Chỉ hiện Total Win cuối và balance xác nhận"]
+    M --> N
+    B --> A["spin xác nhận curStep và lấy bước kế"]
+    R --> A
+    F --> A
+    C --> A
+    S --> D["Đóng màn, FE gửi xác nhận summary"]
+    D --> N
+    A --> W
+    W --> N
 ```
 
-**Ba sự kiện khác nhau.** `releasedThrough` là bước cao nhất A đã cho phép truy cập, kể cả khi response bị mất. Client biết một bước đã chạy xong khi reels, win, key/retrigger hoặc chest và số tiền của bước đó đã hoàn tất. `presentedThrough` là bước liên tục cuối đã được A lưu sau ACK. Luôn có `0 ≤ presentedThrough ≤ releasedThrough`. Snapshot phải khớp với cursor đã lưu. Việc wallet trả tiền là trạng thái độc lập với cả hai cursor.
+`/spin` có thể trả bước tiếp theo thay vì trạng thái chờ ví. FE chỉ chuyển sang nhánh chờ settlement khi BE báo phần trình diễn cuối đã được ghi nhận.
 
-**Đề xuất xử lý khoảng mất ACK.** Sau khi animation chạm trạng thái nghỉ, FE ghi ticket ACK bền vững trên thiết bị theo account/game/round/step trước khi chuyển sang bước kế. FE gửi ACK và chỉ tiến sang bước kế khi A xác nhận. Mất response thì khi reconnect, FE đối chiếu ticket với `gameInfo`. Nếu server đã tiến cursor, bỏ ticket cũ. Nếu chưa, gửi lại ticket rồi dựng snapshot mới. Skip/Turbo đưa animation tới cùng trạng thái nghỉ và đi qua đúng logic ACK này.
+A lưu deadline **30 ngày không có hoạt động thật**. Polling nền và các lần retry tự động không tự kéo dài deadline. A xác định hoạt động đủ điều kiện và quyết định kết quả khi người chơi quay lại sát hạn. Trước hạn dùng luồng resume bình thường. Sau hạn, A tự đóng phần trình diễn và settle số cuối đã lưu. Nếu ví vẫn đang đối soát, BE giữ khóa cược và FE dùng trạng thái chờ thông thường cho đến khi nhận xác nhận.
 
-**Giới hạn phải chốt với khách.** Nếu trình duyệt chết đúng sau frame cuối và trước lần ghi bền vững, hoặc người chơi chuyển thiết bị khi ACK chưa tới A, server không có bằng chứng màn cũ đã chiếu hết. Đề xuất thương lượng một ranh giới recover cụ thể cho free spin đã release nhưng còn mơ hồ: dựng board kết quả tĩnh, hiện win, keys và retrigger đã ghi, cho người chơi tiếp tục từ màn kết quả đó. Nhờ vậy FE không quay lại các reels của một spin có thể đã xem xong. Đổi lại người chơi có thể bỏ qua đuôi animation chưa xem. Nếu khách cần phát chính xác từng đoạn trên mọi thiết bị, phải thống nhất thêm checkpoint bên trong spin và ý nghĩa của “đã hoàn thành”. Đây là điểm nghiệm thu cần quyết định trước khi hứa hành vi production.
+Ví dụ round `r19` đã tự đóng và settlement đã xác nhận. `gameInfo` chỉ dẫn hiển thị màn Total Win thông thường, sau khi đóng màn mới bật chơi tiếp.
 
-**Đa tab và reconnect.** A kiểm tra account/game/round, expected cursor và quyền của phiên đang trình diễn. Đề xuất một phiên được ghi progress tại một thời điểm. Khi chuyển thiết bị, A cấp lại quyền cho phiên mới và từ chối checkpoint muộn của tab cũ. Client nhận conflict thì tải snapshot chính thức. Outcome và cursor phải còn truy cập được sau khi session cũ hết hạn và cả khi round đã paid. A/operator cần chốt thời gian lưu, chính sách takeover và cách hiển thị round đã đóng nhưng presentation còn dở.
+```json
+{"code":0,"resume":{"mode":"final_summary","roundId":"r19","summaryId":"r19-last-result","finalRoundAwardMinor":60400},"presentationStatus":"auto_closed","settlement":{"status":"paid","settlementId":"award-r19","creditedMinor":60400},"wallet":{"confirmedBalanceMinor":159400,"walletVersion":42},"canStartPaidRound":false}
+```
 
-## 6. BE và wallet khi browser đóng hoặc mất response
+Khi người chơi đóng tổng kết, FE xác nhận theo contract A. Ví dụ dùng cùng endpoint `/spin`.
+
+```json
+{"isFreespin":0,"curStep":"final-summary","summaryId":"r19-last-result"}
+```
+
+```json
+{"code":0,"roundId":"r19","resume":null,"wallet":{"confirmedBalanceMinor":159400,"walletVersion":42},"canStartPaidRound":true,"playToken":"play-be-next"}
+```
+
+## 5. BE, wallet và lỗi mạng
 
 ```mermaid
 flowchart TD
-    S["POST rounds · account + game + requestId"] --> D{"Đã có request?"}
-    D -->|Cùng payload| RR["Trả round hoặc trạng thái xử lý đã ghi"]
-    D -->|Payload khác| ERR["Báo conflict"]
-    D -->|Mới| INT["Lưu ý định đặt cược và debitId"]
-    INT --> DEB["Gửi debit bằng debitId cố định"]
-    DEB --> DR{"Wallet xác nhận?"}
-    DR -->|Từ chối| BAD["Lưu rejected, trả lỗi"]
-    DR -->|Chưa rõ| REC["Worker đối soát bằng debitId"]
-    REC --> DR
-    DR -->|Chấp nhận| OUT["Lưu outcome, cap, payout và việc cần settle"]
-    OUT --> UI["API phát các step cho client"]
-    OUT --> JOB["Worker xử lý theo policy của A"]
-    JOB --> ZERO{"Award bằng 0?"}
-    ZERO -->|Có| Z["Ghi hoàn tất zero win theo quy ước wallet"]
-    ZERO -->|Không| W["Credit bằng settlementId cố định theo round"]
-    W --> WR{"Có receipt xác nhận?"}
-    WR -->|Có| PAID["Lưu paid và receipt"]
-    WR -->|Chưa rõ| RECON["Đối soát, retry cùng settlementId"]
-    RECON --> W
+    G["Nhận spin hoặc buy"] --> L{"BE cho phép cược mới?"}
+    L -->|Không| X["Trả trạng thái round cũ"]
+    L -->|Có| R["Giữ Play-Token, ghi debit và outcome"]
+    R --> V["Phát từng bước theo contract"]
+    V --> A{"Sự kiện đóng presentation"}
+    A -->|Normal không trigger| C["BE đóng round theo quy tắc A"]
+    A -->|FE xác nhận free-end hoặc skip hợp lệ| C
+    A -->|Quá 30 ngày không hoạt động thật| E["Auto-close và giữ final summary"]
+    C --> S["Settle recorded award bằng ID cố định"]
+    E --> S
+    S --> P{"Wallet đã xác nhận?"}
+    P -->|Chưa| Q["Đối soát và giữ khóa Spin"]
+    Q --> P
+    P -->|Đã xác nhận| F{"Còn summary cần xem?"}
+    F -->|Có| D["Hiện final Total Win và chờ dismiss"]
+    D --> N["Cho phép cược mới"]
+    F -->|Không| N
 ```
 
-- **Ranh giới giữa DB và ví ngoài.** A lưu intent và ID giao dịch bền vững trước debit. Nếu wallet debit thành công nhưng BE crash trước khi ghi outcome, worker tra giao dịch đó và tiếp tục đúng round. A cần giữ input/math version và kết quả RNG đã cam kết hoặc một cách khôi phục outcome duy nhất trước khi bất kỳ phần nào được release. Khi ghi outcome, lưu cả việc phải settle trong cùng transaction, chẳng hạn bằng outbox. Một job phục hồi có thể tìm mọi wager đã nhận mà chưa xử lý xong.
-- **Một lần trả tiền dù gọi lại nhiều lần.** A và wallet cần thống nhất idempotency/lookup cho cả debit và credit. Nếu wallet đã credit nhưng mất response, A tra theo `settlementId` và chỉ retry với cùng ID theo bảo đảm dedupe của wallet. Khóa unique trong DB game một mình không giải quyết được mất response từ ví. Khi kết quả vẫn chưa rõ, giữ trạng thái cần đối soát và giao cho worker/operator. A chốt backoff, cảnh báo và quy trình xử lý lỗi dứt điểm.
-- **Hợp đồng của progress.** Kiểm tra trùng `requestId` trước kiểm tra xung đột cursor. Duplicate cùng nội dung trả cùng kết quả bước và cursor đã commit. Cùng ID khác nội dung trả conflict. Bước quá xa, ACK vượt release hoặc phiên mất quyền ghi thì trả cursor chính thức. `progress` chỉ thay đổi checkpoint/phạm vi release. Nó không nhận bet mới, không chạy RNG và không gọi wallet credit.
-- **Số dư và quyền chơi tiếp.** Chỉ cập nhật Balance từ wallet snapshot đã xác nhận. Nếu một response cũ về muộn, so version trước khi cập nhật. Người chơi có thể đã xem xong nhưng tiền còn pending, hoặc đã được credit dù đang ở rương đầu tiên. A quyết định thời điểm settlement và việc nhận round mới trong lúc debit/credit cũ còn chờ. Nếu nhiều round pending được phép, `gameInfo` phải liệt kê tham chiếu cho từng khoản đang đối soát.
+- **Retry.** A đối chiếu token cược và receipt trước khi kiểm tra quyền cược mới. Retry cùng token và body phục hồi đúng round. Cùng token với nội dung khác trả lỗi xung đột. Với checkpoint, A dùng `stepId` hoặc `summaryId` do BE cấp để xác nhận đúng bước một lần, kể cả khi request tới muộn. A dùng một mã giao dịch ví ổn định cho mỗi debit và credit để đối soát khi mất response. ACK cuối và auto-close cạnh tranh trên cùng round và cùng mã settlement.
+- **Khóa chơi.** Presentation xong **và** settlement xác nhận mới nhận cược cùng game. Khi có summary hết hạn, người chơi còn phải đóng màn đó. FE theo `canStartPaidRound`, BE enforce ở lệnh cược.
+- **UI.** Balance lấy từ wallet snapshot đã xác nhận và giữ version mới nhất. Total Win chạy theo số BE trả sau từng step. Khi chờ, dùng loading trung tính hoặc nút Spin bị khóa. Với lỗi thật, dùng luồng reconnect/retry. Timeout giữ trạng thái chưa rõ kết quả.
+- **Tần suất.** Normal spin không trigger dùng một request đặt cược và đọc status khi cần. Freegame gộp xác nhận/lấy bước kế. Chest xác nhận theo từng rương. Polling chỉ để đọc trạng thái, dùng nhịp A trả.
 
-## 7. Chênh lệch với code đang chạy và điều kiện nghiệm thu
+## 6. Điểm tích hợp A và FE cần làm rõ
 
-| Đã kiểm tra trong project | Việc cần bổ sung khi tích hợp |
-| --- | --- |
-| `GET /api/session` trả snapshot trong RAM. `POST /api/command` chạy cho từng spin. FE lưu pending request nhưng xóa nó khi nhận outcome. | A cung cấp durable round theo account/game. FE thêm adapter login/gameInfo, journal ACK và dựng đúng presentation tại checkpoint. [Controller hiện tại](../src/framework/controller.ts) |
-| Fixture `normalWin` có `spinWin:20`, `paidAward:20`. Fixture `finalFreeSpin` có tích lũy 420, rương 5×, credit 2100. Các số mock dùng scale 2. | Tách base/feature win để trình diễn khỏi final wallet credit. Chuyển formatter theo currency/exponent, kiểm tra ₩ và số dài trên mobile. [Các request/response mock gốc và field còn thiếu](backend-mock-examples-client-review.md) |
-| Mock giữ receipt trong RAM, có thể credit base riêng và cấu hình cap 5.000×. | Team A kiểm chứng debit/credit idempotent qua restart, receipt thật và cap 10.000× base bet. [Mock](../server/mock-game.ts) · [Game config](../src/games/tavern/game.config.json) |
-
-| Bài test chung giữa FE, A và wallet | Kết quả đạt |
-| --- | --- |
-| Mất response của paid spin, restart server rồi retry | Cùng round, cùng board, một debit. Nếu wallet còn chưa rõ thì trả trạng thái để đối soát. |
-| Reload sau 4/10 spins, có retrigger, bấm turbo | Cùng board, keys, tổng lượt và win ở checkpoint. Không restart các free spin đã hoàn thành. |
-| Thoát giữa hai rương, quay lại sau khi wallet đã credit | Ví dụ mục 4 dựng ₩6,400 và rương cột 1 đã mở, tiếp tục rương cột 3 đến ₩60,400. Receipt vẫn là `award-r17`. |
-| Spin cuối không có chest đủ điều kiện | Bỏ qua hàng rương và phần đợi mở rương. Chuyển từ tổng trước chest tới tổng cuối theo A. |
-| Đóng browser ngay sau debit và không quay lại | Worker hoàn tất round và xử lý khoản thắng. Mất response credit vẫn dẫn tới cùng một receipt. |
-| Cùng lúc hai tab, request cũ tới sau takeover | Một phiên tiến cursor. UI thiết bị còn lại khôi phục từ snapshot. Số dư không lùi do response cũ. |
-| Buy, cap, no-win và tiền pending | Cap dùng base bet gốc. Zero win có tính cuối cùng rõ ràng. Balance chỉ đổi theo wallet version mới. |
-
-**Các quyết định dành cho buổi review.** Yongtae và A duyệt ranh giới resume khi mất ACK và mức chi tiết từng rương. A xác nhận thời điểm credit, cách xử lý round bị bỏ dở, khả năng đối soát của wallet và retention. A/math duyệt bet steps, rounding, cap và các amount trung gian. Sau đó hai phía cố định schema v1 và chạy cùng bộ tình huống ở bảng trên. Các ví dụ gốc đã có sẵn để Than đưa vào API thread hiện tại. [Mock có chú thích](backend-mock-examples-client-review.md) · [Bản phân tích yêu cầu và field chi tiết](backend-requirements-krw-resume-single-settlement.md)
+1. **A cung cấp contract chốt.** Tên route, enum, mã lỗi, trạng thái terminal cho zero win, entitlement khóa cược, quyền xác nhận bước giữa nhiều tab, quy tắc hoạt động thật và retention của summary. FE thực hiện theo response.
+2. **Mốc kết thúc thường và skip.** A định nghĩa khi nào BE tự đóng normal spin không trigger và cách nhận diện skip hợp lệ trong freegame. Đối với freegame, chốt lúc nào Total Win được xem là xong, gồm trường hợp đóng kết quả và auto-dismiss nếu thiết kế dùng.
+3. **Dựng lại rương.** A trả board và keys cần cho cảnh, danh sách rương đã mở với multiplier đã phát, chỉ số rương sắp mở và số tiền tại checkpoint. Mẫu JSON rút gọn minh họa state riêng của rương. A cần chốt behavior animation khi một rương có hệ số ×1 hoặc chạm cap.
+4. **Mock và runtime.** API hiện tại dùng session/command, board hai chiều và settlement demo. FE cần adapter cho bản A cung cấp, đồng thời test mất response, chuyển thiết bị, mất ACK, auto-close khi wallet timeout và chặn cược trong cùng game.
