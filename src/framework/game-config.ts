@@ -94,6 +94,13 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   )
     invalid("presentation");
   const { normal, drop, feature, animationGrid, scene } = display;
+  const deformation = display.landing;
+  if (deformation !== undefined && (!deformation ||
+      ![deformation.compressMs, deformation.stretchMs, deformation.settleMs].every(positiveInt) ||
+      !nonNegativeInt(deformation.leadMs) || deformation.leadMs > deformation.compressMs + deformation.stretchMs + deformation.settleMs ||
+      ![deformation.squashX, deformation.squashY, deformation.stretchX, deformation.stretchY]
+        .every((value) => Number.isFinite(value) && value >= 0.5 && value <= 1.5)))
+    invalid("presentation.landing");
   const anticipation = drop?.anticipation;
   if (anticipation !== undefined &&
     (!anticipation || !ids.has(anticipation.symbolId) ||

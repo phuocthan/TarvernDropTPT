@@ -97,7 +97,8 @@ export async function mountBasicGame(
     await runtime.prepare(loader);
     textures = await loadTextures(images, runtime.resources);
     await mount(host);
-    host.style.aspectRatio = `${board.app.screen.width} / ${board.app.screen.height}`;
+    const contentHeight = board.app.screen.height - 2 * (game.presentation.reelMaskPaddingPx ?? 0);
+    host.style.aspectRatio = `${board.app.screen.width} / ${contentHeight}`;
     sync();
     status.textContent = "";
     loader?.ready();

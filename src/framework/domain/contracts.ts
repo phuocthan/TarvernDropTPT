@@ -1,4 +1,5 @@
 import type { ResourceManifest } from "../resources/contracts.ts";
+import type { LandingMotion } from "../presentation/landing-motion.ts";
 /** Money is always an integer in demo minor units. Boards are column-major. */
 export type Mode = "base" | "tavern" | "drop";
 export type Chance = "standard" | "extra" | "super";
@@ -103,6 +104,7 @@ export interface DropAnticipation {
   reelPauseMs: number;
 }
 export interface ReelPresentation {
+  landing?: LandingMotion;
   spinType: ReelMotion;
   cellSizePx: number;
   gapPx: number;

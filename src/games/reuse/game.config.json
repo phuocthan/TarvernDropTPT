@@ -98,6 +98,8 @@
     "contract": "proposal-v1"
   },
   "presentation": {
+    "landing": { "compressMs": 70, "stretchMs": 90, "settleMs": 120, "leadMs": 80, "squashX": 1.1, "squashY": 0.88, "stretchX": 0.94, "stretchY": 1.06 },
+    "reelMaskPaddingPx": 10,
     "spinType": "normal",
     "cellSizePx": 96,
     "gapPx": 6,
@@ -107,7 +109,7 @@
       "stopDelayMs": 130,
       "turboStopDelayMs": 20,
       "bounceMs": 170,
-      "bouncePx": 8
+      "bouncePx": 14
     },
     "drop": {
       "exit": {
@@ -122,7 +124,7 @@
         "rowStaggerMs": 52,
         "holdMs": 0
       },
-      "bounceMs": 100,
+      "bounceMs": 200,
       "bouncePx": 8,
       "turboMultiplier": 4
     }

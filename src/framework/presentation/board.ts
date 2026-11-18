@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, RenderLayer, UPDATE_PRIORITY, type Ticker } from "pixi.js";
 import { keepWithinVerticalViewport, reelCellCenter, type VerticalBounds } from "./grid.ts";
 import { planDropColumns } from "./drop-schedule.ts";
+import { landingDuration, landingOffset, landingScale } from "./landing-motion.ts";
 import type {
   Board,
   GameDefinition,
@@ -52,6 +53,9 @@ export class BoardView {
   private factory: SymbolFactory;
   private readonly cell: number;
   private readonly gap: number;
+  private landingCarriers = new Map<SymbolView, Container>();
+  private motionGeneration = 0;
+  private skipLanding = false;
   private get unfocusedTint() {
     const channel = Math.round(255 * (1 - (this.game.presentation.winDimmerOpacity ?? 0.5)));
     return (channel << 16) | (channel << 8) | channel;
@@ -115,7 +119,21 @@ export class BoardView {
       this.elapsed.push(0);
       this.spinning.push(false);
       for (let row = 0; row < this.game.rows + 2; row++) {
-        const tile = this.factory(this.cell, this.app.ticker);
+        const original = this.factory(this.cell, this.app.ticker);
+        let tile = original;
+        if (this.game.presentation.landing) {
+          const view = new Container();
+          const carrier = new Container({ label: "symbol-landing" });
+          carrier.pivot.set(this.cell / 2, this.cell);
+          carrier.position.copyFrom(carrier.pivot);
+          carrier.addChild(original.view); view.addChild(carrier);
+          tile = { ...original, view, verticalBounds: () => {
+            const bounds = original.verticalBounds?.();
+            return bounds && { top: this.cell + (bounds.top - this.cell) * carrier.scale.y,
+              bottom: this.cell + (bounds.bottom - this.cell) * carrier.scale.y };
+          } };
+          this.landingCarriers.set(tile, carrier);
+        }
         if (this.game.presentation.symbolEdgeInsetPx !== undefined &&
           (row === 1 || row === this.game.rows)) {
           this.edgeTiles.set(tile, { reel, pivotY: tile.view.pivot.y, settled: true });
@@ -153,6 +171,8 @@ export class BoardView {
       this.app.ticker.add(() => this.fitEdgeSymbols(), undefined, UPDATE_PRIORITY.LOW + 1);
   }
   setBoard(board: Board) {
+    this.motionGeneration++;
+    this.resetLanding();
     this.dropRound = null;
     this.finishDrop?.();
     this.spinning.fill(false);
@@ -203,6 +223,9 @@ export class BoardView {
     }
   }
   start(turbo: boolean, motion: ReelMotion = this.game.presentation.spinType) {
+    this.motionGeneration++;
+    this.skipLanding = false;
+    this.resetLanding();
     this.fast = turbo;
     this.landingAnimations.clear();
     this.clearHighlight();
@@ -228,6 +251,8 @@ export class BoardView {
   }
   skip() {
     this.fast = true;
+    this.skipLanding = true;
+    this.resetLanding();
     if (this.dropRound) {
       this.dropRound.skipped = true;
       this.finishDrop?.();
@@ -261,9 +286,11 @@ export class BoardView {
       return;
     }
     const normal = this.game.presentation.normal;
+    const generation = this.motionGeneration;
     let lastBounce: Promise<void> = Promise.resolve();
     for (let reel = 0; reel < this.game.reels; reel++) {
       await delay(this.fast ? normal.turboStopDelayMs : normal.stopDelayMs);
+      if (generation !== this.motionGeneration) return;
       this.spinning[reel] = false;
       this.setReel(reel, board[reel], this.fast ? "idle" : "land");
       board[reel].forEach((_, row) => onLand(reel, row));
@@ -273,8 +300,12 @@ export class BoardView {
         start = performance.now();
       lastBounce = new Promise<void>((resolve) => {
         const bounce = () => {
-          const t = Math.min(1, (performance.now() - start) / normal.bounceMs);
-          col.y = Math.sin(t * Math.PI) * normal.bouncePx * (1 - t);
+          if (generation !== this.motionGeneration) { resolve(); return; }
+          const elapsed = performance.now() - start;
+          const duration = Math.max(normal.bounceMs, landingDuration(this.game.presentation.landing));
+          const t = this.skipLanding ? 1 : Math.min(1, elapsed / duration);
+          col.y = landingOffset(t, normal.bouncePx);
+          for (const tile of this.tiles[reel]) this.applyLanding(tile, this.skipLanding ? Infinity : elapsed);
           if (t < 1) requestAnimationFrame(bounce);
           else {
             col.y = 0;
@@ -302,7 +333,8 @@ export class BoardView {
     const { fallMs, reelStaggerMs, rowStaggerMs, holdMs } = entering
       ? drop.enter
       : drop.exit;
-    const bounce = entering ? drop.bounceMs : 0;
+    const deformation = this.game.presentation.landing;
+    const bounce = entering ? Math.max(drop.bounceMs, landingDuration(deformation) - (deformation?.leadMs ?? 0)) : 0;
     const moves = this.tiles.flatMap((tiles, reel) =>
       Array.from({ length: this.game.rows }, (_, row) => {
         const rest = row * pitch;
@@ -345,10 +377,11 @@ export class BoardView {
           Math.min(1, (elapsed - move.fall) / (bounce || 1)),
         );
         const rebound = entering
-          ? drop.bouncePx * Math.sin(Math.PI * settle)
+          ? landingOffset(settle, drop.bouncePx)
           : 0;
+        this.applyLanding(move.tile, entering ? elapsed - move.fall + (deformation?.leadMs ?? 0) : Infinity);
         move.tile.view.y =
-          move.from + (move.to - move.from) * progress ** 2 - rebound;
+          move.from + (move.to - move.from) * progress ** 2 + rebound;
         if (
           entering &&
           progress === 1 &&
@@ -394,6 +427,7 @@ export class BoardView {
         cancelAnimationFrame(frame);
         this.finishDrop = null;
         paint(duration);
+        this.resetLanding();
         if (anticipating) {
           this.clearHighlight();
           landing?.events?.anticipation?.(false);
@@ -486,10 +520,22 @@ export class BoardView {
     this.app.canvas.removeAttribute("data-anticipation-focus");
   }
   destroy() {
+    this.motionGeneration++;
     this.resizeObserver?.disconnect();
     this.dropRound = null;
     this.finishDrop?.();
+    this.landingCarriers.clear();
     this.app.destroy(true, { children: true });
+  }
+  private applyLanding(tile: SymbolView, elapsed: number) {
+    const carrier = this.landingCarriers.get(tile);
+    if (!carrier) return;
+    const scale = landingScale(elapsed, this.game.presentation.landing);
+    carrier.scale.set(scale.x, scale.y);
+  }
+  private resetLanding() {
+    for (const carrier of this.landingCarriers.values()) carrier.scale.set(1);
+    for (const column of this.columns) column.y = 0;
   }
   async collect(positions: Position[]) {
     await Promise.all(

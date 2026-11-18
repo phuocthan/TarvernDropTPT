@@ -127,6 +127,21 @@
         "drop"
       ],
       "properties": {
+        "landing": {
+          "type": "object",
+          "required": ["compressMs", "stretchMs", "settleMs", "leadMs", "squashX", "squashY", "stretchX", "stretchY"],
+          "properties": {
+            "compressMs": { "type": "integer", "minimum": 1 },
+            "stretchMs": { "type": "integer", "minimum": 1 },
+            "settleMs": { "type": "integer", "minimum": 1 },
+            "leadMs": { "type": "integer", "minimum": 0 },
+            "squashX": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+            "squashY": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+            "stretchX": { "type": "number", "minimum": 0.5, "maximum": 1.5 },
+            "stretchY": { "type": "number", "minimum": 0.5, "maximum": 1.5 }
+          },
+          "additionalProperties": false
+        },
         "spinType": {
           "enum": [
             "normal",
