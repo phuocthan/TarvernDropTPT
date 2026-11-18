@@ -35,14 +35,15 @@
       "symbol.bonus": { "src": "bonus_static.webp" }
     },
     "bundles": {
-      "fonts": { "assets": ["font.gold", "font.green", "font.red", "font.ui"] },
+      "fonts": { "assets": ["font.gold", "font.green", "font.red"] },
+      "ui": { "assets": ["font.ui"] },
       "symbols-static": { "assets": ["symbol.A", "symbol.K", "symbol.Q", "symbol.J", "symbol.10", "symbol.ale", "symbol.barrel", "symbol.coin", "symbol.crown", "symbol.wild", "symbol.bonus"] },
       "atlas": { "assets": ["atlas"] },
       "symbol-spines": { "dependsOn": ["atlas"], "assets": ["symbols.low", "symbols.high", "symbols.wild", "symbols.bonus"] },
       "scene": { "dependsOn": ["atlas"], "assets": ["scene.background", "scene.reelhouse", "scene.screens", "scene.mascot"] },
       "audio": { "assets": ["audio.manifest"] }
     },
-    "startup": ["fonts", "symbols-static", "symbol-spines", "scene", "audio"]
+    "startup": ["fonts", "symbol-spines", "scene", "audio"]
   },
   "reels": 5,
   "rows": 5,

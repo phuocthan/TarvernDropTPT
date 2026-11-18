@@ -91,6 +91,20 @@ test("FE adapter drives checkpoints, resumes an issued spin, and credits only fi
   assert.equal(f.requests.filter((req) => req.path.endsWith("buy-feature")).length, 1);
 });
 
+test("boot reuses the prepared session without another game-info request", async (t) => {
+  const f = setup(t);
+  const transport = new ProposalTransport(f.game, f.local, f.fetcher);
+  const initialState = await transport.session();
+  const requests = f.requests.length;
+  const controller = new GameController(transport, f.local, "v1.pending");
+  await controller.boot(initialState);
+  assert.equal(f.requests.length, requests);
+  assert.equal(controller.phase, "ready");
+  assert.deepEqual(controller.state, initialState);
+  const outcome = await controller.execute({ action: "spin", bet: f.game.defaultBet, chance: "standard" });
+  assert.equal(outcome.state.board.length, f.game.reels);
+});
+
 test("FE retries a lost paid response with the original Play-Token after reload", async (t) => {
   const f = setup(t);
   let controller = f.create(); await controller.boot();

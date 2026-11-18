@@ -37,18 +37,7 @@ export function paytableIcon(id: string) {
 }
 
 export async function loadTavernSymbols(resources: ResourceManager): Promise<SymbolFactory> {
-  await resources.loadBundle("symbols-static");
-  const textures = new Map(symbols.map(([id]) => [id as string, resources.get<Texture>(`symbol.${id}`)]));
-  for (const [id, , x, y, width, height] of symbols) {
-    const texture = textures.get(id)!;
-    textures.set(
-      id,
-      new Texture({
-        source: texture.source,
-        frame: new Rectangle(x, y, width, height),
-      }),
-    );
-  }
+  const textures = new Map<string, Texture>();
   const atlas = resources.url("atlas");
   const groups = { l: "low", h: "high", w: "wild", b: "bonus" } as const;
   const skeletons = new Map(
@@ -66,6 +55,16 @@ export async function loadTavernSymbols(resources: ResourceManager): Promise<Sym
         return false;
       },
     ));
+  if (!clipsReady) {
+    await resources.loadBundle("symbols-static");
+    for (const [id, , x, y, width, height] of symbols) {
+      const texture = resources.get<Texture>(`symbol.${id}`);
+      textures.set(id, new Texture({
+        source: texture.source,
+        frame: new Rectangle(x, y, width, height),
+      }));
+    }
+  }
   const clips = new Map<string, string>(symbols.map(([id, name]) => [id, name]));
   return (cellSizePx, ticker) => {
     const cellCenter = cellSizePx / 2;

@@ -2,13 +2,19 @@
 
 ## Brand intro startup
 
-The brand loader exposes `waitForIntro()` separately from `ready()`. Tavern downloads startup resources and opens the API session during the intro, then waits for the configured GIF duration and two animation frames before creating the game DOM, WebGL renderers, or rendering the scene. The final logo frame stays visible during GPU initialization; the loader fades only after the opening scene and shop images are ready.
+The brand loader exposes `waitForIntro()` separately from `ready()`. Tavern downloads startup resources and opens the API session concurrently during the intro, then waits for the configured GIF duration and two animation frames before creating the game DOM or WebGL renderers. The prepared session snapshot is passed to the controller so mounting the board does not request game-info again.
 
-Loading progress is monotonic and interpolated over 300 ms, with immediate updates for reduced motion. Startup resources occupy 0–70%, the session reaches 75%, and scene setup and first renders occupy 80–95%. Only `ready()` publishes 100%. GIF decode failures fall back to the static brand logo and do not prevent startup.
+Only the visible scene's first frame must render before the loader fades. The scene ticker starts after the landing has painted, so textures first used by its animation do not extend the fade. Hidden reels and the desktop mascot upload their textures when the user presses Continue, before the reveal animation begins. The extra mascot renderer is created after the landing paints. Shop image prefetch and the optional UI font also start after the landing; neither can hold the loader open.
+
+Native Spine symbols use the shared atlas. The separate static symbol bundle loads only for the fallback path, including reduced motion; it is no longer a startup bundle. Paytable images are requested when their HTML is shown.
+
+Loading progress is monotonic and interpolated over 300 ms, with immediate updates for reduced motion. Startup resources occupy 0–70%, resources plus the session reach 75%, and scene setup and its first frame occupy 80–95%. Only `ready()` publishes 100% to indicate landing readiness. GIF decode failures fall back to the static brand logo and do not prevent startup.
 
 A Chrome headless local check on 2026-11-18 recorded GIF decode at 59 ms, the end of its 1600 ms motion at 1659 ms, and the first WebGL context request at 1701 ms. No tasks of at least 50 ms started within that GIF motion window. The earlier production audit had a 628 ms task starting at 1147 ms while the GIF was still moving. These are diagnostic samples on this machine, not a claim about every displayed GIF frame or target device.
 
-`tests/browser/loading.spec.ts` checks resource loading while the GIF request is held, the intro-to-WebGL ordering, monotonic progress and landing readiness at 100%, GIF failure, and reduced motion. Local validation also covered the mobile v1 paid spin, the 3×3 runtime, TypeScript/production build, and all 38 unit tests.
+Three Chrome headless desktop runs per version on 2026-11-18 measured loader removal after the visible scene's first frame: the median decreased from 3299.8 ms to 2457.9 ms (about 26%). The new range was 2373.7–2490.6 ms. The 1600 ms GIF duration is preserved. This measures arrival at the landing, not completion of the subsequent Continue transition; hidden GPU uploads now happen during entry. Host load and GPU/cache conditions affect these local measurements.
+
+`tests/browser/loading.spec.ts` checks resource loading while the GIF request is held, the intro-to-WebGL ordering, monotonic progress and landing readiness at 100%, GIF failure, reduced motion, and landing without static-symbol requests while shop/font requests are held. Local validation also covers a single game-info request, mobile v1 paid spin, the 3×3 runtime, TypeScript/production build, and all 39 unit tests.
 
 The portrait layout now draws the Spine mascot in the scene between the background and the reelhouse. It creates the separate mascot renderer only when needed for the landscape overlay and pauses it when returning to portrait. The reel renderer sizes its backing buffer to the displayed board width and device pixel ratio (capped at 2). Symbols advance on the board ticker, and edge alignment runs once in that same tick before rendering.
 

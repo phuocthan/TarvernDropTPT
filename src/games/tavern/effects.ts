@@ -515,6 +515,8 @@ export async function mountTavernEffects(
       app.render();
       // Let the first Spine frame reach the compositor under the opaque loader.
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    },
+    startOpening() {
       app.start();
     },
     async enterGame(playbackRate = 1) {

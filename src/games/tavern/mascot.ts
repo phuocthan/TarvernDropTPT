@@ -48,8 +48,10 @@ export async function mountMascot(host: HTMLElement, resources: ResourceManager)
     app.canvas.className = "mascot-animation";
     host.append(app.canvas);
     host.dataset.ready = "true";
-    app.render();
     return {
+      prepare() {
+        app.render();
+      },
       setActive(active: boolean) {
         if (active && !reduceMotion) {
           app.render();

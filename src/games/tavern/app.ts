@@ -31,11 +31,13 @@ import type {
 export async function mountTavern(root: HTMLElement, game: GameDefinition, loader?: BrandLoader) {
   const runtime = gameRuntime(game);
   const resources = runtime.resources;
-  await runtime.prepare(loader && {
-    update: (completed, total) => loader.update(completed / total * 70, 100),
-  });
   const transport = createGameTransport(game, localStorage);
-  await transport.session();
+  const [, initialState] = await Promise.all([
+    runtime.prepare(loader && {
+      update: (completed, total) => loader.update(completed / total * 70, 100),
+    }),
+    transport.session(),
+  ]);
   loader?.update(75, 100);
   // Downloads may overlap the intro; renderer creation and first renders must wait.
   await loader?.waitForIntro();
@@ -893,12 +895,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       bolts: 5,
     },
   ] as const;
-  const shopImages = shopOptions.map(({ image }) => {
-    const preview = new Image();
-    preview.src = asset(image);
-    return preview;
-  });
-  const shopImagesReady = Promise.allSettled(shopImages.map((preview) => preview.decode()));
   type ShopOption = (typeof shopOptions)[number];
   const shopPrice = (option: ShopOption) =>
     game.bets[betIndex] *
@@ -1064,9 +1060,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
   });
   try {
-    await mount($("board"), { autoStart: false });
+    await mount($("board"), { autoStart: false, initialState });
     view.app.ticker.maxFPS = 60;
-    view.app.render();
     loader?.update(85, 100);
     const [reelhouse, fonts] = await paylineAssets;
     const nativePayline = !reducedMotion && reelhouse.status === "fulfilled"
@@ -1074,7 +1069,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     payline = createTavernPayline(view.app.stage, game, nativePayline, fonts.status === "fulfilled");
     effects = await effectsReady;
     loader?.update(90, 100);
-    if (!effects && !reducedMotion) placeOverlayMascot();
     $("loading").remove();
     {
       const shell = root.querySelector<HTMLElement>(".game-shell")!;
@@ -1088,13 +1082,30 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (controller.state) $("balance").textContent = money(controller.state.balance);
       shell.append(opening);
       const landing = effects?.showOpening();
-      if (!reducedMotion && !stage.hasAttribute("data-mascot-behind-board"))
-        await prepareOverlayMascot();
       await landing;
-      await shopImagesReady;
       loader?.update(95, 100);
       await loader?.ready();
-      await waitForContinue(shell, opening);
+      const continued = waitForContinue(shell, opening);
+      const mascotReady = (async () => {
+        // Paint the interactive landing before warming an invisible extra renderer.
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        effects?.startOpening();
+        if (!effects && !reducedMotion) placeOverlayMascot();
+        if (!reducedMotion && !stage.hasAttribute("data-mascot-behind-board"))
+          await prepareOverlayMascot();
+      })();
+      void resources.loadBundle("ui").catch((error) => console.warn("Tavern UI font unavailable", error));
+      for (const { image } of shopOptions) {
+        const preview = new Image();
+        preview.decoding = "async";
+        preview.src = asset(image);
+      }
+      await continued;
+      await mascotReady;
+      // The landing hides the reels and mascot. Upload them only when entering,
+      // before starting the reveal animation, so they cannot delay its first paint.
+      view.app.render();
+      overlayMascot?.prepare();
       opening.remove();
       const reveal = scene?.openingReveal;
       const celebrateOpening = !controller.state?.feature && controller.phase === "ready";

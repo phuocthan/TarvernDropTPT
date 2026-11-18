@@ -22,8 +22,8 @@ export class GameController {
     this.storage = storage;
     this.storageKey = storageKey;
   }
-  async boot() {
-    this.state = await this.transport.session();
+  async boot(initialState?: Snapshot) {
+    this.state = initialState ?? await this.transport.session();
     const saved = this.storage.getItem(this.storageKey);
     try {
       this.pending = saved ? JSON.parse(saved) : null;

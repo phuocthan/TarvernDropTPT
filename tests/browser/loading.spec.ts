@@ -90,3 +90,29 @@ test("reduced motion uses a static logo and still unlocks the game", async ({ pa
   await expect(page.locator("#spin")).toBeEnabled();
   await expect(page.locator("#app")).not.toHaveAttribute("inert");
 });
+
+test("landing skips static symbols and does not wait for shop images or the optional font", async ({ page }) => {
+  test.setTimeout(60000);
+  const staticSymbols: string[] = [];
+  const gameInfo: string[] = [];
+  page.on("request", (request) => {
+    if (/_static\.webp$/.test(request.url())) staticSymbols.push(request.url());
+    if (new URL(request.url()).pathname === "/api/v1/game-info") gameInfo.push(request.url());
+  });
+  let releaseOptional!: () => void;
+  const optionalGate = new Promise<void>((resolve) => { releaseOptional = resolve; });
+  await page.route(/(?:td_ante|td_superante|td_bonus|td_super)\.webp$|outfit-700-D9T176aR\.woff2$/, async (route) => {
+    await optionalGate;
+    await route.continue();
+  });
+  try {
+    await page.goto("/?game=tavern", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".brand-loading")).toHaveCount(0, { timeout: 30000 });
+    await expect(page.locator(".opening-continue")).toBeVisible();
+    expect(staticSymbols).toEqual([]);
+    expect(gameInfo).toHaveLength(1);
+    await page.locator(".opening-continue").click();
+    await expect(page.locator("[data-entering]")).toHaveCount(0, { timeout: 15000 });
+    await expect(page.locator("#spin")).toBeEnabled();
+  } finally { releaseOptional(); }
+});

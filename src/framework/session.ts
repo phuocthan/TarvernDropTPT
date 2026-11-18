@@ -1,5 +1,5 @@
 import { GameController } from "./controller.ts";
-import type { GameDefinition, GameTransport } from "./domain/contracts.ts";
+import type { GameDefinition, GameTransport, Snapshot } from "./domain/contracts.ts";
 import { BoardView, type SymbolFactory } from "./presentation/board.ts";
 
 export function createSlotSession(
@@ -38,8 +38,8 @@ export function createSlotSession(
       if (timing?.endDelayMs)
         await new Promise<void>((resolve) => setTimeout(resolve, timing.endDelayMs));
     },
-    async mount(host: HTMLElement, options?: { autoStart?: boolean }) {
-      await Promise.all([board.mount(host, options), controller.boot()]);
+    async mount(host: HTMLElement, options?: { autoStart?: boolean; initialState?: Snapshot }) {
+      await Promise.all([board.mount(host, options), controller.boot(options?.initialState)]);
       board.setBoard(controller.state!.board);
       if (controller.state!.feature?.played === 0) prepareFeatureEntry();
     },
