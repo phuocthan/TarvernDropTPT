@@ -24,7 +24,8 @@ try {
         ...template,
         id: slug,
         title: title.join(" ").trim() || slug,
-        routing: { query: slug, apiBase: `/api/${slug}`, skin: "basic" },
+        routing: { query: slug, apiBase: `/api/${slug}`, skin: "basic", contract: "proposal-v1" },
+        resources: { assets: {}, bundles: { core: { assets: [] } }, startup: ["core"], concurrency: 4, retries: 1 },
       };
       mkdirSync(dirname(paths.config), { recursive: true });
       writeFileSync(paths.config, JSON.stringify(game, null, 2) + "\n", { flag: "wx" });

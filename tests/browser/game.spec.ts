@@ -3,6 +3,13 @@ import { MockGame } from "../../server/mock-game.ts";
 import { tavern } from "../../src/games/tavern/definition.ts";
 import { reuse } from "../../src/games/reuse/definition.ts";
 test.beforeEach(async ({ page }, testInfo) => {
+  // These presentation fixtures exercise the retained legacy transport; v1 has its own suite.
+  await page.route("**/src/games/*/definition.ts*", async (route) => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace("loadGameConfig(config)",
+      "loadGameConfig({ ...config, routing: { ...config.routing, contract: undefined } })");
+    await route.fulfill({ response, body });
+  });
   if (testInfo.title.startsWith("real demo API")) return;
   await page.addInitScript(() => {
     const timer = setInterval(() => {
@@ -98,7 +105,7 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   await expect(page.locator("#board canvas")).toHaveCSS("opacity", "1");
   await expect(page.locator(".tavern-hud")).toHaveCSS("filter", "none");
   await expect(page.locator("#spin")).toBeEnabled();
-  await expect(page.locator("#balance")).toHaveText("1,000.00");
+  await expect(page.locator("#balance")).toHaveText("$1,000.00");
   await page.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("button", { name: "Game Rules" }).click();
   await expect(
@@ -413,8 +420,8 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   expect(finalSpin.win).toBeGreaterThan(0);
   expect(finalSpin.total).toBeGreaterThan(finalSpin.win);
   await expect(page.locator("#win-value")).toBeVisible();
-  await expect(page.locator("#spin-win-amount")).toHaveText((finalSpin.win / 100).toFixed(2));
-  await expect(page.locator("#feature-total-amount")).toHaveText((finalSpin.total / 100).toFixed(2));
+  await expect(page.locator("#spin-win-amount")).toHaveText("$" + (finalSpin.win / 100).toFixed(2));
+  await expect(page.locator("#feature-total-amount")).toHaveText("$" + (finalSpin.total / 100).toFixed(2));
   await expect(page.locator("#spin-win-label")).toHaveCSS("color", "rgb(255, 255, 255)");
   await expect(page.locator("#spin-win-amount")).toHaveCSS("color", "rgb(65, 225, 251)");
   for (const property of ["font-size", "font-family"])
@@ -448,7 +455,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   const expected = server.state.balance;
   await page.mouse.click(5, 5);
   await expect(page.locator("#balance")).toHaveText(
-    (expected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
+    "$" + (expected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
   );
 });
 for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows all chests when one unlocks" : "omits chests when none unlock"}`, async ({ page }) => {
@@ -529,7 +536,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     await expect(resultDialog.getByRole("button", { name: "Press to continue" })).toBeInViewport();
   }
   await expect(page.locator(".reveal-chests")).toHaveCount(0);
-  await expect(page.locator(".result-total")).toHaveText(unlocked ? "2.00" : "0.00");
+  await expect(page.locator(".result-total")).toHaveText(unlocked ? "$2.00" : "$0.00");
   if (unlocked) expect(await page.evaluate(() => (window as any).chestClips)).toEqual([
     "4_finalwin", "36_reel_3_chest_open", "37_reel_3_chest_finalwin",
   ]);
@@ -621,7 +628,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
     await expect(betPanel).toHaveAttribute("data-selection-color", "rgb(65, 225, 251)");
     await expect(betPanel).toHaveAttribute("data-selection-open", "true");
     expect(Number(await betPanel.getAttribute("data-selection-delay"))).toBeGreaterThanOrEqual(95);
-    await expect(page.locator("#bet")).toHaveText("1.20");
+    await expect(page.locator("#bet")).toHaveText("$1.20");
     await expect(page.locator(".tavern-status")).toHaveCount(0);
     await page.getByRole("button", { name: "Feature buy" }).click();
     await expect(page.locator(".shop-balance strong")).toHaveText(/^\$[\d,.]+$/);
@@ -1020,7 +1027,7 @@ test("lost response recovers the exact request without charging another spin", a
   ).toBeVisible({ timeout: 20000 });
   await page.locator("#recover").click();
   await expect(page.locator("#spin")).toContainText("SPIN");
-  await expect(page.locator("#balance")).toHaveText("999.00");
+  await expect(page.locator("#balance")).toHaveText("$999.00");
   expect(ids).toHaveLength(2);
   expect(ids[0]).toBe(ids[1]);
 });
@@ -1093,7 +1100,7 @@ test("the 3 × 3 build uses the shared board and has its own session", async ({
     (canvas: HTMLCanvasElement) => canvas.width / Math.min(devicePixelRatio, 2),
   );
   expect(canvasWidth).toBe(reuse.reels * (cellSizePx + gapPx) - gapPx);
-  await expect(page.locator("#reuse-balance")).toHaveText("Balance 1000.00");
+  await expect(page.locator("#reuse-balance")).toHaveText("Balance $1,000.00");
   const response = page.waitForResponse((event) =>
     event.url().endsWith("/api/reuse/command"),
   );
@@ -1103,10 +1110,10 @@ test("the 3 × 3 build uses the shared board and has its own session", async ({
     3, 3, 3,
   ]);
   await expect(page.locator("#reuse-balance")).toHaveText(
-    "Balance " + (result.state.balance / 100).toFixed(2),
+    "Balance $" + (result.state.balance / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
   );
   await page.getByRole("link", { name: "Tavern Drop" }).click();
-  await expect(page.locator("#balance")).toHaveText("1,000.00");
+  await expect(page.locator("#balance")).toHaveText("$1,000.00");
 });
 
 test("Tavern defaults to Drop with demo controls hidden and Skip preserves one result per spin", async ({
@@ -1150,13 +1157,13 @@ test("Tavern defaults to Drop with demo controls hidden and Skip preserves one r
   await spin.click();
   releaseResult();
   await expect(spin).toHaveAttribute("aria-label", "Spin");
-  await expect(page.locator("#balance")).toHaveText("999.00");
+  await expect(page.locator("#balance")).toHaveText("$999.00");
 
   await page.reload();
   await expect(spin).toBeEnabled();
   await spin.click();
   await expect(spin).toHaveAttribute("aria-label", "Spin");
-  await expect(page.locator("#balance")).toHaveText("998.00");
+  await expect(page.locator("#balance")).toHaveText("$998.00");
   expect(new Set(commands).size).toBe(2);
   expect(commands).toHaveLength(2);
 });

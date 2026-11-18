@@ -1,5 +1,6 @@
 import type { GameDefinition } from "./domain/contracts.ts";
 import { validateDefinition } from "./domain/rules.ts";
+import { validateResourceManifest } from "./resources/validate-manifest.ts";
 
 const key = /^[a-z][a-z0-9-]*$/;
 const nonEmpty = (value: unknown) =>
@@ -13,6 +14,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   if (!raw || typeof raw !== "object")
     throw Error("Game config must be an object");
   const game = raw as GameDefinition;
+  if (game.resources !== undefined) validateResourceManifest(game.resources);
   const invalid = (field: string): never => {
     throw Error(`Invalid game config [${game.id ?? "unknown"}]: ${field}`);
   };
@@ -20,6 +22,8 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   if (!nonEmpty(game.id) || !key.test(game.id) || !nonEmpty(game.title))
     invalid("id or title");
   const route = game.routing;
+  if (route?.contract !== undefined && route.contract !== "proposal-v1") invalid("routing.contract");
+  if (game.currency && (!/^[A-Z]{3}$/.test(game.currency.code) || !nonNegativeInt(game.currency.exponent) || game.currency.exponent > 6)) invalid("currency");
   if (
     !route ||
     !nonEmpty(route.query) ||

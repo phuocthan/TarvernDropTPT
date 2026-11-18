@@ -1,4 +1,5 @@
-import { BitmapText, Container, Text } from "pixi.js";
+import { Container, Text } from "pixi.js";
+import { BitmapAmount } from "../../framework/presentation/bitmap-amount.ts";
 import type { Spine } from "@esotericsoftware/spine-pixi-v8";
 import type {
   GameDefinition,
@@ -32,7 +33,7 @@ export function createTavernPayline(
 ) {
   const layer = new Container();
   const label = bitmapFont
-    ? new BitmapText({ style: { fontFamily: "td_green", fontSize: 54 } })
+    ? new BitmapAmount("td_green", 54, 0xadff35)
     : new Text({
         style: {
           fontFamily: "Outfit",
@@ -44,7 +45,7 @@ export function createTavernPayline(
       });
   label.anchor.set(0.5);
   const highLabel = bitmapFont
-    ? new BitmapText({ style: { fontFamily: "td_red", fontSize: 54 } })
+    ? new BitmapAmount("td_red", 54, 0xff6354)
     : null;
   highLabel?.anchor.set(0.5);
   layer.visible = false;

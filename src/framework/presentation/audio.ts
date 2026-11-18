@@ -24,7 +24,8 @@ interface Playback {
   source?: AudioBufferSourceNode;
 }
 
-export class AudioBus<Cue extends string> {
+/** Compatibility implementation for games that still explicitly choose the Web Audio backend. */
+export class WebAudioBus<Cue extends string> {
   private context: AudioContext | null = null;
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private playing = new Map<Cue, Set<Playback>>();
@@ -133,3 +134,4 @@ export class AudioBus<Cue extends string> {
     active.clear();
   }
 }
+export { AudioBus } from "../audio/howler-bus.ts";

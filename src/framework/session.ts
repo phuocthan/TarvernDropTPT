@@ -11,7 +11,7 @@ export function createSlotSession(
   const controller = new GameController(
     transport,
     storage,
-    game.id + ".pending",
+    game.id + (game.routing.contract ? ".proposal-v1.pending" : ".pending"),
   );
   const board = new BoardView(game, symbols);
   const timing = game.presentation.feature;

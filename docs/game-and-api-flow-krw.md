@@ -10,12 +10,12 @@ Prefix đề xuất là `/api/v1`. Sau login, FE dùng `sessionId` và `token` d
 
 | API | Mục đích | FE gửi | BE trả | FE xử lý |
 | --- | --- | --- | --- | --- |
-| `POST /login` | Mở phiên cho đúng tài khoản | **Mock:** gửi `userId` đã được server xác thực trước đó để vào đúng tài khoản test, hoặc gửi body rỗng để BE chọn tài khoản demo ngẫu nhiên. **Server thật:** gửi `launchToken` do operator cấp | `sessionId`, `token`, và `userId` nếu BE trả kèm. Nên trả `userId` trong mock để dễ kiểm tra resume đúng tài khoản demo đã chọn | Dùng phiên vừa nhận để gọi `gameInfo`. Quyền truy cập tài khoản do BE xác thực. |
-| `GET /game-info` · `gameInfo` | Lấy game settings và tiến độ hiện tại của user | `gameCode` và thông tin xác thực của phiên | `settings`, `lastReels`, `wallet`, `canStartPaidRound`, `playToken` khi được cược và `resume` nếu có | BE tìm tiến độ theo tài khoản đã xác thực và game. FE dùng response để vào normal game, resume spin/bonus/chest hoặc hiện Total Win của round tự đóng. |
+| `POST /login` | Mở phiên cho đúng tài khoản | **Mock:** gửi `userId` đã được server xác thực trước đó để vào đúng tài khoản test, hoặc chỉ gửi `gameCode` để BE chọn tài khoản demo ngẫu nhiên. **Server thật:** gửi `launchToken` do operator cấp | `sessionId`, `token`, và `userId` nếu BE trả kèm. Nên trả `userId` trong mock để dễ kiểm tra resume đúng tài khoản demo đã chọn | Dùng phiên vừa nhận để gọi `gameInfo`. Quyền truy cập tài khoản do BE xác thực. |
+| `POST /game-info` · `gameInfo` | Lấy game settings và tiến độ hiện tại của user | `gameCode` và thông tin xác thực của phiên | `settings`, `lastReels`, `wallet`, `canStartPaidRound`, `playToken` khi được cược và `resume` nếu có | BE tìm tiến độ theo tài khoản đã xác thực và game. FE dùng response để vào normal game, resume spin/bonus/chest hoặc hiện Total Win của round tự đóng. |
 | `POST /spin` · paid | Đặt cược và lấy kết quả normal spin | `isFreespin: 0`, `betMinor`, `chanceMode: normal / extra / super`. Header `Play-Token` do BE cấp | `chargedMinor`, `reels`, `winLines`, `spinWinMinor`, bước hiện tại và `freegame` nếu trigger | Hiện base spin rồi vào bonus nếu BE trả `intro`. Retry giữ nguyên token và payload. |
 | `POST /buy-feature` | Mua và vào bonus trực tiếp | `betMinor`, `featureMode: tavern / drop`. Header `Play-Token` do BE cấp | `chargedMinor`, `freegame.curStep: intro`, số lượt và bước trình diễn đầu | Tiếp tục bằng `/spin` với `isFreespin: 1`. Retry giữ nguyên token và payload. |
 | `POST /spin` · freegame | Xác nhận bước vừa hoàn tất và lấy bước kế | `isFreespin: 1`, `curStep` vừa trình diễn, `stepId` do BE cấp. Có thể thêm `kind: shown_as_result` khi resume bằng kết quả tĩnh | `freegame` đã cập nhật, `stepId` mới và dữ liệu ở bước kế. Với rương chỉ trả multiplier và Total Win của rương đến lượt | BE trả `freespin` thì quay reels. BE trả `show-chest`, `open-chest` hoặc `free-end` thì hiển thị đúng màn. Xác nhận một rương sau khi animation và số mới đều đã hiện. |
-| `GET /rounds/status` | Kiểm tra payout khi còn chờ hoặc cần đối soát | `gameCode` nếu phiên chưa gắn game | `settlement.status`, receipt nếu có, `wallet`, `canStartPaidRound` và có thể có `retryAfterMs` | Cập nhật Balance từ số đã xác nhận. Bật Spin khi BE cho phép. Polling chạy nền không kéo dài mốc 30 ngày. |
+| `POST /rounds/status` | Kiểm tra payout khi còn chờ hoặc cần đối soát | `gameCode` trong JSON body | `settlement.status`, receipt nếu có, `wallet`, `canStartPaidRound` và có thể có `retryAfterMs` | Cập nhật Balance từ số đã xác nhận. Bật Spin khi BE cho phép. Polling chạy nền không kéo dài mốc 30 ngày. |
 | `POST /spin` · đóng tổng kết | Xác nhận đã đóng màn Total Win của round tự đóng sau 30 ngày | `isFreespin: 0`, `curStep: final-summary` và `summaryId` do BE cấp | `resume: null` nếu đã ghi nhận, `wallet` và `canStartPaidRound` | Khi nhận response, FE cập nhật quyền Spin. |
 
 ### Một endpoint Spin cho lượt cược và bước freegame
@@ -172,7 +172,7 @@ Các JSON là ví dụ rút gọn theo từng tình huống. Những response `g
 {"code":0,"sessionId":"session-example","accountId":"player-17"}
 ```
 
-FE gọi `GET /api/v1/game-info?gameCode=tavern-drop`.
+FE gọi `POST /api/v1/game-info`.
 
 ```json
 {"code":0,"contractVersion":"v1-review-6","settings":{"configId":"tavern-grid-v1","cols":5,"rows":5,"lineCount":15,"currency":"KRW","currencyExponent":0,"defaultBetMinor":1000,"allowedBetMinor":[1000,2000]},"lastReels":null,"resume":null,"wallet":{"confirmedBalanceMinor":100000,"walletVersion":40},"canStartPaidRound":true,"playToken":"play-be-17"}
@@ -192,7 +192,7 @@ FE gọi `GET /api/v1/game-info?gameCode=tavern-drop`.
 
 Normal spin không trigger dùng một lệnh đặt cược. BE tự hoàn tất round và xử lý payout theo quy tắc của A. Nếu response còn báo `pending`, FE có thể đọc status để cập nhật Balance và quyền cược tiếp. Khi reload, `gameInfo` trả kết quả đã lưu để FE hiển thị trực tiếp.
 
-`GET /api/v1/rounds/status` trả khi ví xác nhận:
+`POST /api/v1/rounds/status` trả khi ví xác nhận:
 
 ```json
 {"code":0,"roundId":"r17","presentationStatus":"completed","settlement":{"status":"paid","settlementId":"award-r17","creditedMinor":200},"wallet":{"confirmedBalanceMinor":99200,"walletVersion":42},"canStartPaidRound":true,"playToken":"play-be-next"}

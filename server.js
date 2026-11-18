@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { MockGame } from "./server/mock-game.ts";
+import { ProposalBackend, ProposalError } from "./server/proposal-backend.ts";
 import { gamePaths, readGameConfig } from "./tools/game-profile.ts";
 
 const target = process.env.GAME_TARGET;
@@ -17,6 +18,12 @@ if (profile) {
 } else {
   ({ games: catalog } = await import("./src/games/catalog.ts"));
 }
+
+const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE || ".runtime/backend-v1.json");
+proposal.sweepExpired();
+setInterval(() => {
+  try { proposal.sweepExpired(); } catch (error) { console.error("Proposal settlement sweep failed", error); }
+}, 60000).unref();
 
 // Each demo has its own sessions and cookies.
 const games = new Map(catalog.map((definition) => [
@@ -49,6 +56,37 @@ function json(res, status, body) {
 createServer(async (req, res) => {
   try {
     const path = new URL(req.url || "/", "http://localhost").pathname;
+    if (path.startsWith("/api/v1/")) {
+      if (new URL(req.url, "http://localhost").search) return json(res, 400, { error: "QUERY_PARAMETERS_NOT_ALLOWED" });
+      if (req.method !== "POST") {
+        res.setHeader("Allow", "POST");
+        return json(res, 405, { error: "METHOD_NOT_ALLOWED" });
+      }
+      if (req.headers["sec-fetch-site"] === "cross-site") return json(res, 403, { error: "INVALID_ORIGIN" });
+      try {
+        let body = {};
+        if (req.method === "POST") {
+          let raw = "";
+          for await (const chunk of req) {
+            raw += chunk;
+            if (Buffer.byteLength(raw) > 8192) return json(res, 413, { error: "REQUEST_TOO_LARGE" });
+          }
+          try { body = JSON.parse(raw || "{}"); } catch { return json(res, 400, { error: "INVALID_JSON" }); }
+          if (!body || Array.isArray(body) || typeof body !== "object") return json(res, 400, { error: "INVALID_JSON" });
+        }
+        if (typeof body.gameCode !== "string" || !body.gameCode) return json(res, 400, { error: "GAME_CODE_REQUIRED" });
+        const result = proposal.handle(req.method, path.slice("/api/v1".length), body, {
+          sessionId: req.headers["session-id"] || "",
+          token: (req.headers.authorization || "").replace(/^Bearer /, ""),
+          playToken: req.headers["play-token"] || "",
+        });
+        return json(res, 200, result);
+      } catch (error) {
+        if (error instanceof ProposalError) return json(res, error.status, { error: error.message, synthetic: true });
+        console.error("Proposal API failed", error);
+        return json(res, 500, { error: "INTERNAL_ERROR" });
+      }
+    }
     if (path.startsWith("/api/")) {
       const lastSlash = path.lastIndexOf("/");
       const game = games.get(path.slice(0, lastSlash));

@@ -1,6 +1,8 @@
 import "./theme.css";
-import { createSlotSession } from "../../framework/session.ts";
-import { HttpTransport } from "../../framework/transport/http.ts";
+import { createSlotSession } from "../../framework/slot-core/index.ts";
+import { gameRuntime } from "../../framework/app/game-runtime.ts";
+import { createGameTransport } from "../../framework/transport/proposal.ts";
+import { formatMoney } from "../../framework/ui/index.ts";
 import { loadTavernSymbols, paytableIcon } from "./skin.ts";
 import { createTavernPayline } from "./payline.ts";
 import {
@@ -12,7 +14,7 @@ import { loadTavernBitmapFonts, renderAmount } from "./typography.ts";
 import { artRegion, hudIcon, tavernAsset as asset } from "./art.ts";
 import { applySceneLayers, revealScene, waitForContinue, type SceneAnchor } from "../../framework/presentation/scene.ts";
 import type { BrandLoader } from "../../framework/presentation/brand-loading.ts";
-import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framework/presentation/hud-controls.ts";
+import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framework/ui/index.ts";
 import { countPayout } from "../../framework/presentation/payout.ts";
 import { loadTavernAudio } from "./audio.ts";
 import { mountMascot } from "./mascot.ts";
@@ -26,12 +28,18 @@ import type {
 } from "../../framework/domain/contracts.ts";
 
 
-const amountFormat = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-const money = (n: number) => amountFormat.format(n / 100);
 export async function mountTavern(root: HTMLElement, game: GameDefinition, loader?: BrandLoader) {
+  const runtime = gameRuntime(game);
+  const resources = runtime.resources;
+  await runtime.prepare(loader && {
+    update: (completed, total) => loader.update(completed / total * 70, 100),
+  });
+  const transport = createGameTransport(game, localStorage);
+  await transport.session();
+  loader?.update(75, 100);
+  // Downloads may overlap the intro; renderer creation and first renders must wait.
+  await loader?.waitForIntro();
+  const money = (n: number) => formatMoney(game, n);
   const controls = game.presentation.controls;
   const gameMenuEnabled = controls?.menu ?? false;
   root.innerHTML = `
@@ -103,7 +111,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const scene = game.presentation.scene;
   const stage = root.querySelector<HTMLElement>(".stage")!;
   if (scene) applySceneLayers(stage, scene.layers);
-  const audioReady = loadTavernAudio();
+  const audioReady = loadTavernAudio(resources);
   const showLoadingError = () => {
     const boardLoading = $("loading");
     if (boardLoading) boardLoading.textContent = "Reload to retry";
@@ -111,13 +119,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   };
   let symbols;
   try {
-    symbols = await loadTavernSymbols();
-    loader?.update(2, 4);
+    symbols = await loadTavernSymbols(resources);
   } catch {
     showLoadingError();
     return;
   }
   const audio = await audioReady;
+  runtime.lifetime.add(() => audio.dispose());
+  loader?.update(80, 100);
   let music = "";
   function syncMusic(bonus: boolean) {
     const cue = bonus ? "musicBonus" : "musicBase";
@@ -134,14 +143,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     prepareFeatureEntry,
     waitAfterReels,
     mount,
-  } = createSlotSession(game, new HttpTransport(game.routing.apiBase), symbols, localStorage);
+  } = createSlotSession(game, transport, symbols, localStorage);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let overlayMascot: Awaited<ReturnType<typeof mountMascot>> | undefined;
   let overlayMount: Promise<void> | undefined;
   let mascotAnchor: SceneAnchor | undefined;
   let overlayVisible = false;
   function prepareOverlayMascot() {
-    return overlayMount ??= mountMascot($("mascot")).then((mounted) => {
+    return overlayMount ??= mountMascot($("mascot"), resources).then((mounted) => {
       overlayMascot = mounted;
       if (mascotAnchor) mounted.place(mascotAnchor);
       mounted.setActive(overlayVisible);
@@ -181,13 +190,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("scene-table"),
     scene,
     placeOverlayMascot,
+    resources,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     return undefined;
   });
   const paylineAssets = Promise.allSettled([
-    reducedMotion ? Promise.resolve() : loadReelhouse(),
-    loadTavernBitmapFonts(),
+    reducedMotion ? Promise.resolve() : loadReelhouse(resources),
+    loadTavernBitmapFonts(resources),
   ]);
   let presentingFeature: FeatureState | null = null;
   let presentingBet = game.bets[betIndex];
@@ -208,7 +218,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const keyArt = artRegion("key", "key-art");
   const betPicker = mountBetPicker(
     $("bet-panel"), $<HTMLButtonElement>("bet-picker"), game.bets,
-    (bet) => "$" + money(bet * game.demo.chancePrices[chance]),
+    (bet) => money(bet * game.demo.chancePrices[chance]),
     (index) => setBet(index),
     controls?.betMenuCloseDelayMs,
   );
@@ -288,7 +298,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         : bet * game.demo.chancePrices[chance],
     );
     $("bet").textContent = shownBet;
-    $("bet-picker").setAttribute("aria-label", `Bet menu, current bet $${shownBet}`);
+    $("bet-picker").setAttribute("aria-label", `Bet menu, current bet ${shownBet}`);
     const mode = feature?.mode || "base";
     const shell = stage.parentElement!;
     shell.dataset.mode = mode;
@@ -335,6 +345,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("sound").setAttribute("aria-pressed", String(!audio.muted));
   }
   function modal(content: string, dismissible = true, look = "", onBack?: () => void) {
+    delete dialog.dataset.returning;
     dialog.dataset.look = look;
     $("modal-content").innerHTML = content;
     closeModal.hidden = !dismissible;
@@ -490,113 +501,146 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     presentingFeature = outcome.entry
       ? null
       : (outcome.finalFeature ?? outcome.state.feature);
-    let scatterLanded = 0;
-    await view.stop(outcome.state.board, effects?.playSceneEffects, {
-      reel: (reel) => audio.cue(`reel${reel}`),
-      symbol: (id) => {
-        if (id === game.presentation.drop.anticipation?.symbolId)
-          audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
-      },
-      anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
-    });
-    const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
-      !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
-    const noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
-    if (!plainNoWin) await waitAfterReels(spinTurbo);
-    const scatter =
-      outcome.entry || outcome.retrigger
-        ? outcome.state.board.flatMap((column, reel) =>
-            column.flatMap((id, row) =>
-              id === "bonus" ? [{ reel, row }] : [],
-            ),
-          )
-        : [];
-    displayWin = 0;
-    countingFeatureBase = presentingFeature
-      ? Math.max(0, presentingFeature.accumulated - outcome.spinWin)
-      : undefined;
-    sync();
-    if (outcome.wins.length) audio.cue("win");
-    const animateWins = async () => {
-      const lineDuration = turbo
-        ? 304
-        : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
-      for (const win of outcome.wins) {
-        if (skipped) break;
-        view.focusWins(win.positions);
-        await payline.play(
-          win,
-          game.lines[win.line],
-          money(win.amount),
-          win.amount >= outcome.bet * 20,
-          lineDuration,
-          () => skipped,
-        );
-      }
-      if (scatter.length && (outcome.entry || !skipped)) {
-        await view.waitForLandings(scatter);
-        await view.focusWins(scatter);
-        celebrate();
-      }
-      view.clearHighlight();
-    };
-    const from = performance.now();
-    const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
-      const tick = () => {
-        const t = skipped
-          ? 1
-          : Math.min(1, (performance.now() - from) / (turbo ? 179 : 650));
-        displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
-        syncWin(presentingFeature);
-        if (t < 1) requestAnimationFrame(tick);
-        else resolve();
-      };
-      tick();
-    });
-    await Promise.all([animateWins(), countWin]);
-    countingFeatureBase = undefined;
-    syncWin(presentingFeature);
-    if (outcome.retrigger) {
-      audio.cue("retrigger");
-      effects?.shake();
-      await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
-    }
+    const checkpoint = outcome.checkpoint;
+    const isSpinStep = !checkpoint || ["base", "intro", "freespin"].includes(checkpoint.curStep);
+    let noWinReelsStoppedAt: number | undefined;
     const tier = winTier(outcome.spinWin, outcome.bet);
-    if (outcome.entry) {
-      stopAuto();
-      audio.cue("entry");
-      prepareFeatureEntry();
-      await effects?.prepareBonusIntro();
-      stage.dataset.bonusIntro = "true";
-      modal(
-        `<div class="tavern-screen-art bonus-intro-art"></div>
-        <h2>${outcome.entry.toUpperCase()} BONUS</h2>
-        <img class="bonus-preview" src="${asset(outcome.entry === "drop" ? "td_super.webp" : "td_bonus.webp")}" alt="">
-        <strong class="free-spin-title">${outcome.state.feature!.remaining} Free Spins</strong>
-        <p class="bonus-instructions">Win every position on a reel to unlock its chest multiplier.</p>
-        <button id="continue" class="scene-continue">Press to continue</button>`,
-        false,
-        "bonus",
-      );
-      const bonusClip = outcome.entry === "drop" ? "super" : "bonus";
-      const introArt = dialog.querySelector<HTMLElement>(".tavern-screen-art")!;
-      if (effects) void effects.showScreen(introArt, bonusClip + "_intro", {
-        count: outcome.state.feature!.remaining,
-        outro: bonusClip + "_outro",
+    if (isSpinStep) {
+      let scatterLanded = 0;
+      if (checkpoint?.staticResult) view.setBoard(outcome.state.board);
+      else await view.stop(outcome.state.board, effects?.playSceneEffects, {
+        reel: (reel) => audio.cue(`reel${reel}`),
+        symbol: (id) => {
+          if (id === game.presentation.drop.anticipation?.symbolId)
+            audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
+        },
+        anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
       });
-      await waitForContinue(dialog, $<HTMLButtonElement>("continue"));
-      await effects?.endScreen(bonusClip + "_outro");
-      dialog.close();
+      const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
+        !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
+      noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
+      if (!plainNoWin) await waitAfterReels(spinTurbo);
+      const scatter =
+        outcome.entry || outcome.retrigger
+          ? outcome.state.board.flatMap((column, reel) =>
+              column.flatMap((id, row) =>
+                id === "bonus" ? [{ reel, row }] : [],
+              ),
+            )
+          : (outcome.scatterPositions ?? []);
       displayWin = 0;
+      countingFeatureBase = presentingFeature
+        ? Math.max(0, presentingFeature.accumulated - outcome.spinWin)
+        : undefined;
+      sync();
+      if (outcome.wins.length) audio.cue("win");
+      const animateWins = async () => {
+        const lineDuration = turbo
+          ? 304
+          : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
+        for (const win of outcome.wins) {
+          if (skipped) break;
+          view.focusWins(win.positions);
+          await payline.play(
+            win,
+            game.lines[win.line],
+            money(win.amount),
+            win.amount >= outcome.bet * 20,
+            lineDuration,
+            () => skipped,
+          );
+        }
+        if (scatter.length && (outcome.entry || !skipped)) {
+          await view.waitForLandings(scatter);
+          await view.focusWins(scatter);
+          celebrate();
+        }
+        view.clearHighlight();
+      };
+      const from = performance.now();
+      const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
+        const tick = () => {
+          const t = skipped
+            ? 1
+            : Math.min(1, (performance.now() - from) / (turbo ? 179 : 650));
+          displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
+          syncWin(presentingFeature);
+          if (t < 1) requestAnimationFrame(tick);
+          else resolve();
+        };
+        tick();
+      });
+      await Promise.all([animateWins(), countWin]);
+      countingFeatureBase = undefined;
+      syncWin(presentingFeature);
+      if (outcome.retrigger) {
+        audio.cue("retrigger");
+        effects?.shake();
+        await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
+      }
+      if (outcome.entry) {
+        stopAuto();
+        audio.cue("entry");
+        prepareFeatureEntry();
+        await effects?.prepareBonusIntro();
+        stage.dataset.bonusIntro = "true";
+        modal(
+          `<div class="tavern-screen-art bonus-intro-art"></div>
+          <h2>${outcome.entry.toUpperCase()} BONUS</h2>
+          <img class="bonus-preview" src="${asset(outcome.entry === "drop" ? "td_super.webp" : "td_bonus.webp")}" alt="">
+          <strong class="free-spin-title">${outcome.state.feature!.remaining} Free Spins</strong>
+          <p class="bonus-instructions">Win every position on a reel to unlock its chest multiplier.</p>
+          <button id="continue" class="scene-continue">Press to continue</button>`,
+          false,
+          "bonus",
+        );
+        const bonusClip = outcome.entry === "drop" ? "super" : "bonus";
+        const introArt = dialog.querySelector<HTMLElement>(".tavern-screen-art")!;
+        if (effects) void effects.showScreen(introArt, bonusClip + "_intro", {
+          count: outcome.state.feature!.remaining,
+          outro: bonusClip + "_outro",
+        });
+        await waitForContinue(dialog, $<HTMLButtonElement>("continue"));
+        await effects?.endScreen(bonusClip + "_outro");
+        dialog.close();
+        displayWin = 0;
+        presentingFeature = outcome.state.feature;
+        sync();
+        delete stage.dataset.bonusIntro;
+        audio.cue("entryEnd");
+        syncMusic(true);
+      }
+    } else if (checkpoint?.curStep === "show-chest" || checkpoint?.curStep === "open-chest") {
       presentingFeature = outcome.state.feature;
       sync();
-      delete stage.dataset.bonusIntro;
-      audio.cue("entryEnd");
-      syncMusic(true);
+      view.hideSymbols();
+      if (checkpoint.curStep === "show-chest") {
+        await waitBeforeFeatureResult();
+        if (music) audio.stop(music);
+        music = "";
+        audio.cue("chestIntro");
+        await effects?.revealChests(money(checkpoint.displayWinMinor));
+        await delay(2000);
+      } else {
+        const reel = checkpoint.reel!;
+        // A reload may enter directly at an unfinished chest, without replaying prior ones.
+        if (!stage.dataset.chestReveal) {
+          await effects?.revealChests(money(checkpoint.beforeWinMinor));
+          for (const [index, chest] of (presentingFeature?.chests ?? []).entries())
+            if (index !== reel && chest.multiplier != null) effects?.restoreChest(index, chest.multiplier);
+        }
+        audio.cue(`chest${Math.min(reel, 3)}`);
+        if (effects) await effects.openChest(reel, checkpoint.multiplier!);
+        else $("chests").children[reel].outerHTML = chestMarkup(presentingFeature!.chests[reel], reel, true);
+        const finishing = effects?.finishChest(reel);
+        await countPayout(checkpoint.beforeWinMinor, checkpoint.displayWinMinor, 420, (value) => effects?.setChestAmount(money(value)));
+        await finishing;
+      }
     }
     if (outcome.completion) {
       stopAuto();
-      await waitBeforeFeatureResult();
+      if (!checkpoint || !outcome.state.feature?.chests.some((chest) => chest.unlocked))
+        await waitBeforeFeatureResult();
       const c = outcome.completion;
       const chests = outcome.finalFeature?.chests ?? [];
       const unlocked = chests.map((chest, reel) => ({ chest, reel }))
@@ -683,6 +727,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         await leaving;
         dialog.close();
       }
+      if (checkpoint) {
+        const before = controller.state!.balance;
+        await controller.completePresentation();
+        outcome.state.balance = controller.state!.balance;
+        outcome.paidAward = Math.max(0, outcome.state.balance - before);
+      }
       view.setBoard(outcome.state.board);
       presentingFeature = null;
       displayWin = liveReturn ? 0 : c.roundAward;
@@ -717,7 +767,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
     if (outcome.paidAward > 0 && !outcome.state.feature)
       lastShareableWin = { amount: outcome.completion?.roundAward ?? outcome.paidAward, bet: outcome.bet };
-    controller.completePresentation();
+    await controller.completePresentation();
+    const next = controller.nextPresentation();
+    if (next) { await present(next, spinTurbo); return; }
     if (autoRunning && autoRemaining !== Infinity) {
       autoRemaining--;
       autoRunning = autoRemaining > 0;
@@ -742,9 +794,11 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     const spinTurbo = turbo;
     audio.unlock();
     skipped = false;
-    view.start(turbo, reelMotion);
-    effects?.spin();
-    audio.cue("start");
+    if (!recover) {
+      view.start(turbo, reelMotion);
+      effects?.spin();
+      audio.cue("start");
+    }
     const work = recover
       ? controller.recover()
       : controller.execute({
@@ -864,17 +918,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           <button data-${option.kind}="${option.id}" class="shop-card ${option.kind}">
             ${shopArt(option)}
             <strong>${option.title}</strong>
-            <b>$${money(shopPrice(option))}</b>
+            <b>${money(shopPrice(option))}</b>
             <span class="shop-action">${option.kind === "chance" ? "Activate" : "Buy"}</span>
           </button>
         </div>`,
         )
         .join("")}</div>
       <div class="shop-controls">
-        <div class="hud-money shop-balance"><span>Balance</span><strong>$${money(controller.state!.balance)}</strong></div>
+        <div class="hud-money shop-balance"><span>Balance</span><strong>${money(controller.state!.balance)}</strong></div>
         <div class="shop-bet">
         <button id="shop-bet-down" aria-label="Decrease feature bet" ${betIndex === 0 ? "disabled" : ""}>${hudIcon("bet-down")}</button>
-        <div class="hud-money"><span>Bet</span><strong>$${money(game.bets[betIndex])}</strong></div>
+        <div class="hud-money"><span>Bet</span><strong>${money(game.bets[betIndex])}</strong></div>
         <button id="shop-bet-up" aria-label="Increase feature bet" ${betIndex === game.bets.length - 1 ? "disabled" : ""}>${hudIcon("bet-up")}</button>
         </div>
       </div>`,
@@ -912,7 +966,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     modal(
       `<div class="shop-card shop-confirm">
         ${shopArt(option)}<h2>${option.title}</h2><p>${summary}${multiplier}</p>
-        <b>$${money(shopPrice(option))}</b>
+        <b>${money(shopPrice(option))}</b>
         <button id="confirm-buy" class="shop-action">Confirm</button>
       </div>`,
       true,
@@ -983,14 +1037,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const win = lastShareableWin;
       modal(`<h2>Share</h2><p class="share-game">Tavern Drop</p>
         <div class="share-card">${win
-          ? `<strong>Win $${money(win.amount)}</strong><p>Bet $${money(win.bet)}</p><button id="copy-win" type="button">Copy result</button>`
+          ? `<strong>Win ${money(win.amount)}</strong><p>Bet ${money(win.bet)}</p><button id="copy-win" type="button">Copy result</button>`
           : "<strong>Nothing to share yet</strong><p>Play a round and your cards show up here.</p>"}</div>`,
         true, "share",
       );
       if (win) $("copy-win").onclick = async () => {
         const button = $("copy-win");
         try {
-          await navigator.clipboard.writeText(`Tavern Drop · Win $${money(win.amount)} · Bet $${money(win.bet)}`);
+          await navigator.clipboard.writeText(`Tavern Drop · Win ${money(win.amount)} · Bet ${money(win.bet)}`);
           button.textContent = "Copied";
         } catch {
           button.textContent = "Clipboard unavailable";
@@ -1011,14 +1065,15 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   });
   try {
     await mount($("board"), { autoStart: false });
-    loader?.update(3, 4);
     view.app.ticker.maxFPS = 60;
     view.app.render();
+    loader?.update(85, 100);
     const [reelhouse, fonts] = await paylineAssets;
     const nativePayline = !reducedMotion && reelhouse.status === "fulfilled"
-      ? createReelhouse(view.app) : undefined;
+      ? createReelhouse(view.app, false, resources) : undefined;
     payline = createTavernPayline(view.app.stage, game, nativePayline, fonts.status === "fulfilled");
     effects = await effectsReady;
+    loader?.update(90, 100);
     if (!effects && !reducedMotion) placeOverlayMascot();
     $("loading").remove();
     {
@@ -1037,6 +1092,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         await prepareOverlayMascot();
       await landing;
       await shopImagesReady;
+      loader?.update(95, 100);
       await loader?.ready();
       await waitForContinue(shell, opening);
       opening.remove();

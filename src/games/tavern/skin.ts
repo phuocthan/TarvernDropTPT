@@ -1,11 +1,10 @@
-import { Assets, Container, Rectangle, Sprite, Texture } from "pixi.js";
+import { Container, Rectangle, Sprite, Texture } from "pixi.js";
+import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 import { Spine, type Animation, type TrackEntry } from "@esotericsoftware/spine-pixi-v8";
-import { loadTextures } from "../../framework/presentation/assets.ts";
 import type { SymbolFactory, SymbolPhase } from "../../framework/presentation/board.ts";
-import { tavernAsset, textureRegion } from "./art.ts";
+import { textureRegion } from "./art.ts";
 import symbolVerticalBounds from "./symbol-vertical-bounds.json";
 
-const folder = "tavern-assets/assets/";
 // The four skeletons use the same authored origin and units. At a 110px reel
 // pitch this scale matches the visible symbol sizes on the reference board.
 const spineScale = 0.18;
@@ -37,12 +36,9 @@ export function paytableIcon(id: string) {
   );
 }
 
-export async function loadTavernSymbols(): Promise<SymbolFactory> {
-  const textures = await loadTextures(
-    Object.fromEntries(
-      symbols.map(([id, file]) => [id, folder + file + "_static.webp"]),
-    ),
-  );
+export async function loadTavernSymbols(resources: ResourceManager): Promise<SymbolFactory> {
+  await resources.loadBundle("symbols-static");
+  const textures = new Map(symbols.map(([id]) => [id as string, resources.get<Texture>(`symbol.${id}`)]));
   for (const [id, , x, y, width, height] of symbols) {
     const texture = textures.get(id)!;
     textures.set(
@@ -53,17 +49,17 @@ export async function loadTavernSymbols(): Promise<SymbolFactory> {
       }),
     );
   }
-  const atlas = tavernAsset("hd/td_master.atlas");
+  const atlas = resources.url("atlas");
   const groups = { l: "low", h: "high", w: "wild", b: "bonus" } as const;
   const skeletons = new Map(
     Object.entries(groups).map(([prefix, group]) => [
       prefix,
-      tavernAsset(`td_symbols_${group}.skel`),
+      resources.url(`symbols.${group}`),
     ]),
   );
   const clipsReady =
     !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-    (await Assets.load([atlas, ...skeletons.values()]).then(
+    (await resources.loadBundle("symbol-spines").then(
       () => true,
       (error) => {
         console.warn("Tavern symbol animations unavailable", error);

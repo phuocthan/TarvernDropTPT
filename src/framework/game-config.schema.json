@@ -18,6 +18,17 @@
     "defaultBet"
   ],
   "properties": {
+    "resources": { "$ref": "./resources/resource-manifest.schema.json" },
+    "currency": {
+      "type": "object",
+      "required": ["code", "exponent"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "exponent": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "locale": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "$schema": {
       "type": "string",
       "minLength": 1
@@ -88,6 +99,7 @@
         "skin"
       ],
       "properties": {
+        "contract": { "const": "proposal-v1" },
         "query": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9-]*$"

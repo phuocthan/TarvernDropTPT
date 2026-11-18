@@ -1,4 +1,4 @@
-import { Application, Assets, BitmapText, Graphics, Text } from "pixi.js";
+import { Application, BitmapText, Graphics, Text } from "pixi.js";
 import {
   RegionAttachment,
   AttachmentTimeline,
@@ -9,29 +9,26 @@ import {
 } from "@esotericsoftware/spine-pixi-v8";
 import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
 import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/presentation/scene.ts";
-import { tavernAsset } from "./art.ts";
 import { hasTavernBitmapFont } from "./typography.ts";
 import { createMascot, loadMascot, playMascotWin } from "./mascot.ts";
 import { animationBounds } from "./spine-bounds.ts";
+import { BitmapAmount } from "../../framework/presentation/bitmap-amount.ts";
+import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 
-const atlas = tavernAsset("hd/td_master.atlas");
-const backgroundUrl = tavernAsset("td_backgrounds.skel");
-const reelhouseUrl = tavernAsset("td_reelhouse.skel");
-const screensUrl = tavernAsset("td_screens.skel");
 const cameraEffects = new Set(["fade", "fx_light"]);
 const introArtSlots = new Set(["bonus_title", "bonus_img", "bonus_desc", "fs"]);
 
-export function createReelhouse(app: Application, autoUpdate = false) {
+export function createReelhouse(app: Application, autoUpdate: boolean, resources: ResourceManager) {
   return Spine.from({
-    skeleton: reelhouseUrl,
-    atlas,
+    skeleton: resources.url("scene.reelhouse"),
+    atlas: resources.url("atlas"),
     ticker: app.ticker,
     autoUpdate,
   });
 }
 
-export async function loadReelhouse() {
-  await Assets.load([atlas, reelhouseUrl]);
+export async function loadReelhouse(resources: ResourceManager) {
+  await resources.loadBundle("scene");
 }
 
 export function playClip(spine: Spine, track: number, name: string, playbackRate = 1) {
@@ -65,12 +62,16 @@ export async function mountTavernEffects(
   foreground: HTMLElement,
   sceneLayout: ReelPresentation["scene"],
   placeMascot: (anchor?: SceneAnchor | null) => void,
+  resources: ResourceManager,
 ) {
+  const atlas = resources.url("atlas");
+  const backgroundUrl = resources.url("scene.background");
+  const screensUrl = resources.url("scene.screens");
   const slots = sceneLayout?.slots ?? {};
   const camera = sceneLayout?.backgroundCamera;
   const [, mascotLoaded] = await Promise.all([
-    Assets.load([atlas, backgroundUrl, reelhouseUrl, screensUrl]),
-    loadMascot().then(() => true, () => false),
+    resources.loadBundle("scene"),
+    loadMascot(resources).then(() => true, () => false),
   ]);
   const app = new Application();
   await app.init({
@@ -91,7 +92,7 @@ export async function mountTavernEffects(
     ticker: app.ticker,
     autoUpdate: false,
   });
-  const reelhouse = createReelhouse(app);
+  const reelhouse = createReelhouse(app, false, resources);
   const symbolAnchor = reelhouse.skeleton.findSlot("slot_symbols")?.bone
     ?? reelhouse.skeleton.findBone("slot_symbols");
   let baseSymbolY: number | undefined;
@@ -99,7 +100,7 @@ export async function mountTavernEffects(
     slot.data.name.startsWith("reel_chest_"),
   );
   const chestAlpha = new Map<Slot, number>();
-  const chestTotal = new BitmapText({ style: { fontFamily: "td_gold", fontSize: 240 } });
+  const chestTotal = new BitmapAmount("td_gold", 240);
   chestTotal.anchor.set(0.5);
   chestTotal.visible = false;
   reelhouse.addSlotObject("slot_finalwin", chestTotal, { followSlotColor: true });
@@ -154,9 +155,7 @@ export async function mountTavernEffects(
     ticker: app.ticker,
     autoUpdate: false,
   });
-  const payout = new BitmapText({
-    style: { fontFamily: "td_gold", fontSize: 480 },
-  });
+  const payout = new BitmapAmount("td_gold", 480);
   payout.anchor.set(0.5);
   screens.addSlotObject("slot_win", payout, { followSlotColor: true });
   const spinCount = new Text({
@@ -178,7 +177,7 @@ export async function mountTavernEffects(
   };
   screens.visible = false;
   app.stage.addChild(background, openingDimmer, reelhouse, screens);
-  const portraitMascot = mascotLoaded ? createMascot(app) : undefined;
+  const portraitMascot = mascotLoaded ? createMascot(app, resources) : undefined;
   if (portraitMascot) {
     portraitMascot.visible = portraitMascot.autoUpdate = false;
     app.stage.addChildAt(portraitMascot, app.stage.getChildIndex(reelhouse));
@@ -692,6 +691,11 @@ export async function mountTavernEffects(
     },
     screenTime() {
       return screens.state.getCurrent(0)?.trackTime ?? 0;
+    },
+    restoreChest(reel: number, multiplier: number) {
+      chestMultipliers[reel].text = `x${multiplier}`;
+      chestMultipliers[reel].visible = true;
+      reelhouse.state.setAnimation(50 + reel, `${30 + reel * 2}_reel_${reel}_chest_open_idle`, true);
     },
     async openChest(reel: number, multiplier: number) {
       stage.dataset.chestOpening = String(reel);

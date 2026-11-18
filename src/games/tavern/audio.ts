@@ -1,17 +1,18 @@
 import { AudioBus, audioSpriteCues, type AudioCue } from "../../framework/presentation/audio.ts";
 import { assetUrl } from "../../framework/presentation/asset-url.ts";
 import config from "./audio.config.json";
+import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 
-export async function loadTavernAudio() {
+export async function loadTavernAudio(resources: ResourceManager) {
   const files: Record<string, AudioCue> = Object.fromEntries(
     ["start", "stop", "win", "entry", "chest"].map((name) => [
       name, assetUrl(`tavern-assets/cues/${name}.mp3`),
     ]),
   );
   try {
-    const response = await fetch(assetUrl(config.manifest));
-    if (!response.ok) throw Error("Sound manifest unavailable");
-    const sprite = audioSpriteCues(await response.json(), assetUrl(config.base));
+    const manifest = await resources.load<Parameters<typeof audioSpriteCues>[0] | undefined>("audio.manifest");
+    if (!manifest) throw Error("Sound manifest unavailable");
+    const sprite = audioSpriteCues(manifest, assetUrl(config.base));
     Object.assign(files, sprite);
     for (const [event, clip] of Object.entries({ ...config.cues, ...config.tiers }))
       if (sprite[clip]) files[event] = sprite[clip];

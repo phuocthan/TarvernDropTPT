@@ -1209,7 +1209,7 @@
   display: none;
 }
 .tavern-hud .hud-money strong::before {
-  content: "$";
+  content: none;
 }
 .tavern-hud .win-value #spin-win-label { color: white; }
 .tavern-hud .win-value > strong {

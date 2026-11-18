@@ -1,3 +1,4 @@
+import type { ResourceManifest } from "../resources/contracts.ts";
 /** Money is always an integer in demo minor units. Boards are column-major. */
 export type Mode = "base" | "tavern" | "drop";
 export type Chance = "standard" | "extra" | "super";
@@ -50,11 +51,20 @@ export interface Completion {
   capped: boolean;
 }
 export interface Outcome {
+  checkpoint?: {
+    curStep: string;
+    staticResult?: boolean;
+    reel?: number;
+    multiplier?: number;
+    displayWinMinor: number;
+    beforeWinMinor: number;
+  };
   requestId: string;
   bet: number;
   state: Snapshot;
   wins: LineWin[];
   spinWin: number;
+  scatterPositions?: Position[];
   entry: Mode | null;
   retrigger: number;
   collected: Position[];
@@ -142,10 +152,12 @@ export interface ReelPresentation {
   };
 }
 export interface GameDefinition {
+  resources?: ResourceManifest;
   schemaVersion: 1;
   id: string;
   title: string;
-  routing: { query: string; apiBase: string; skin: "basic" | "tavern" };
+  routing: { query: string; apiBase: string; skin: "basic" | "tavern"; contract?: "proposal-v1" };
+  currency?: { code: string; exponent: number; locale?: string };
   presentation: ReelPresentation;
   reels: number;
   rows: number;
@@ -168,6 +180,10 @@ export interface GameDefinition {
   };
 }
 export interface GameTransport {
+  hasResume?: boolean;
+  resume?(): Promise<Outcome>;
+  completePresentation?(): Promise<Snapshot>;
+  nextPresentation?(): Outcome | null;
   session(): Promise<Snapshot>;
   execute(command: Command): Promise<Outcome>;
 }

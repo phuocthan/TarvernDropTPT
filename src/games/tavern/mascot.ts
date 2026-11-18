@@ -1,16 +1,13 @@
-import { Application, Assets } from "pixi.js";
+import { Application } from "pixi.js";
+import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 import { Spine } from "@esotericsoftware/spine-pixi-v8";
-import { assetUrl } from "../../framework/presentation/assets.ts";
 import type { SceneAnchor } from "../../framework/presentation/scene.ts";
 import { animationBounds } from "./spine-bounds.ts";
 
-const skeleton = assetUrl("tavern-assets/assets/td_character.skel");
-const atlas = assetUrl("tavern-assets/assets/hd/td_master.atlas");
+export const loadMascot = (resources: ResourceManager) => resources.loadBundle("scene");
 
-export const loadMascot = () => Assets.load([skeleton, atlas]);
-
-export function createMascot(app: Application) {
-  const mascot = Spine.from({ skeleton, atlas, ticker: app.ticker });
+export function createMascot(app: Application, resources: ResourceManager) {
+  const mascot = Spine.from({ skeleton: resources.url("scene.mascot"), atlas: resources.url("atlas"), ticker: app.ticker });
   mascot.state.setAnimation(0, "idle", true);
   mascot.update(0);
   return mascot;
@@ -21,7 +18,7 @@ export function playMascotWin(mascot: Spine, playbackRate = 1) {
   mascot.state.addAnimation(0, "idle", true, 0);
 }
 
-export async function mountMascot(host: HTMLElement) {
+export async function mountMascot(host: HTMLElement, resources: ResourceManager) {
   const app = new Application();
   await app.init({
     width: 1,
@@ -33,8 +30,8 @@ export async function mountMascot(host: HTMLElement) {
   });
   app.ticker.maxFPS = 30;
   try {
-    await loadMascot();
-    const mascot = createMascot(app);
+    await loadMascot(resources);
+    const mascot = createMascot(app, resources);
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const bounds = animationBounds(mascot.skeleton.data, ["idle", "win"]) ?? mascot.getLocalBounds();
     const scale = 360 / Math.max(bounds.width, bounds.height);

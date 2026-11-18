@@ -31,7 +31,7 @@ export class GameController {
       this.storage.removeItem(this.storageKey);
       this.pending = null;
     }
-    this.phase = this.pending ? "recovery" : "ready";
+    this.phase = this.pending || this.transport.hasResume ? "recovery" : "ready";
   }
   async execute(
     input: Omit<Command, "requestId" | "expectedVersion">,
@@ -46,6 +46,15 @@ export class GameController {
     return this.send();
   }
   async recover() {
+    if (!this.pending && this.transport.resume) {
+      this.phase = "pending";
+      try {
+        const outcome = await this.transport.resume();
+        this.state = outcome.state;
+        this.phase = "presenting";
+        return outcome;
+      } catch (error) { this.phase = "recovery"; throw error; }
+    }
     if (!this.pending) throw Error("NO_PENDING_ROUND");
     return this.send();
   }
@@ -69,7 +78,18 @@ export class GameController {
       throw error;
     }
   }
-  completePresentation() {
-    if (this.phase === "presenting") this.phase = "ready";
+  async completePresentation() {
+    if (this.phase !== "presenting") return;
+    try {
+      if (this.transport.completePresentation) this.state = await this.transport.completePresentation();
+      this.phase = "ready";
+    } catch (error) { this.phase = "recovery"; throw error; }
+  }
+  nextPresentation() {
+    const outcome = this.transport.nextPresentation?.();
+    if (!outcome) return null;
+    this.state = outcome.state;
+    this.phase = "presenting";
+    return outcome;
   }
 }

@@ -4,6 +4,7 @@ import { assetUrl } from "./asset-url.ts";
 
 export interface BrandLoader {
   update(completed: number, total: number): void;
+  waitForIntro(): Promise<void>;
   ready(): Promise<void>;
   fail(): void;
 }
@@ -53,7 +54,10 @@ export function mountBrandLoader(
   root.setAttribute("aria-busy", "true");
   root.after(screen);
   let intro: HTMLElement | undefined;
-  let introFinished: Promise<void> | undefined;
+  let introFinished = Promise.resolve();
+  const afterPaint = () => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
   if (brandIntro && (!reducedMotion || directToLanding)) {
     const panel = document.createElement("div");
     panel.className = "brand-loading-intro";
@@ -68,8 +72,11 @@ export function mountBrandLoader(
     introFinished = (async () => {
       try {
         await animation.decode();
-        if (!reducedMotion)
+        if (!reducedMotion) {
           await new Promise<void>((resolve) => setTimeout(resolve, brandIntro.durationMs));
+          // Present the final GIF frame before WebGL initialization can occupy the thread.
+          await afterPaint();
+        }
       } catch {
         if (directToLanding && !reducedMotion) animation.src = assetUrl(config.brandLogo);
       }
@@ -79,24 +86,51 @@ export function mountBrandLoader(
       }
     })();
   }
-  function update(completed: number, total: number) {
-    const percent = Math.round(
-      Math.max(0, Math.min(1, completed / total)) * 100,
-    );
+  let shown = 0;
+  let target = 0;
+  let from = 0;
+  let started = 0;
+  let progressFrame = 0;
+  let failed = false;
+  let finished = false;
+  function display(value: number) {
+    shown = value;
+    const percent = Math.floor(value);
     progress.textContent = `${percent}%`;
     progress.setAttribute("aria-valuenow", String(percent));
   }
-  update(0, 1);
+  function animateProgress(now: number) {
+    const fraction = Math.max(0, Math.min(1, (now - started) / 300));
+    display(from + (target - from) * (1 - (1 - fraction) ** 3));
+    progressFrame = fraction < 1 ? requestAnimationFrame(animateProgress) : 0;
+  }
+  function update(completed: number, total: number) {
+    if (failed || finished || total <= 0 || !Number.isFinite(completed / total)) return;
+    // Resource downloads alone cannot complete startup: ready() owns the final 100%.
+    const next = Math.max(target, Math.min(99, Math.max(0, completed / total * 100)));
+    if (next === target) return;
+    from = shown;
+    target = next;
+    started = performance.now();
+    if (reducedMotion) display(target);
+    else if (!progressFrame) progressFrame = requestAnimationFrame(animateProgress);
+  }
+  display(0);
   let reveal: Promise<void> | undefined;
   let fade: Animation | undefined;
   return {
     update,
+    waitForIntro: () => introFinished,
     ready() {
       return reveal ??= (async () => {
-        update(1, 1);
         await introFinished;
         if (!reload.hidden) return;
+        finished = true;
+        cancelAnimationFrame(progressFrame);
+        display(100);
         if (!reducedMotion) {
+          await afterPaint();
+          if (!reload.hidden) return;
           fade = screen.animate([{ opacity: 1 }, { opacity: 0 }], {
             duration: 250,
             easing: "ease-out",
@@ -112,6 +146,8 @@ export function mountBrandLoader(
       })();
     },
     fail() {
+      failed = true;
+      cancelAnimationFrame(progressFrame);
       root.removeAttribute("aria-busy");
       progress.removeAttribute("role");
       progress.removeAttribute("aria-valuenow");

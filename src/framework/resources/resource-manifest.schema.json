@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Game resource manifest",
+  "type": "object",
+  "required": ["assets", "bundles"],
+  "properties": {
+    "base": { "type": "string" },
+    "brand": { "type": "string" },
+    "version": { "type": "string" },
+    "concurrency": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "retries": { "type": "integer", "minimum": 0, "maximum": 5 },
+    "startup": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "assets": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "required": ["src"],
+        "properties": {
+          "src": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["pixi", "json", "font"] },
+          "optional": { "type": "boolean" },
+          "family": { "type": "string", "minLength": 1 },
+          "weight": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "bundles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object", "required": ["assets"],
+        "properties": {
+          "assets": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "dependsOn": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,21 +1,25 @@
 import { Assets, type BitmapFont } from "pixi.js";
 import { tavernAsset } from "./art.ts";
+import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
 
 const fonts = ["td_green", "td_gold", "td_red"] as const;
 type AmountFont = (typeof fonts)[number];
 const fontUrl = (name: AmountFont) => tavernAsset(name + ".xml");
+const loadedFonts = new Map<AmountFont, BitmapFont>();
 export const hasTavernBitmapFont = (name: AmountFont) =>
-  !!Assets.get<BitmapFont | undefined>(fontUrl(name));
+  loadedFonts.has(name) || !!Assets.get<BitmapFont | undefined>(fontUrl(name));
 
-export const loadTavernBitmapFonts = () =>
-  Promise.all(fonts.map((name) => Assets.load<BitmapFont>(fontUrl(name))));
+export const loadTavernBitmapFonts = async (resources: ResourceManager) => {
+  await resources.loadBundle("fonts");
+  for (const name of fonts) loadedFonts.set(name, resources.get<BitmapFont>("font." + name.slice(3)));
+};
 
 export function renderAmount(
   target: HTMLElement,
   value: string,
   name: AmountFont,
 ) {
-  const font = Assets.get<BitmapFont | undefined>(fontUrl(name));
+  const font = loadedFonts.get(name) ?? Assets.get<BitmapFont | undefined>(fontUrl(name));
   const glyphs = Array.from(
     value.replaceAll("×", "x"),
     (letter) => font?.chars[letter],

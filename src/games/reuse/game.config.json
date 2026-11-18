@@ -3,6 +3,13 @@
   "schemaVersion": 1,
   "id": "reuse-3x3",
   "title": "3 × 3 Reuse Demo",
+  "resources": {
+    "assets": {},
+    "bundles": { "core": { "assets": [] } },
+    "startup": ["core"],
+    "concurrency": 4,
+    "retries": 1
+  },
   "reels": 3,
   "rows": 3,
   "lines": [
@@ -87,7 +94,8 @@
   "routing": {
     "query": "reuse",
     "apiBase": "/api/reuse",
-    "skin": "basic"
+    "skin": "basic",
+    "contract": "proposal-v1"
   },
   "presentation": {
     "spinType": "normal",

@@ -1,10 +1,12 @@
 import "./basic-game.css";
 import { Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import { createSlotSession } from "../session.ts";
-import { HttpTransport } from "../transport/http.ts";
+import { createGameTransport } from "../transport/proposal.ts";
+import { formatMoney } from "./money.ts";
 import type { GameDefinition } from "../domain/contracts.ts";
 import type { BrandLoader } from "./brand-loading.ts";
 import { loadTextures } from "./assets.ts";
+import { gameRuntime } from "../app/game-runtime.ts";
 
 export async function mountBasicGame(
   root: HTMLElement,
@@ -36,7 +38,7 @@ export async function mountBasicGame(
 
   const { controller, board, mount, waitAfterReels } = createSlotSession(
     game,
-    new HttpTransport(game.routing.apiBase),
+    createGameTransport(game, localStorage),
     (cellSizePx) => {
       const view = new Container();
       const scale = cellSizePx / 102;
@@ -84,14 +86,16 @@ export async function mountBasicGame(
   const status = root.querySelector<HTMLElement>("#reuse-status")!;
   const balance = root.querySelector<HTMLElement>("#reuse-balance")!;
   function sync() {
-    balance.textContent = `Balance ${(controller.state!.balance / 100).toFixed(2)}`;
+    balance.textContent = `Balance ${formatMoney(game, controller.state!.balance)}`;
     button.textContent =
       controller.phase === "recovery" ? "Recover result" : "Spin";
     button.disabled = false;
   }
   try {
     const host = root.querySelector<HTMLElement>("#reuse-board")!;
-    textures = await loadTextures(images);
+    const runtime = gameRuntime(game);
+    await runtime.prepare(loader);
+    textures = await loadTextures(images, runtime.resources);
     await mount(host);
     host.style.aspectRatio = `${board.app.screen.width} / ${board.app.screen.height}`;
     sync();
@@ -117,9 +121,9 @@ export async function mountBasicGame(
       await board.stop(outcome.state.board);
       await waitAfterReels(false);
       board.highlight(outcome.wins);
-      controller.completePresentation();
+      await controller.completePresentation();
       status.textContent = outcome.wins.length
-        ? `Win ${(outcome.spinWin / 100).toFixed(2)}`
+        ? `Win ${formatMoney(game, outcome.spinWin)}`
         : "No line win";
     } catch {
       board.setBoard(controller.state!.board);

@@ -50,7 +50,6 @@ function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
         const root = document.querySelector("#app");
         await launchGame(root, game, async (loader) => {
           const { ${skin[1]}: mount } = await import(${JSON.stringify(skin[0])});
-          loader?.update(1, ${tavern ? 4 : 2});
           await mount(root, game, loader);
         });
       `;
@@ -69,7 +68,7 @@ function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
 
 export default defineConfig({
   base: "./",
-  server: { proxy: { "/api": "http://127.0.0.1:4000" } },
+  server: { proxy: { "/api": process.env.LOCAL_API_ORIGIN || "http://127.0.0.1:4000" } },
   ...(target && paths ? {
     plugins: [standalone(target, paths)],
     build: { outDir: paths.dist, copyPublicDir: false, emptyOutDir: true },

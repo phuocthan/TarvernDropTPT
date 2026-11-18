@@ -21,11 +21,9 @@ if (requested === "viewer") {
   await launchGame(root, game, async (loader) => {
     if (game.routing.skin === "tavern") {
       const { mountTavern } = await import("./games/tavern/app.ts");
-      loader?.update(1, 4);
       await mountTavern(root, game, loader);
     } else {
       const { mountBasicGame } = await import("./framework/presentation/basic-game.ts");
-      loader?.update(1, 2);
       await mountBasicGame(root, game, loader, { href: "./?game=tarvern", label: `← ${defaultGame.title}` });
     }
   });

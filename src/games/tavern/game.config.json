@@ -3,6 +3,47 @@
   "schemaVersion": 1,
   "id": "tavern-template",
   "title": "Tavern Drop",
+  "resources": {
+    "base": "tavern-assets/assets/",
+    "concurrency": 4,
+    "retries": 1,
+    "assets": {
+      "atlas": { "src": "hd/td_master.atlas" },
+      "symbols.low": { "src": "td_symbols_low.skel" },
+      "symbols.high": { "src": "td_symbols_high.skel" },
+      "symbols.wild": { "src": "td_symbols_wild.skel" },
+      "symbols.bonus": { "src": "td_symbols_bonus.skel" },
+      "scene.background": { "src": "td_backgrounds.skel" },
+      "scene.reelhouse": { "src": "td_reelhouse.skel" },
+      "scene.screens": { "src": "td_screens.skel" },
+      "scene.mascot": { "src": "td_character.skel" },
+      "font.gold": { "src": "td_gold.xml" },
+      "font.green": { "src": "td_green.xml" },
+      "font.red": { "src": "td_red.xml" },
+      "font.ui": { "src": "outfit-700-D9T176aR.woff2", "type": "font", "family": "Outfit", "weight": "700", "optional": true },
+      "audio.manifest": { "src": "td_sounds.json", "type": "json", "optional": true },
+      "symbol.A": { "src": "l1_static.webp" },
+      "symbol.K": { "src": "l2_static.webp" },
+      "symbol.Q": { "src": "l3_static.webp" },
+      "symbol.J": { "src": "l4_static.webp" },
+      "symbol.10": { "src": "l5_static.webp" },
+      "symbol.ale": { "src": "h4_static.webp" },
+      "symbol.barrel": { "src": "h2_static.webp" },
+      "symbol.coin": { "src": "h3_static.webp" },
+      "symbol.crown": { "src": "h1_static.webp" },
+      "symbol.wild": { "src": "wild_static.webp" },
+      "symbol.bonus": { "src": "bonus_static.webp" }
+    },
+    "bundles": {
+      "fonts": { "assets": ["font.gold", "font.green", "font.red", "font.ui"] },
+      "symbols-static": { "assets": ["symbol.A", "symbol.K", "symbol.Q", "symbol.J", "symbol.10", "symbol.ale", "symbol.barrel", "symbol.coin", "symbol.crown", "symbol.wild", "symbol.bonus"] },
+      "atlas": { "assets": ["atlas"] },
+      "symbol-spines": { "dependsOn": ["atlas"], "assets": ["symbols.low", "symbols.high", "symbols.wild", "symbols.bonus"] },
+      "scene": { "dependsOn": ["atlas"], "assets": ["scene.background", "scene.reelhouse", "scene.screens", "scene.mascot"] },
+      "audio": { "assets": ["audio.manifest"] }
+    },
+    "startup": ["fonts", "symbols-static", "symbol-spines", "scene", "audio"]
+  },
   "reels": 5,
   "rows": 5,
   "lines": [
@@ -292,7 +333,8 @@
   "routing": {
     "query": "tavern",
     "apiBase": "/api",
-    "skin": "tavern"
+    "skin": "tavern",
+    "contract": "proposal-v1"
   },
   "presentation": {
     "spinType": "drop",

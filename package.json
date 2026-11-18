@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"node --experimental-strip-types server.js\" \"vite --host 0.0.0.0\"",
+    "dev": "concurrently -k \"node --watch --experimental-strip-types server.js\" \"vite --host 0.0.0.0\"",
     "start": "node --experimental-strip-types server.js",
     "build": "tsc --noEmit && vite build",
     "game:new": "node --experimental-strip-types tools/game.mjs new",
@@ -15,10 +15,14 @@
   },
   "dependencies": {
     "@esotericsoftware/spine-pixi-v8": "4.2.120",
+    "fontfaceobserver": "^2.1.0",
+    "howler": "^2.2.4",
     "pixi.js": "^8.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
+    "@types/fontfaceobserver": "^2.1.3",
+    "@types/howler": "^2.2.12",
     "@types/node": "^26.6.6",
     "concurrently": "^10.0.7",
     "prettier": "^3.10.1",

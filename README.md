@@ -10,6 +10,10 @@ The framework implementation lives in this repository. It uses the shared-core/g
 
 ## Development
 
+The [Gen3 architecture review and resource standard](docs/framework-gen3-review.md) documents the shared app, resource, remote, network, audio, UI and slot-core boundaries. Each game can declare resource bundles/dependencies in its JSON. POST requests use clean URLs and put `gameCode` in the JSON payload. Local development watches backend changes to keep reload/login on the same API contract.
+
+The Tavern and 3×3 configurations use the resumable KRW `/api/v1` mock from [FE–BE Proposal](docs/FE-BE-Proposal.md). See [localhost backend instructions, adapter and request examples](docs/backend-localhost-v1.md). The reusable transport maps numeric boards and server checkpoints into presentation objects; the client acknowledges each completed step.
+
 Node >=22.18, npm:
 
 ```sh
@@ -55,4 +59,4 @@ See the [Tavern asset inventory](docs/tavern-asset-inventory.md) for CDN verific
 
 See the [Tavern performance notes](docs/tavern-performance.md) for the local profiling results and hardware checks.
 
-The fake server owns all demo outcomes and balances. It is not certified math; no real money. Sessions reset on server restart. Browser recovery retries the same command only within a live mock session. The reference asset integration is local. The approved game math, final client asset pack, and production API are pending.
+The fake server owns all demo outcomes and balances. It is not certified math; no real money. The v1 backend persists rounds, receipts and synthetic wallets across restart. A browser test identity is retained in local storage; clearing that identity starts another test account. The reference asset integration is local. Approved math, final client assets and the production API are pending.
