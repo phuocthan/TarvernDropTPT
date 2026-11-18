@@ -45,7 +45,8 @@ test("the intro finishes before WebGL startup, with progress reserved for the la
   });
   await page.goto("/?game=tavern", { waitUntil: "domcontentloaded" });
   // Startup downloads and the session can finish even while the GIF is pending.
-  await expect(page.getByRole("progressbar")).toHaveText("75%", { timeout: 15000 });
+  await expect(page.locator(".brand-loading-progress")).toHaveText("75%", { timeout: 15000 });
+  await expect(page.locator(".brand-loading-progress")).toBeHidden();
   await expect(page.locator("#app canvas")).toHaveCount(0);
   expect(await page.evaluate(() => window.loadingAudit.contexts)).toEqual([]);
   releaseGif();

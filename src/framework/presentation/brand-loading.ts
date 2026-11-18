@@ -41,6 +41,7 @@ export function mountBrandLoader(
 
   const progress = document.createElement("div");
   progress.className = "brand-loading-progress";
+  progress.hidden = true;
   progress.setAttribute("role", "progressbar");
   progress.setAttribute("aria-label", "Loading progress");
   const reload = document.createElement("button");
@@ -152,6 +153,7 @@ export function mountBrandLoader(
       progress.removeAttribute("role");
       progress.removeAttribute("aria-valuenow");
       progress.textContent = "Could not load the game.";
+      progress.hidden = false;
       reload.hidden = false;
       intro?.remove();
       fade?.cancel();

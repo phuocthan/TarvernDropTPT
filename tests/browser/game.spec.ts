@@ -58,7 +58,7 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   await page.waitForTimeout(tavern.presentation.loadingScreen!.brandIntro!.durationMs + 100);
   await expect(intro).toBeVisible();
   await expect(page.locator(".brand-loading-game")).toHaveCount(0);
-  await expect(page.getByRole("progressbar", { name: "Loading progress" })).toBeVisible();
+  await expect(page.locator(".brand-loading-progress")).toBeHidden();
   await expect(page.locator("#app")).toHaveAttribute("aria-busy", "true");
   releaseSession();
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 15000 });
