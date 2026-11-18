@@ -70,7 +70,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
      <div class="bet-arrows"><button id="bet-up" aria-label="Increase bet">${hudIcon("bet-up")}</button><button id="bet-down" aria-label="Decrease bet">${hudIcon("bet-down")}</button></div>
     </div>
     <div class="hud-spin-control">
-     <button id="spin" class="spin-button" disabled aria-label="Spin">${hudIcon("spin")}</button>
+     <button id="spin" class="spin-button" popovertarget="auto-panel" popovertargetaction="hide" disabled aria-label="Spin">${hudIcon("spin")}</button>
      <button id="auto-add" type="button" class="auto-add" aria-label="Add ${controls?.autoTopUp ?? 0} autoplay spins" hidden>+${controls?.autoTopUp ?? 0}</button>
     </div>
     <div class="hud-quick"><button id="auto" aria-label="Autoplay">${hudIcon("autoplay")}</button><button id="speed" aria-label="Turbo" aria-pressed="false">${hudIcon("turbo")}</button></div>
@@ -203,6 +203,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     },
     controls?.autoUnlimited,
   );
+  $("auto-panel").addEventListener("toggle", () => sync());
   const featureIcon = hudIcon("feature-buy");
   const keyArt = artRegion("key", "key-art");
   const betPicker = mountBetPicker(
@@ -322,13 +323,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     const skip = (busy && shell.dataset.totalWin !== "returning") || nextFreeSpin;
     const spin = $("spin");
     const unlimited = autoRemaining === Infinity;
-    spin.toggleAttribute("data-auto-ready", !autoRunning && autoRemaining > 0);
     spin.innerHTML = autoRunning
       ? `<span class="auto-count">${unlimited ? "∞" : autoRemaining}</span>`
-      : skip ? hudIcon(feature ? "skip" : "stop") : hudIcon("spin") + hudIcon("autoplay-ready");
+      : skip ? hudIcon("spin") : hudIcon("spin") + hudIcon("autoplay-ready");
     spin.setAttribute("aria-label", autoRunning
       ? (unlimited ? "Stop unlimited autoplay" : `Stop autoplay, ${autoRemaining} spins left`)
-      : skip ? "Skip" : "Spin");
+      : skip ? "Skip" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
     $("auto-add").hidden = !autoRunning || unlimited || !controls?.autoTopUp;
     autoPicker.setSelected(autoRunning ? 0 : autoRemaining);
     $("speed").setAttribute("aria-pressed", String(turbo));
@@ -351,7 +351,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       onModalBack?.();
     }
   });
-  dialog.addEventListener("close", scheduleNextSpin);
+  dialog.addEventListener("close", () => scheduleNextSpin());
   const winTier = (amount: number, bet: number) =>
     game.demo.winTiers.filter((tier) => amount >= bet * tier.multiplier).at(-1);
   const winAnimation = (label: string) =>
@@ -468,7 +468,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     clearSpinTimer();
     sync();
   }
-  function scheduleNextSpin() {
+  function scheduleNextSpin(noWinReelsStoppedAt?: number) {
     const feature = controller.state?.feature;
     if (
       autoTimer !== null ||
@@ -477,11 +477,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       !(feature?.remaining || autoRunning)
     )
       return;
-    const delay = turbo ? 357 : feature?.played === 0 ? 1400 : 900;
+    const delay = noWinReelsStoppedAt === undefined
+      ? nextSpinDelay(turbo ? 357 : feature?.played === 0 ? 1400 : 900)
+      : Math.max(0, 500 - (performance.now() - noWinReelsStoppedAt));
     autoTimer = setTimeout(() => {
       autoTimer = null;
       if (!dialog.open && controller.phase === "ready") void run("spin");
-    }, nextSpinDelay(delay));
+    }, delay);
   }
   async function present(outcome: Outcome, spinTurbo: boolean) {
     presentingBet = outcome.bet;
@@ -497,7 +499,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       },
       anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
     });
-    await waitAfterReels(spinTurbo);
+    const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
+      !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
+    const noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
+    if (!plainNoWin) await waitAfterReels(spinTurbo);
     const scatter =
       outcome.entry || outcome.retrigger
         ? outcome.state.board.flatMap((column, reel) =>
@@ -536,7 +541,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       view.clearHighlight();
     };
     const from = performance.now();
-    const countWin = new Promise<void>((resolve) => {
+    const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
       const tick = () => {
         const t = skipped
           ? 1
@@ -719,7 +724,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
     sync();
     syncMusic(!!controller.state?.feature);
-    scheduleNextSpin();
+    scheduleNextSpin(noWinReelsStoppedAt);
   }
   async function run(
     action: "spin" | "buy-tavern" | "buy-drop",
@@ -732,7 +737,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       return;
     }
     clearSpinTimer();
-    if (controller.state?.feature) displayWin = 0;
+    displayWin = 0;
+    syncWin(controller.state?.feature);
     const spinTurbo = turbo;
     audio.unlock();
     skipped = false;
@@ -772,9 +778,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       stopAuto();
       return;
     }
-    autoPicker.close();
-    if (controller.phase === "ready" && !controller.state?.feature && autoRemaining)
+    if (autoPicker.isOpen() && controller.phase === "ready" && !controller.state?.feature && autoRemaining > 0)
       autoRunning = true;
+    autoPicker.close();
     void run("spin");
   };
   $("auto-add").onclick = () => {
@@ -798,6 +804,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   };
   $("auto").onclick = () => {
     audio.cue("click");
+    if (controls?.autoUnlimited && !autoRemaining) {
+      autoRemaining = Infinity;
+      sync();
+    }
   };
   const shopOptions = [
     {
@@ -829,6 +839,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       bolts: 5,
     },
   ] as const;
+  const shopImages = shopOptions.map(({ image }) => {
+    const preview = new Image();
+    preview.src = asset(image);
+    return preview;
+  });
+  const shopImagesReady = Promise.allSettled(shopImages.map((preview) => preview.decode()));
   type ShopOption = (typeof shopOptions)[number];
   const shopPrice = (option: ShopOption) =>
     game.bets[betIndex] *
@@ -996,7 +1012,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   try {
     await mount($("board"), { autoStart: false });
     loader?.update(3, 4);
-    view.app.ticker.maxFPS = 45;
+    view.app.ticker.maxFPS = 60;
     view.app.render();
     const [reelhouse, fonts] = await paylineAssets;
     const nativePayline = !reducedMotion && reelhouse.status === "fulfilled"
@@ -1020,6 +1036,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (!reducedMotion && !stage.hasAttribute("data-mascot-behind-board"))
         await prepareOverlayMascot();
       await landing;
+      await shopImagesReady;
       await loader?.ready();
       await waitForContinue(shell, opening);
       opening.remove();

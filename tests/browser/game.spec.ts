@@ -580,8 +580,9 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
       await expect(page.locator("#bet-picker")).toHaveCSS("min-width", "102px");
       await expect(page.locator("#balance")).toHaveCSS("font-size", "22px");
       await spin.hover();
-      await expect(spin).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, -2)");
-      await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(0, 0, 0)");
+      await expect(spin).toHaveCSS("transform", "none");
+      await expect(spin).toHaveCSS("background-color", "rgb(255, 255, 255)");
+      await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(65, 225, 251)");
     }
     await page.getByRole("button", { name: "Autoplay", exact: true }).click();
     const panel = page.locator("#auto-panel");
@@ -594,7 +595,6 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
       expect((await panel.boundingBox())!.width).toBeCloseTo(viewport.width * 0.65, 0);
     }
     const unlimited = panel.getByRole("button", { name: "Unlimited autoplay" });
-    await unlimited.click();
     await expect(unlimited).toHaveAttribute("aria-pressed", "true");
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
@@ -705,18 +705,28 @@ test("finite and unlimited autoplay start on Spin and can be stopped", async ({ 
   const count = spin.locator(".auto-count");
   const add = page.getByRole("button", { name: "Add 10 autoplay spins" });
   await expect(spin).toBeEnabled({ timeout: 20000 });
-  await page.getByRole("button", { name: "Autoplay", exact: true }).click();
-  const choice = page.locator("#auto-panel").getByRole("button", { name: "25", exact: true });
+  const auto = page.getByRole("button", { name: "Autoplay", exact: true });
+  const panel = page.locator("#auto-panel");
+  const playIcon = spin.locator(".hud-icon-autoplay-ready");
+  await expect(playIcon).toBeHidden();
+  await auto.click();
+  await expect(playIcon).toBeVisible();
+  await auto.click();
+  await expect(playIcon).toBeHidden();
+  await auto.click();
+  const choice = panel.getByRole("button", { name: "25", exact: true });
   await choice.hover();
   await expect(choice).toHaveCSS("background-color", "rgb(60, 60, 70)");
   await choice.click();
   await expect(choice).toHaveCSS("background-color", "rgb(65, 225, 251)");
-  await expect(spin).toHaveAttribute("data-auto-ready", "");
+  await expect(panel).toBeVisible();
+  await expect(spin).toHaveAttribute("aria-label", "Start autoplay");
   await expect(add).toBeHidden();
   expect(requests).toBe(0);
   await spin.click();
   await expect.poll(() => requests).toBe(1);
   await expect(count).toHaveText("25");
+  await expect(panel).toBeHidden();
   await spin.hover();
   await expect(count).toHaveCSS("background-color", "rgb(65, 225, 251)");
   await add.hover();
@@ -730,9 +740,17 @@ test("finite and unlimited autoplay start on Spin and can be stopped", async ({ 
   await spin.click();
   await expect(add).toBeHidden();
   await expect(spin).toHaveAttribute("aria-label", "Spin", { timeout: 15000 });
+  await auto.click();
+  await auto.click();
+  const beforeManual = requests;
+  await spin.click();
+  await expect.poll(() => requests).toBe(beforeManual + 1);
+  await expect(count).toBeHidden();
+  await expect(spin).toHaveAttribute("aria-label", "Spin", { timeout: 15000 });
+
   const beforeUnlimited = requests;
-  await page.getByRole("button", { name: "Autoplay", exact: true }).click();
-  await page.getByRole("button", { name: "Unlimited autoplay" }).click();
+  await auto.click();
+  await expect(panel.getByRole("button", { name: "Unlimited autoplay" })).toHaveAttribute("aria-pressed", "true");
   expect(requests).toBe(beforeUnlimited);
   await spin.click();
   await expect(count).toHaveText("∞");
@@ -1127,6 +1145,8 @@ test("Tavern defaults to Drop with demo controls hidden and Skip preserves one r
   await spin.click();
   await expect.poll(() => commands.length).toBe(1);
   await expect(spin).toHaveAttribute("aria-label", "Skip");
+  await expect(spin).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(spin.locator(".hud-icon-spin")).toHaveCSS("background-color", "rgb(163, 163, 163)");
   await spin.click();
   releaseResult();
   await expect(spin).toHaveAttribute("aria-label", "Spin");

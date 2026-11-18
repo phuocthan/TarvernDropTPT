@@ -44,6 +44,7 @@
 }
 .brand-loading-progress {
   position: absolute;
+  z-index: 2;
   bottom: max(20px, env(safe-area-inset-bottom));
   text-align: center;
   font-size: clamp(21px, 4svh, 32px);

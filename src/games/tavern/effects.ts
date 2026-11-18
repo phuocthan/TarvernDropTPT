@@ -68,8 +68,10 @@ export async function mountTavernEffects(
 ) {
   const slots = sceneLayout?.slots ?? {};
   const camera = sceneLayout?.backgroundCamera;
-  await Assets.load([atlas, backgroundUrl, reelhouseUrl, screensUrl]);
-  const mascotLoaded = await loadMascot().then(() => true, () => false);
+  const [, mascotLoaded] = await Promise.all([
+    Assets.load([atlas, backgroundUrl, reelhouseUrl, screensUrl]),
+    loadMascot().then(() => true, () => false),
+  ]);
   const app = new Application();
   await app.init({
     width: stage.clientWidth,
@@ -77,7 +79,7 @@ export async function mountTavernEffects(
     autoStart: false,
     backgroundAlpha: 0,
     antialias: false,
-    resolution: Math.min(devicePixelRatio, 1.5),
+    resolution: Math.min(devicePixelRatio, 1.25),
     preference: "webgl",
   });
   app.ticker.maxFPS = 30;

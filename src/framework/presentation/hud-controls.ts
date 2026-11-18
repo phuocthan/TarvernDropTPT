@@ -30,6 +30,7 @@ export function mountRoundPicker(
     trigger.setAttribute("aria-expanded", String(panel.matches(":popover-open")));
   });
   return {
+    isOpen() { return panel.matches(":popover-open"); },
     close() { panel.hidePopover(); },
     setSelected(round: number) {
       choices.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {

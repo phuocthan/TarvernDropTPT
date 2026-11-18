@@ -59,6 +59,7 @@ export function mountBrandLoader(
     panel.className = "brand-loading-intro";
     const animation = new Image();
     animation.alt = config.brandName;
+    animation.fetchPriority = "high";
     animation.src = assetUrl(reducedMotion ? config.brandLogo : brandIntro.src);
     panel.append(animation);
     screen.append(panel);
