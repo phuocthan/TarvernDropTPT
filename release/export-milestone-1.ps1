@@ -58,7 +58,7 @@ try {
     Remove-Item -LiteralPath (Join-Path $destinationPath 'release')
     Set-Content -LiteralPath (Join-Path $destinationPath 'SOURCE_REVISION') -Value $commit
     $manifest = Get-ChildItem -LiteralPath $destinationPath -Recurse -File | ForEach-Object {
-        [pscustomobject]@{ path = [System.IO.Path]::GetRelativePath($destinationPath, $_.FullName).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        [pscustomobject]@{ path = $_.FullName.Substring($destinationPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar).Length + 1).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
     }
     [pscustomobject]@{ milestone = 'M1'; sourceRevision = $commit; files = @($manifest) } |
       ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destinationPath 'EXPORT_MANIFEST.json') -Encoding utf8
