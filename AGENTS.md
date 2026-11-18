@@ -10,3 +10,7 @@
 # Framework naming
 
 Use `fw-pixi` as the framework name in current source, documentation and filenames.
+
+# Next-session context
+
+Before continuing the latest client API work, read `docs/handoff-2026-11-19.md` and `docs/client-communication-log.md`. They record the newest client decisions, verified gaps and publishing restrictions.
