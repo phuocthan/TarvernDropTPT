@@ -1,4 +1,4 @@
-# Framework extension: Gen3 review and resource pipeline
+# fw-pixi architecture and resource pipeline
 
 ## Implemented in this revision
 
@@ -18,22 +18,20 @@ Login, buy-feature, progress ACK and final-summary ACK also carry `gameCode` in 
 
 The development backend now uses Node watch mode. A previous localhost process was still running the old login validator, causing `INVALID_FIELDS` after the FE body changed. It has been restarted with the matching contract. Refresh tests must cover the actual HTTP endpoint, not only in-memory mocks.
 
-## Gen3 source reviewed
+## fw-pixi module boundaries
 
-Reference checkout: `D:/Blackwolf/gen3-framework`. Files reviewed include:
+The framework separates resource paths, shared utilities, slot execution, UI, app lifetime and transport. These are logical boundaries within this repository, not separately published packages.
 
-| Gen3 module | Relevant source/design | Current framework implementation |
+| Area | Responsibility | Current implementation |
 | --- | --- | --- |
-| gen3-remote | `config/central-config.json`, remote asset/branding folders | `remote/asset-resolver.ts`: data-only resource paths, HTTP(S), CDN base, `{brand}`, `{locale}`, `{version}` |
-| gen3-shared | Shared fonts, localization, overlays and common assets | `shared/disposables.ts`; shared resource ownership and existing shared controls/money helpers |
-| gen3-slot-core | Shared reel/game execution separated from game assets | `slot-core/index.ts`: public core entry, controller/session/domain contracts; existing normal/drop BoardView remains shared |
-| gen3-ui | Common controls, loading popup and game UI wrappers | `ui/index.ts`: controls, money and bitmap amounts; Tavern keeps its specific art/layout/animations |
-| gen3-app | MainApp, scene lifecycle, ResourceManager, ResourceAsyncLoader, ResourceUtils, SoundLoader | `app/game-runtime.ts`, `resources/*`, `audio/howler-bus.ts`: per-game service scope, manifest/bundles, typed driver, preload, lazy load and disposal |
-| gen3-network | HTTPClient and socket request/response mapping | `network/json-client.ts`: HTTP/timeout/error handling; `transport/proposal.ts`: versioned protocol, auth, entitlements, checkpoints and wire mapping |
+| fw-pixi remote | Resource URLs and branding variables | `remote/asset-resolver.ts`: data-only paths, HTTP(S), CDN base, `{brand}`, `{locale}`, `{version}` |
+| fw-pixi shared | Shared lifetime and resource ownership | `shared/disposables.ts`, shared controls and money helpers |
+| fw-pixi slot core | Reel/game execution separated from game assets | `slot-core/index.ts`, controller/session/domain contracts and shared Normal/Drop BoardView |
+| fw-pixi UI | Controls, loading and game-independent widgets | `ui/index.ts`, controls, money and bitmap amounts; game-specific art/layout stays in the game module |
+| fw-pixi app | Resource and scene service lifetime | `app/game-runtime.ts`, `resources/*`, `audio/howler-bus.ts`: manifests, bundles, preload, lazy load and disposal |
+| fw-pixi network | Requests and wire-format mapping | `network/json-client.ts`, `transport/proposal.ts`: timeouts, errors, auth, entitlements, checkpoints and protocol mapping |
 
-This is an adaptation of the architecture, not an installation of the Gen3 packages. The inspected Gen3 app pins Pixi 6.3.2 and Spine loader 3.8; this project uses Pixi 8 and Spine 4.2. Importing those packages wholesale would introduce incompatible rendering objects and duplicate engine versions. Production hosts/operators from the reference remote config are not used here.
-
-The open-source libraries actually adopted are **Howler 2.2.4** for sound packs/sprites, fallback codecs and browser audio lifecycle, and **FontFaceObserver 2.1.0** for webfont readiness. Both are also used by Gen3. Pixi 8 `Assets` remains the texture/atlas/Spine/bitmap-font backend instead of porting Pixi 6 `Loader`.
+fw-pixi uses PixiJS 8 and Spine 4.2. Its resource driver uses Pixi `Assets` for textures, atlases, skeleton data and bitmap fonts. **Howler 2.2.4** handles sound packs/sprites, fallback codecs and browser audio lifecycle; **FontFaceObserver 2.1.0** provides webfont readiness.
 
 ## Resource standard
 
