@@ -7,6 +7,7 @@ Reusable TypeScript/PixiJS core with a 5×5 Drop preview and a 3×3 Normal examp
 Node >=22.18 and npm:
 
 ```sh
+node tools/verify-m1.mjs
 npm ci
 npm test
 npm run build

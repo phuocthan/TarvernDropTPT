@@ -54,15 +54,24 @@ try {
     $config | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $configPath -Encoding utf8
     $proposalPath = Join-Path $destinationPath 'docs/FE-BE-Proposal.md'
     $proposalText = Get-Content -LiteralPath $proposalPath -Raw -Encoding utf8
-    $proposalText.Replace('backend-mock-examples-client-review.md', 'milestone-1-api.md') |
+    $proposalText.Replace('backend-mock-examples-client-review.md', 'milestone-1-api.md').TrimEnd() |
       Set-Content -LiteralPath $proposalPath -Encoding utf8
     Remove-Item -LiteralPath $profile
     Remove-Item -LiteralPath (Join-Path $destinationPath 'release')
     Set-Content -LiteralPath (Join-Path $destinationPath 'SOURCE_REVISION') -Value $commit
     $manifest = Get-ChildItem -LiteralPath $destinationPath -Recurse -File | ForEach-Object {
-        [pscustomobject]@{ path = $_.FullName.Substring($destinationPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar).Length + 1).Replace('\', '/'); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+        $relative = $_.FullName.Substring($destinationPath.TrimEnd([System.IO.Path]::DirectorySeparatorChar).Length + 1).Replace('\', '/')
+        $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+        if ($_.Extension -in @('.ts', '.js', '.mjs', '.json', '.md', '.txt', '.css', '.html') -or $relative -in @('.gitignore', 'SOURCE_REVISION')) {
+            $text = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8).Replace("`r`n", "`n")
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+        }
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try { $hash = [System.BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant() }
+        finally { $sha.Dispose() }
+        [pscustomobject]@{ path = $relative; sha256 = $hash }
     }
-    [pscustomobject]@{ milestone = 'M1'; sourceRevision = $commit; files = @($manifest) } |
+    [pscustomobject]@{ milestone = 'M1'; checksumNormalization = 'UTF-8 text without BOM with LF; binary unchanged'; sourceRevision = $commit; files = @($manifest) } |
       ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destinationPath 'EXPORT_MANIFEST.json') -Encoding utf8
     Write-Output "Exported milestone 1 from $commit to $destinationPath"
 } finally {
