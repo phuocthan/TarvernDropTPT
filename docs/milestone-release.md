@@ -6,6 +6,12 @@ Development continues in `phuocthan/TarvernDropTPT`. The client reviews publishe
 
 Push development changes to `TarvernDropTPT` when requested. Push `DropTarvernRelease` only when the user explicitly names that release destination, and include only the milestone/files/features they specify. A development push must never automatically trigger a release export, commit or push. The user reaffirmed this policy on 18 November 2026. Existing milestone tags must remain unchanged.
 
+## Working flow — reaffirmed 20 November 2026
+
+Develop and verify in `TarvernDropTPT` → curate the requested milestone scope in `DropTarvernRelease` → submit the approved client scope on the client's feature branch through a Draft GitLab MR.
+
+Both downstream destinations require an explicit user instruction: **do not push release or client GitLab, or publish/update the client MR, merely because development, local tests or milestone packaging is complete**. Preserve protected main and the approved branch base. An instruction to pull code or run locally does not authorize publication.
+
 ## Milestone 1 package
 
 The explicit file list is in [export-milestone-1.ps1](../release/export-milestone-1.ps1). It includes the shared TypeScript/PixiJS core, Tavern 5 × 5 JSON and 3 × 3 reuse configuration, durable synthetic v1 mock API, 22 sanitized request/response examples, shared tests and production browser smoke, a package lock and build configuration, the client README and M1 documents, and clean-preview desktop/portrait screenshots. The release entry points mount both configurations using the shared placeholder skin.
