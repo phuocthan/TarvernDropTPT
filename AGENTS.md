@@ -13,6 +13,8 @@ Use `fw-pixi` as the framework name in current source, documentation and filenam
 
 # Next-session context
 
+For the next game comparison work, start with `docs/handoff-2026-11-19.md` and `docs/game-comparison-test-plan.md`.
+
 Before continuing the latest client API work, read `docs/handoff-2026-11-19.md` and `docs/client-communication-log.md`. They record the newest client decisions, verified gaps and publishing restrictions.
 
 # Working flow reaffirmed 20 November 2026
