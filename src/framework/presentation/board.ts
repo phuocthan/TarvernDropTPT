@@ -345,6 +345,7 @@ export class BoardView {
     const pitch = this.cell + this.gap;
     const boardHeight = this.game.rows * pitch;
     const drop = this.game.presentation.drop;
+    const spawnY = -pitch - (drop.enterSpawnClearancePx ?? 0);
     const { fallMs, reelStaggerMs, rowStaggerMs, holdMs } = entering
       ? drop.enter
       : drop.exit;
@@ -352,11 +353,13 @@ export class BoardView {
     const bounce = entering ? Math.max(drop.bounceMs, landingDuration(deformation) - (deformation?.leadMs ?? 0)) : 0;
     const moves = this.tiles.flatMap((tiles, reel) =>
       Array.from({ length: this.game.rows }, (_, row) => {
+        const tile = tiles[row + 1];
+        if (entering) tile.view.visible = false;
         const rest = row * pitch;
-        const from = entering ? -pitch : rest;
+        const from = entering ? spawnY : rest;
         const to = entering ? rest : boardHeight;
         return {
-          tile: tiles[row + 1],
+          tile,
           reel,
           row,
           from,
@@ -397,6 +400,10 @@ export class BoardView {
         this.applyLanding(move.tile, entering ? elapsed - move.fall + (deformation?.leadMs ?? 0) : Infinity);
         move.tile.view.y =
           move.from + (move.to - move.from) * progress ** 2 + rebound;
+        // Keep Spine effects outside the cell from revealing a queued symbol.
+        if (entering && !move.tile.view.visible && elapsed > 0 &&
+            move.tile.view.y + this.cell > 0)
+          move.tile.view.visible = true;
         if (
           entering &&
           progress === 1 &&

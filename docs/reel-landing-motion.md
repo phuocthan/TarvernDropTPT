@@ -9,3 +9,7 @@ The downloaded Tavern reference reveal implementation was inspected locally in `
 `landing-motion.ts` contains renderer-independent interpolation. `BoardView` wraps each symbol in a carrier anchored at bottom center; it never overwrites the symbol factory's authored scale. Bounds for edge fitting account for carrier deformation. Skip, snapshot replacement and a new spin restore every carrier to exactly 1×1. A generation guard stops an old normal-settle callback from moving a newer board.
 
 Verification: tests cover the compression/stretch/rest phases, invalid configuration, and actual Pixi normal/drop motion with Skip. The browser fixture deliberately gives authored symbols a 1.15 scale and verifies it remains 1.15 while the carrier returns to 1×1. The local API/UI smoke checks continue to use recorded server outcomes; bounce does not alter results or payouts.
+
+## Drop entry clearance
+
+`presentation.drop.enterSpawnClearancePx` adds clearance above the default entry position of one cell pitch above the reel. It defaults to zero. Tavern Drop uses 48 px of extra clearance, placing incoming cells at −158 px with its 110 px pitch. The shared board keeps each incoming tile invisible until its nominal cell begins crossing the top of the reel, independent of oversized effects such as Scatter glow. Exit motion uses the existing start positions, and landed Scatter Win can still use the foreground layer.

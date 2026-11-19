@@ -154,6 +154,7 @@ export interface ReelPresentation {
   drop: {
     exit: DropTiming;
     enter: DropTiming;
+    enterSpawnClearancePx?: number;
     bounceMs: number;
     bouncePx: number;
     turboMultiplier: number;

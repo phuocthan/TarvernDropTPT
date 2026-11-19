@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { MockGame } from "./server/mock-game.ts";
+import mockGamePolicy from "./server/demo-check.config.json" with { type: "json" };
 import { ProposalBackend, ProposalError } from "./server/proposal-backend.ts";
 import { gamePaths, readGameConfig } from "./tools/game-profile.ts";
 
@@ -19,7 +20,7 @@ if (profile) {
   ({ games: catalog } = await import("./src/games/catalog.ts"));
 }
 
-const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE || ".runtime/backend-v1.json");
+const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE || ".runtime/backend-v1.json", { mockGamePolicy });
 proposal.sweepExpired();
 setInterval(() => {
   try { proposal.sweepExpired(); } catch (error) { console.error("Proposal settlement sweep failed", error); }
@@ -103,7 +104,7 @@ createServer(async (req, res) => {
         if (!sessions.has(sessionId)) {
           if (sessions.size >= 500)
             return json(res, 503, { error: "DEMO_SESSION_LIMIT" });
-          sessions.set(sessionId, new MockGame(definition));
+          sessions.set(sessionId, new MockGame(definition, undefined, mockGamePolicy));
         }
         res.setHeader(
           "Set-Cookie",

@@ -32,6 +32,10 @@ $entries = @(
     'release/milestone-1/playwright.config.ts',
     'release/milestone-1/README.md'
 )
+$mockPolicyPath = 'server/demo-check.config.json'
+if (git -C $source ls-tree --name-only $commit -- $mockPolicyPath) {
+    $entries += $mockPolicyPath
+}
 $archive = Join-Path ([System.IO.Path]::GetTempPath()) ("milestone-1-" + [guid]::NewGuid() + ".zip")
 try {
     git -C $source archive --format=zip "--output=$archive" $commit -- @entries

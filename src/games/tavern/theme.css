@@ -514,7 +514,11 @@
 .tavern-hud #speed:disabled { opacity: .8; }
 .tavern-hud .hud-quick #auto:disabled,
 .tavern-hud .bet-arrows button:disabled { opacity: .7; }
-.tavern-hud .spin-button:disabled { opacity: 1; color: dimgrey; }
+.tavern-hud .spin-button:disabled {
+  opacity: 1;
+  color: dimgrey;
+  cursor: default;
+}
 .spin-button .auto-count {
   position: absolute;
   inset: var(--auto-count-inset);
@@ -1187,6 +1191,7 @@
 .tavern-shell .opening-continue:disabled,
 .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue:disabled {
   opacity: 1;
+  cursor: default;
 }
 #modal-content:has(> .tavern-screen-art[data-spine-ready]) > .scene-continue {
   position: fixed;

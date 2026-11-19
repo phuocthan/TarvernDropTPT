@@ -57,6 +57,8 @@ See the [framework class diagrams and Tavern Drop runtime](docs/framework-classe
 
 See the [Milestone 1 handoff and acceptance checklist](docs/milestone-1.md) and the [client release export procedure](docs/milestone-release.md).
 
+See the [development handoff](docs/handoff-2026-11-19.md) for recent Tavern Drop changes and open API integration work.
+
 See the [Tavern asset inventory](docs/tavern-asset-inventory.md) for CDN verification and the source of the HUD icons.
 
 See the [Tavern performance notes](docs/tavern-performance.md) for the local profiling results and hardware checks.

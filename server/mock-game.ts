@@ -14,15 +14,24 @@ import {
   evaluate,
   settleFeature,
 } from "../src/framework/domain/rules.ts";
+/** Temporary synthetic-server controls; never client-side outcome configuration. */
+export interface MockGamePolicy {
+  allowNaturalFeatureTriggers?: boolean;
+  maxScattersPerReel?: number;
+}
 /** Fake server only. No certified math or real-money support. */
 export class MockGame {
   state: Snapshot;
   private receipts = new Map<string, { command: string; outcome: Outcome }>();
   private game: GameDefinition;
   private rng: () => number;
-  constructor(game: GameDefinition, rng: () => number = Math.random) {
+  private policy: Required<MockGamePolicy>;
+  constructor(game: GameDefinition, rng: () => number = Math.random, policy: MockGamePolicy = {}) {
     this.game = game;
     this.rng = rng;
+    this.policy = { allowNaturalFeatureTriggers: true, maxScattersPerReel: 1, ...policy };
+    if (!Number.isInteger(this.policy.maxScattersPerReel) || this.policy.maxScattersPerReel < 0 || this.policy.maxScattersPerReel > game.rows)
+      throw Error("INVALID_MOCK_SCATTER_LIMIT");
     this.state = {
       version: 0,
       balance: game.demo.initialBalance,
@@ -152,7 +161,7 @@ export class MockGame {
         outcome.paidAward = state.round!.baseWin;
         state.balance += outcome.paidAward;
         const mode = bonus >= 4 ? "drop" : "tavern";
-        if (bonus >= 3 && rules.featureSpins[mode] && state.round!.baseWin < state.round!.cap)
+        if (this.policy.allowNaturalFeatureTriggers && bonus >= 3 && rules.featureSpins[mode] && state.round!.baseWin < state.round!.cap)
           this.enter(state, mode, outcome);
         else state.round = null;
       }
@@ -229,12 +238,15 @@ export class MockGame {
       .map((s) => s.id);
     const bonusId = this.game.symbols.find((s) => s.kind === "bonus")?.id;
     const bonusRate = chance === null ? 0 : this.game.demo.scatterRates[chance];
-    return Array.from({ length: this.game.reels }, () =>
-      Array.from({ length: this.game.rows }, () =>
-        bonusId && bonusRate > 0 && this.rng() < bonusRate
-          ? bonusId
-          : ids[Math.floor(this.rng() * ids.length)],
-      ),
-    );
+    return Array.from({ length: this.game.reels }, () => {
+      let scatterCount = 0;
+      return Array.from({ length: this.game.rows }, () => {
+        if (bonusId && bonusRate > 0 && scatterCount < this.policy.maxScattersPerReel && this.rng() < bonusRate) {
+          scatterCount++;
+          return bonusId;
+        }
+        return ids[Math.floor(this.rng() * ids.length)];
+      });
+    });
   }
 }

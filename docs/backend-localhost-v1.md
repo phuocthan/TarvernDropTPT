@@ -4,6 +4,18 @@ Implementation cho [FE-BE-Proposal](FE-BE-Proposal.md), revision `v1-review-6`. 
 
 Update: mọi POST từ FE dùng URL sạch và gửi `gameCode` trong JSON, bao gồm login, spin, buy-feature và các ACK. Ví dụ `POST /api/v1/spin` với `{"gameCode":"tavern-drop","isFreespin":0,"betMinor":1000,"chanceMode":"normal"}`. Game-info/status cũng dùng POST với body JSON; URL của toàn bộ API v1 không có query parameters. Xem [framework/resource extension](fw-pixi-architecture.md).
 
+## Temporary local checking policy — 20 November 2026
+
+`server/demo-check.config.json` controls the runnable mock routes (v1 and legacy):
+
+```json
+{ "allowNaturalFeatureTriggers": false, "maxScattersPerReel": 1 }
+```
+
+Newly generated base/free-spin boards contain at most one Scatter per reel. Base spins, including Chance spins, do not enter a feature even when three or more reels contain Scatters. Buy Tavern/Drop remains available with exactly three/four trigger Scatters; free-spin retriggers remain enabled. These are temporary synthetic checking controls, not approved client math/rules. Restoring natural entry only requires setting `allowNaturalFeatureTriggers` to true and restarting the backend.
+
+Previously recorded rounds and retry receipts are preserved unchanged; this policy applies when a new round is generated. Test-only forced boards remain explicit fixtures. No wallet/round reset is needed.
+
 ## Chạy
 
 Node >=22.18, chạy tại repository root:

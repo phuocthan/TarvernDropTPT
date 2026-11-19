@@ -412,6 +412,7 @@
       "bouncePx": 8
     },
     "drop": {
+      "enterSpawnClearancePx": 48,
       "exit": {
         "fallMs": 250,
         "reelStaggerMs": 18,

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { Board, FeatureState, GameDefinition, Outcome } from "../src/framework/domain/contracts.ts";
-import { MockGame } from "./mock-game.ts";
+import { MockGame, type MockGamePolicy } from "./mock-game.ts";
 
 type Payload = Record<string, unknown>;
 type CurStep = "base" | "intro" | "freespin" | "show-chest" | "open-chest" | "free-end";
@@ -88,10 +88,12 @@ export class ProposalBackend {
   private file: string;
   private now: () => number;
   private rng: () => number;
-  constructor(games: GameDefinition[], file: string, options: { now?: () => number; rng?: () => number } = {}) {
+  private mockGamePolicy: MockGamePolicy;
+  constructor(games: GameDefinition[], file: string, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy } = {}) {
     this.file = resolve(file);
     this.now = options.now ?? Date.now;
     this.rng = options.rng ?? Math.random;
+    this.mockGamePolicy = { ...options.mockGamePolicy };
     for (const source of games) {
       const game = structuredClone(source);
       game.bets = [100, 500, 1000, 2000, 5000, 10000];
@@ -200,7 +202,7 @@ export class ProposalBackend {
     };
   }
   private buildRound(definition: GameDefinition, bet: number, action: "spin" | "buy-tavern" | "buy-drop", chance: "standard" | "extra" | "super"): Round {
-    const mock = new MockGame(definition, this.rng);
+    const mock = new MockGame(definition, this.rng, this.mockGamePolicy);
     mock.state.balance = Number.MAX_SAFE_INTEGER / 2;
     let outcome = mock.execute({ requestId: randomUUID(), expectedVersion: 0, action, bet, chance });
     const mode = outcome.entry;

@@ -402,6 +402,10 @@
             "enter": {
               "$ref": "#/$defs/dropPhase"
             },
+            "enterSpawnClearancePx": {
+              "type": "integer",
+              "minimum": 0
+            },
             "bounceMs": {
               "type": "integer",
               "minimum": 1

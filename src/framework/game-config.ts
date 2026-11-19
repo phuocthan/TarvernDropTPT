@@ -106,6 +106,8 @@ export function loadGameConfig(raw: unknown): GameDefinition {
       ![deformation.squashX, deformation.squashY, deformation.stretchX, deformation.stretchY]
         .every((value) => Number.isFinite(value) && value >= 0.5 && value <= 1.5)))
     invalid("presentation.landing");
+  if (drop?.enterSpawnClearancePx !== undefined && !nonNegativeInt(drop.enterSpawnClearancePx))
+    invalid("presentation.drop.enterSpawnClearancePx");
   const anticipation = drop?.anticipation;
   if (anticipation !== undefined &&
     (!anticipation || !ids.has(anticipation.symbolId) ||
