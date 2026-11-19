@@ -73,14 +73,14 @@ export class BoardView {
   get isMoving() { return this.spinning.some(Boolean) || this.dropRound !== null; }
   get contentWidth() { return this.game.reels * (this.cell + this.gap) - this.gap; }
   get contentHeight() { return this.game.rows * (this.cell + this.gap) - this.gap; }
-  async mount(host: HTMLElement, { autoStart = true } = {}) {
+  async mount(host: HTMLElement, { autoStart = true, bottomOverflowPx = 0 } = {}) {
     const width = this.game.reels * (this.cell + this.gap) - this.gap;
     const height = this.game.rows * (this.cell + this.gap) - this.gap;
     const padding = this.game.presentation.reelMaskPaddingPx ?? 0;
     const overflow = this.game.presentation.winOverflowPaddingPx ?? 0;
     const renderPadding = Math.max(padding, overflow);
     const renderWidth = width + 2 * overflow;
-    const renderHeight = height + 2 * renderPadding;
+    const renderHeight = height + renderPadding + Math.max(renderPadding, bottomOverflowPx);
     const boardResolution = () => {
       const dpr = Math.min(devicePixelRatio, 2);
       return Math.min(dpr, Math.max(1, (host.clientWidth || width) * dpr / width));
@@ -96,7 +96,7 @@ export class BoardView {
       preference: "webgl",
     });
     this.app.ticker.minFPS = 0;
-    if (renderPadding || overflow) {
+    if (renderPadding || bottomOverflowPx || overflow) {
       host.dataset.maskPadding = "true";
       host.style.setProperty("--reel-canvas-height", `${100 * renderHeight / height}%`);
       host.style.setProperty("--reel-canvas-width", `${100 * renderWidth / width}%`);

@@ -38,7 +38,7 @@ export function createSlotSession(
       if (timing?.endDelayMs)
         await new Promise<void>((resolve) => setTimeout(resolve, timing.endDelayMs));
     },
-    async mount(host: HTMLElement, options?: { autoStart?: boolean; initialState?: Snapshot }) {
+    async mount(host: HTMLElement, options?: { autoStart?: boolean; bottomOverflowPx?: number; initialState?: Snapshot }) {
       await Promise.all([board.mount(host, options), controller.boot(options?.initialState)]);
       board.setBoard(controller.state!.board);
       if (controller.state!.feature?.played === 0) prepareFeatureEntry();

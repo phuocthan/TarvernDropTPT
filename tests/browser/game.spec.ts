@@ -215,7 +215,8 @@ for (const action of ["spin", "buy-drop"] as const) {
     await page.goto("/");
     await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
     await page.evaluate(async (count) => {
-      const boardModule = "/src/framework/presentation/board.ts";
+      const boardModule = performance.getEntriesByType("resource")
+        .find(({ name }) => /\/src\/framework\/presentation\/board\.ts(?:\?|$)/.test(name))!.name;
       const { BoardView } = await import(boardModule);
       const focusWins = BoardView.prototype.focusWins;
       const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
@@ -228,6 +229,14 @@ for (const action of ["spin", "buy-drop"] as const) {
         const result = updateSpine.call(this, elapsed);
         if (this.state.getCurrent(2)?.animation?.name === "2_base_exit")
           boardVisible = () => this.visible;
+        const bonusEntry = this.state.getCurrent(2);
+        if (bonusEntry?.animation?.name === "2_bonus_enter" && bonusEntry.trackTime >= bonusEntry.animationEnd) {
+          const key = this.skeleton.findSlot("reelhouse_key51")!.bone;
+          const scene = document.querySelector(".tavern-spine-scene")!.getBoundingClientRect();
+          const board = document.querySelector("#board")!.getBoundingClientRect();
+          const keyCenterY = scene.top + this.y + key.worldY * this.scale.y;
+          dialog.dataset.keyRowOffset = String((keyCenterY - board.top) / (board.height / 5) - 0.5);
+        }
         return result;
       };
       const drawImage = CanvasRenderingContext2D.prototype.drawImage;
@@ -275,6 +284,17 @@ for (const action of ["spin", "buy-drop"] as const) {
     const duration = await dialog.getAttribute("data-scatter-duration");
     expect(Number(duration)).toBeGreaterThan(300);
     await page.locator("#continue").click();
+    const stage = page.locator(".stage");
+    await expect(stage).toHaveAttribute("data-bonus-entry", "");
+    await expect(page.locator("#chests")).toBeHidden();
+    await expect(hud).toBeHidden();
+    await expect(stage).not.toHaveAttribute("data-bonus-entry");
+    await expect(stage).toHaveAttribute("data-foreground-chests", "");
+    await expect(page.locator("#chests .chest")).toHaveCount(0);
+    await expect.poll(async () => {
+      const offset = await dialog.getAttribute("data-key-row-offset");
+      return offset === null ? Infinity : Math.abs(Number(offset));
+    }).toBeLessThan(0.12);
     await expect(hud).toBeVisible();
     await expect(hud.locator("#feature-progress")).toHaveText("10");
   });
@@ -408,11 +428,8 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     "data-mode",
     "drop",
   );
-  const chestsAboveReels = await page.locator("#board canvas").evaluate(
-    (canvas) => Number(getComputedStyle(document.querySelector("#chests")!).zIndex) >
-      Number(getComputedStyle(canvas).zIndex),
-  );
-  expect(chestsAboveReels).toBe(true);
+  await expect(page.locator(".stage")).toHaveAttribute("data-foreground-chests", "");
+  await expect(page.locator("#chests .chest")).toHaveCount(0);
   await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", {
     timeout: 35000,
   });
@@ -502,8 +519,12 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
       if (name === "4_finalwin" || /reel_3_chest_(open|finalwin)$/.test(name)) clips.push(name);
       const result = document.querySelector<HTMLDialogElement>('#dialog[data-look="total-win"]');
-      if (name === "2_base_enter" && result?.open)
-        result.dataset.baseEnteredDuringOutro = String(!!result.querySelector('[data-spine-clip="total_win_end"]'));
+      if (name === "2_base_enter" && result) {
+        const shell = document.querySelector<HTMLElement>(".tavern-shell")!;
+        result.dataset.baseEnteredDuringOutro = String(result.open && !!result.querySelector('[data-spine-clip="total_win_end"]'));
+        result.dataset.baseLayoutAtEntry = shell.dataset.mode;
+        result.dataset.baseEntryCount = String(Number(result.dataset.baseEntryCount ?? 0) + 1);
+      }
       return original.call(this, track, name, loop);
     };
   });
@@ -517,12 +538,17 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   releaseFreeSpin();
   if (unlocked) {
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", { timeout: 25000 });
-    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "1.00");
-    expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_finalwin")?.style.fontSize)).toBe(240);
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "$1.00");
+    expect(await page.evaluate(() => {
+      const amount = (window as any).chestSlotObjects.get("slot_finalwin");
+      return amount?.children.find((child: { style?: { fontFamily: string } }) =>
+        child.style?.fontFamily === "td_gold",
+      )?.style.fontSize;
+    })).toBe(240);
     await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-opened", "3", { timeout: 10000 });
     expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_reel_mult_3")?.text)).toBe("x2");
-    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "2.00", { timeout: 10000 });
+    await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "$2.00", { timeout: 10000 });
   }
   await expect(page.getByRole("heading", { name: "Total Win" })).toBeVisible({ timeout: 25000 });
   const resultDialog = page.locator('#dialog[data-look="total-win"]');
@@ -548,17 +574,20 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     await expect(page.locator("#dialog")).toBeVisible();
   }
   await page.mouse.click(5, 5);
+  await expect(resultDialog.locator(".total-win-screen > canvas"))
+    .toHaveCSS("animation-name", "total-win-continue-pop");
   await expect(resultDialog).toHaveAttribute("data-base-entered-during-outro", "true");
+  await expect(resultDialog).toHaveAttribute("data-base-layout-at-entry", "base");
+  await expect(resultDialog).toBeHidden({ timeout: 16000 });
+  await expect(resultDialog).toHaveAttribute("data-base-entry-count", "1");
   if (unlocked) {
     await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
     await expect.poll(() => page.evaluate(() => {
       const slots = (window as any).chestSlotObjects as Map<string, { text: string }>;
       return slots.size === 6 && Array.from(slots.values()).every((slot) => slot.text === "");
     })).toBe(true);
-  } else {
-    await expect(page.locator("#dialog")).toBeHidden({ timeout: 16000 });
-    await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
   }
+  await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", "base");
 });
 for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 }, { width: 506, height: 812 }]) {
   test(`autoplay and menu fit the ${viewport.width}px layout`, async ({ page }) => {

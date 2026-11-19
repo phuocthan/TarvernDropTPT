@@ -64,6 +64,7 @@ export async function mountTavernEffects(
   sceneLayout: ReelPresentation["scene"],
   placeMascot: (anchor?: SceneAnchor | null) => void,
   resources: ResourceManager,
+  boardApp: Application,
 ) {
   const atlas = resources.url("atlas");
   const backgroundUrl = resources.url("scene.background");
@@ -96,11 +97,14 @@ export async function mountTavernEffects(
   const reelhouse = createReelhouse(app, false, resources);
   const symbolAnchor = reelhouse.skeleton.findSlot("slot_symbols")?.bone
     ?? reelhouse.skeleton.findBone("slot_symbols");
-  let baseSymbolY: number | undefined;
+  reelhouse.update(0);
+  const baseSymbolY = symbolAnchor?.worldY;
   const chestSlots = reelhouse.skeleton.slots.filter((slot) =>
     slot.data.name.startsWith("reel_chest_"),
   );
   const chestAlpha = new Map<Slot, number>();
+  const chestSlotIndexes = new Set(chestSlots.map(({ data }) => data.index));
+  let foregroundChests: Spine | undefined;
   const chestTotal = new BitmapAmount("td_gold", 240);
   chestTotal.anchor.set(0.5);
   chestTotal.visible = false;
@@ -220,14 +224,70 @@ export async function mountTavernEffects(
   let bounds = screenBounds(screens.skeleton.data, []);
   const viewports = new Map<string, typeof bounds>();
 
+  function layoutForegroundChests() {
+    if (!foregroundChests) return;
+    const stageRect = scene.getBoundingClientRect();
+    const boardRect = boardApp.canvas.getBoundingClientRect();
+    if (!boardRect.width || !boardRect.height || !stageRect.width || !stageRect.height) return;
+    const boardScaleX = boardApp.screen.width / boardRect.width;
+    const boardScaleY = boardApp.screen.height / boardRect.height;
+    const stageScaleX = stageRect.width / app.screen.width;
+    const stageScaleY = stageRect.height / app.screen.height;
+    foregroundChests.position.set(
+      (stageRect.left - boardRect.left + reelhouse.x * stageScaleX) * boardScaleX - boardApp.stage.x,
+      (stageRect.top - boardRect.top + reelhouse.y * stageScaleY) * boardScaleY - boardApp.stage.y,
+    );
+    foregroundChests.scale.set(reelhouse.scale.x * stageScaleX * boardScaleX, reelhouse.scale.y * stageScaleY * boardScaleY);
+  }
+
+  function createForegroundChests() {
+    const layer = new Spine({ skeletonData: reelhouse.skeleton.data, autoUpdate: false });
+    layer.visible = false;
+    const source = reelhouse.skeleton;
+    layer.afterUpdateWorldTransforms = ({ skeleton }) => {
+      // Project the authored slots into the reel renderer using the scene's current
+      // pose and draw order. The scene alone advances tracks and emits events.
+      for (const bone of source.bones) {
+        const target = skeleton.bones[bone.data.index];
+        target.a = bone.a;
+        target.b = bone.b;
+        target.c = bone.c;
+        target.d = bone.d;
+        target.worldX = bone.worldX;
+        target.worldY = bone.worldY;
+      }
+      skeleton.drawOrder.length = 0;
+      for (const slot of source.drawOrder) {
+        if (!chestSlotIndexes.has(slot.data.index)) continue;
+        const target = skeleton.slots[slot.data.index];
+        target.setAttachment(slot.getAttachment());
+        target.color.setFromColor(slot.color);
+        if (target.darkColor && slot.darkColor) target.darkColor.setFromColor(slot.darkColor);
+        target.sequenceIndex = slot.sequenceIndex;
+        target.deform.length = slot.deform.length;
+        for (let i = 0; i < slot.deform.length; i++) target.deform[i] = slot.deform[i];
+        skeleton.drawOrder.push(target);
+      }
+    };
+    boardApp.stage.addChild(layer);
+    return layer;
+  }
+
   function updateReelhouse(time: number) {
-    // Free spins draw the atlas chests over the separate symbol canvas.
     for (const [slot, alpha] of chestAlpha) slot.color.a = alpha;
     chestAlpha.clear();
     reelhouse.update(time);
-    const foreground = mode === "bonus" && !revealingChests && !bonusExited;
+    const foreground = mode === "bonus" && !stage.hasAttribute("data-bonus-entry") &&
+      !revealingChests && !bonusExited;
     stage.toggleAttribute("data-foreground-chests", foreground);
-    if (!foreground) return;
+    if (!foreground) {
+      if (foregroundChests) foregroundChests.visible = false;
+      return;
+    }
+    foregroundChests ??= createForegroundChests();
+    if (!foregroundChests.visible) layoutForegroundChests();
+    foregroundChests.visible = true;
+    foregroundChests.update(0);
     for (const slot of chestSlots) {
       chestAlpha.set(slot, slot.color.a);
       slot.color.a = 0;
@@ -332,6 +392,7 @@ export async function mountTavernEffects(
       (frameRect.top - sceneRect.top) / sceneScale +
         (mode === "bonus" ? 2001 : 1780) * reelScale,
     );
+    layoutForegroundChests();
     updateBackground(0);
   }
   const observer = new ResizeObserver(layout);
@@ -356,6 +417,7 @@ export async function mountTavernEffects(
       reelExit?.cancel();
     }
     const was = mode;
+    let transition: TrackEntry | undefined;
     mode = next;
     revealingChests = false;
     chestAlpha.clear();
@@ -397,10 +459,10 @@ export async function mountTavernEffects(
       reelhouse.state.addAnimation(1, "1_idle", true, 0);
     } else if (was) {
       if ((baseExited && next === "bonus") || (bonusExited && next === "base")) {
-        reelhouse.state.setAnimation(2, `2_${next}_enter`, false);
+        transition = reelhouse.state.setAnimation(2, `2_${next}_enter`, false);
       } else {
         reelhouse.state.setAnimation(2, `2_${was}_exit`, false);
-        reelhouse.state.addAnimation(2, `2_${next}_enter`, false, 0);
+        transition = reelhouse.state.addAnimation(2, `2_${next}_enter`, false, 0);
       }
       background.state.setAnimation(1, "1_zoom_out", false);
       if (next === "base") reelhouse.state.addAnimation(2, "1_idle", true, 0);
@@ -412,6 +474,7 @@ export async function mountTavernEffects(
     bonusExited = false;
     updateReelhouse(0);
     layout();
+    return transition;
   }
 
   function startScene() {
@@ -462,8 +525,10 @@ export async function mountTavernEffects(
       liveOverlay.canvas.remove();
       app.stage.addChild(screens);
       liveOverlay = undefined;
+      return;
     }
-    reelhouse.visible = background.visible = true;
+    background.visible = true;
+    reelhouse.visible = !bonusExited;
     frozenScene.remove();
     scene.append(app.canvas);
     stage.dataset.spineScene = "true";
@@ -555,7 +620,6 @@ export async function mountTavernEffects(
       updateReelhouse(0);
       updateBackground(0);
       await done;
-      baseSymbolY = symbolAnchor?.worldY;
     },
     setOpeningBrightness(brightness: number) {
       const channel = Math.round(brightness * 255);
@@ -569,6 +633,18 @@ export async function mountTavernEffects(
       syncFeature(feature);
       if (host === scene) stage.dataset.spineScene = "true";
       startScene();
+    },
+    async enterBonus() {
+      // The authored entry animates the same chests that the HUD layers above the reels during play.
+      stage.setAttribute("data-bonus-entry", "");
+      try {
+        const entry = setMode("bonus");
+        if (entry) await waitForClip(entry);
+      } finally {
+        stage.removeAttribute("data-bonus-entry");
+        updateReelhouse(0);
+        app.render();
+      }
     },
     restoreFeature(feature: FeatureState | null) {
       openingDimmer.visible = false;
@@ -646,10 +722,25 @@ export async function mountTavernEffects(
     hasLiveTotalWin() {
       return !!liveOverlay;
     },
+    waitForTotalWinReturn(outro: Promise<void>) {
+      const ticker = liveOverlay?.ticker;
+      if (!ticker) return outro;
+      return new Promise<void>((resolve) => {
+        const release = () => {
+          ticker.remove(checkBeat);
+          resolve();
+        };
+        // This key in total_win_end is the first pop of the Total Win title.
+        const checkBeat = () => {
+          if ((screens.state.getCurrent(0)?.getAnimationTime() ?? 0) >= 0.47) release();
+        };
+        ticker.add(checkBeat, undefined, -10);
+        void outro.then(release, release);
+      });
+    },
     async returnFromTotalWin() {
-      setMode("base");
+      const reelEntry = setMode("base");
       reelhouse.visible = true;
-      const reelEntry = reelhouse.state.getCurrent(2);
       if (!reelEntry) return;
       const followReels = () => {
         if (symbolAnchor && baseSymbolY !== undefined) {
@@ -758,7 +849,7 @@ export async function mountTavernEffects(
       if (host === scene) return;
       if (name) {
         host.dataset.spineClip = name;
-        await playClip(screens, 0, name, name === "total_win_end" && liveOverlay ? 1.35 : 1);
+        await playClip(screens, 0, name);
         if (!liveOverlay) background.state.setAnimation(1, "1_zoom_out", false);
       }
       hideScreen();

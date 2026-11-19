@@ -194,6 +194,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     scene,
     placeOverlayMascot,
     resources,
+    view.app,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     return undefined;
@@ -310,8 +311,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       controller.pending?.action === "spin" &&
       controller.pending.expectedVersion === state?.version;
     $("feature-progress").textContent = String(Math.max(0, (feature?.remaining ?? 0) - Number(startingFreeSpin)));
-    syncBonusArt(feature);
-    effects?.sync(feature ?? null);
+    if (effects) effects.sync(feature ?? null);
+    else syncBonusArt(feature);
     $("buy").innerHTML =
       chance === "standard" || feature ? featureIcon : "Disable";
     $("buy").setAttribute(
@@ -625,10 +626,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         dialog.close();
         displayWin = 0;
         presentingFeature = outcome.state.feature;
+        // The Spine key grid and the reel canvas must measure the same bonus layout.
+        stage.parentElement!.dataset.mode = outcome.entry;
+        const bonusEntry = effects?.enterBonus();
         sync();
         delete stage.dataset.bonusIntro;
         audio.cue("entryEnd");
         syncMusic(true);
+        await bonusEntry;
       }
     } else if (checkpoint?.curStep === "show-chest" || checkpoint?.curStep === "open-chest") {
       presentingFeature = outcome.state.feature;
@@ -735,14 +740,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const enter = effects?.showScreen(resultArt, "total_win_start", {
         amount, idle: "total_win_idle", outro: "total_win_end",
       });
-      await waitForContinue(dialog, $<HTMLButtonElement>("continue"));
-      await enter;
+      await waitForContinue(dialog, $<HTMLButtonElement>("continue"), enter);
       audio.cue("totalOutro");
       const liveReturn = effects?.hasLiveTotalWin();
       const leaving = effects?.endScreen("total_win_end");
       if (liveReturn) {
         dialog.dataset.returning = "true";
-        await delay(300);
+        await effects?.waitForTotalWinReturn(leaving!);
       } else {
         await leaving;
         dialog.close();
@@ -753,11 +757,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         outcome.state.balance = controller.state!.balance;
         outcome.paidAward = Math.max(0, outcome.state.balance - before);
       }
-      view.setBoard(outcome.state.board);
       presentingFeature = null;
       displayWin = liveReturn ? 0 : c.roundAward;
-      const entering = effects?.returnFromTotalWin();
+      // The base and bonus machine have different top offsets. Apply the base layout
+      // before the Spine frame is positioned so the frame and symbols enter together.
+      shell.dataset.mode = "base";
       shell.dataset.totalWin = "returning";
+      const entering = effects?.returnFromTotalWin();
+      view.setBoard(outcome.state.board);
       sync();
       if (liveReturn) {
         const balance = outcome.state.balance;
@@ -1092,7 +1099,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
   });
   try {
-    await mount($("board"), { autoStart: false, initialState });
+    await mount($("board"), {
+      autoStart: false,
+      // The native chest row extends below the reel mask in the foreground pass.
+      bottomOverflowPx: reducedMotion ? 0 : 180,
+      initialState,
+    });
     const entry = resolveSessionEntry(controller.state!);
     view.app.ticker.maxFPS = 60;
     loader?.update(85, 100);

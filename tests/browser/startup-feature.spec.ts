@@ -49,7 +49,8 @@ for (const step of ["intro", "freespin"] as const) {
         expect(requests.filter((request) => request.path.endsWith("game-info"))).toHaveLength(1);
         if (step === "freespin") {
           await expect(page.locator("#feature-progress")).toHaveText(String(issued.freegame.remainSpin));
-          await expect(page.locator("#chests .chest")).toHaveCount(5);
+          await expect(page.locator(".stage")).toHaveAttribute("data-foreground-chests", "");
+          await expect(page.locator("#chests .chest")).toHaveCount(0);
         }
         expect(requests.filter((request) => request.path.endsWith("spin"))).toHaveLength(0);
         if (step === "freespin") await page.locator("#recover").click();
@@ -60,7 +61,8 @@ for (const step of ["intro", "freespin"] as const) {
         } else {
           await expect(page.locator(".game-shell")).toHaveAttribute("data-mode", mode);
           await expect(page.locator("#feature-progress")).toHaveText(String(issued.freegame.remainSpin));
-          await expect(page.locator("#chests .chest")).toHaveCount(5);
+          await expect(page.locator(".stage")).toHaveAttribute("data-foreground-chests", "");
+          await expect(page.locator("#chests .chest")).toHaveCount(0);
           await expect(page.locator('dialog[data-look="bonus"]')).not.toBeVisible();
         }
         await expect(page.locator("[data-entering]")).toHaveCount(0);

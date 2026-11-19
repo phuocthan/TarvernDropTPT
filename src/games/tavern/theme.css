@@ -45,6 +45,7 @@
   max-width: none;
   height: 100svh;
   min-height: 350px;
+  overflow: clip;
   isolation: isolate;
   color: white;
   background: #31211d;
@@ -855,6 +856,13 @@
 .tavern-dialog[data-look="total-win"][data-returning] #modal-content > :is(h2, .result-total) {
   opacity: 0;
 }
+.tavern-dialog[data-look="total-win"][data-returning] .total-win-screen > canvas {
+  animation: total-win-continue-pop 440ms ease-out;
+}
+@keyframes total-win-continue-pop {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  35% { transform: scale(1.075); filter: brightness(1.18); }
+}
 .tavern-dialog[data-look="total-win"][data-returning]::backdrop {
   background: transparent;
   backdrop-filter: blur(0px);
@@ -1060,11 +1068,9 @@
   visibility: hidden;
 }
 .stage[data-bonus-intro] .machine,
-.stage[data-bonus-intro] ~ .tavern-hud {
+.stage[data-bonus-intro] ~ .tavern-hud,
+.stage[data-bonus-entry] ~ .tavern-hud {
   visibility: hidden;
-}
-.stage[data-spine-scene][data-foreground-chests] .chest-row:not([hidden]) {
-  visibility: visible;
 }
 .tavern-spine-canvas {
   display: block;
