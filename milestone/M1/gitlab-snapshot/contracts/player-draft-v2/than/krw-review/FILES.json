@@ -1,0 +1,14 @@
+{
+  "revision": "than-m1-krw-review-1",
+  "synthetic": true,
+  "files": {
+    "API.md": {
+      "sha256": "130615a79fd0aff6a444e0ad0af8ca723a042e0e456cd649185e59b4bfd48b49",
+      "bytes": 14172
+    },
+    "m1-api-review-sequences.json": {
+      "sha256": "66cb4d9e6ec165fdea11259a8ff7f29670b719d8591d820471f0aefb14b56c4b",
+      "bytes": 225950
+    }
+  }
+}
