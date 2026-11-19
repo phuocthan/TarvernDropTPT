@@ -98,6 +98,8 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
   try {
     await enter(page);
     await page.locator("#buy").click();
+    const shopClose = await page.locator(".close-modal").boundingBox();
+    expect(shopClose?.width).toBeCloseTo(61.2, 1);
     await page.locator('[data-buy="drop"]').click();
     await page.locator("#confirm-buy").click();
     await expect(page.locator('dialog[data-look="bonus"]')).toBeVisible({ timeout: 30000 });
@@ -113,16 +115,33 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     await expect(page.locator(".game-shell")).toHaveAttribute("data-entry-scene", "base");
     await expect(page.locator(".game-shell")).not.toHaveAttribute("data-opening", "true");
     await expect(page.locator('dialog[data-look="bonus"]')).toBeVisible({ timeout: 30000 });
-    await page.locator("#continue").click();
+    const bonusDialog = page.locator('dialog[data-look="bonus"]');
+    const continueButton = bonusDialog.locator("#continue");
+    await expect(bonusDialog).toHaveCSS("overflow-y", "clip");
+    await continueButton.hover();
+    await expect(continueButton).toHaveCSS("translate", "0px -5px");
+    const veil = page.locator(".scene-reveal-veil");
+    const hasClickMotion = await continueButton.evaluate((button: HTMLButtonElement) => {
+      button.click();
+      return button.getAnimations().some((animation) =>
+        (animation.effect as KeyframeEffect).getKeyframes().some((frame) => frame.scale === "1.14"));
+    });
+    expect(hasClickMotion).toBe(true);
+    await expect(veil).toHaveCount(1);
+    expect(requests.filter((req) => req.curStep === "intro")).toHaveLength(0);
     await expect(page.locator('dialog[data-look="total-win"]')).toBeVisible({ timeout: 90000 });
     expect(requests.filter((req) => req.curStep === "open-chest")).toHaveLength(5);
     expect(requests.filter((req) => req.curStep === "free-end")).toHaveLength(0);
     await expect(page.locator("#balance")).toHaveText("₩9,900,000");
     await page.screenshot({ path: ".runtime/v1-total-win.png" });
-    // Continue works anywhere on the screen, not just the text.
+    // Wait for the Total Win intro before clicking the dialog outside the button.
+    await expect(page.locator("#continue")).toBeVisible();
+    await expect(page.locator("#continue")).toBeEnabled();
     await page.locator("#dialog").click({ position: { x: 20, y: 20 } });
+    await expect(veil).toHaveCount(1);
     await expect.poll(() => requests.filter((req) => req.curStep === "free-end").length).toBe(1);
     await expect(page.locator("#spin")).toBeEnabled({ timeout: 15000 });
+    await expect(veil).toHaveCount(0);
     expect(errors).toEqual([]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

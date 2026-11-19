@@ -374,6 +374,7 @@
     "scene": {
       "layers": { "scenery": 1, "mascot-behind": 2, "reels": 3, "mascot": 4, "table": 5 },
       "openingDimmerOpacity": 0.55,
+      "bonusSceneVeil": { "durationMs": 840, "blurPx": 4, "opacity": 0.3 },
       "winScreen": { "centerY": 0.44, "paddingPx": 16, "landscapeFit": 1.55, "portraitFit": 1.71 },
       "openingReveal": { "durationMs": 900, "symbolDelayMs": 288, "mascotDelayMs": 225, "playbackRate": 0.8 },
       "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },

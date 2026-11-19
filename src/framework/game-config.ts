@@ -154,6 +154,11 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     invalid("presentation.scene");
   const camera = scene?.backgroundCamera;
   const openingDimmer = scene?.openingDimmerOpacity;
+  const bonusSceneVeil = scene?.bonusSceneVeil;
+  if (bonusSceneVeil !== undefined && (!bonusSceneVeil ||
+      !positiveInt(bonusSceneVeil.durationMs) || !nonNegative(bonusSceneVeil.blurPx) ||
+      !nonNegative(bonusSceneVeil.opacity) || bonusSceneVeil.opacity > 1))
+    invalid("presentation.scene.bonusSceneVeil");
   const winScreen = scene?.winScreen;
   if (winScreen !== undefined && (!winScreen ||
       !Number.isFinite(winScreen.centerY) || winScreen.centerY <= 0 || winScreen.centerY >= 1 ||

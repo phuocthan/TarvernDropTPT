@@ -262,6 +262,16 @@
               },
               "additionalProperties": false
             },
+            "bonusSceneVeil": {
+              "type": "object",
+              "required": ["durationMs", "blurPx", "opacity"],
+              "properties": {
+                "durationMs": { "type": "integer", "minimum": 1 },
+                "blurPx": { "type": "number", "minimum": 0 },
+                "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+              },
+              "additionalProperties": false
+            },
             "winScreen": {
               "type": "object",
               "required": ["centerY", "paddingPx", "landscapeFit", "portraitFit"],

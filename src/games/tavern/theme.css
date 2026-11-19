@@ -651,15 +651,15 @@
   top: max(16px, env(safe-area-inset-top, 0px));
   right: max(22px, env(safe-area-inset-right, 0px));
   z-index: 2;
-  width: 72px;
-  height: 72px;
+  width: 61.2px;
+  height: 61.2px;
   border-radius: 12px;
   background: rgb(8 9 9 / 70%);
   color: white;
 }
 .tavern-dialog[data-look^="shop"] .close-modal .hud-icon {
-  width: 50px;
-  height: 50px;
+  width: 42.5px;
+  height: 42.5px;
 }
 .shop-grid {
   display: grid;
@@ -783,8 +783,12 @@
   background: #36d9ef;
   color: white;
 }
+.tavern-dialog[data-look="bonus"] {
+  box-sizing: border-box;
+  overflow: clip;
+}
 .tavern-dialog[data-look="bonus"] .modal-inner {
-  padding: 20px 12px;
+  padding: min(3svh, 20px) 12px;
   display: grid;
   place-items: center;
 }
@@ -814,6 +818,8 @@
 }
 .bonus-preview {
   width: min(62vw, 420px);
+  max-height: 33svh;
+  object-fit: contain;
   display: block;
   border-radius: 13px;
 }
@@ -837,7 +843,8 @@
   place-content: center;
   text-align: center;
   pointer-events: none;
-  background: #180f1ac4;
+  background: rgb(16 23 32 / 49%);
+  backdrop-filter: blur(2px);
 }
 .win-celebration .tavern-screen-art {
   /* Keep the authored art size, but let its slot amount render outside the old inset canvas. */
@@ -856,17 +863,9 @@
 .tavern-dialog[data-look="total-win"][data-returning] #modal-content > :is(h2, .result-total) {
   opacity: 0;
 }
-.tavern-dialog[data-look="total-win"][data-returning] .total-win-screen > canvas {
-  animation: total-win-continue-pop 440ms ease-out;
-}
-@keyframes total-win-continue-pop {
-  0%, 100% { transform: scale(1); filter: brightness(1); }
-  35% { transform: scale(1.075); filter: brightness(1.18); }
-}
-.tavern-dialog[data-look="total-win"][data-returning]::backdrop {
+.tavern-dialog[data-look="total-win"][data-scene-reveal]::backdrop {
   background: transparent;
-  backdrop-filter: blur(0px);
-  transition: background-color 520ms ease 320ms, backdrop-filter 520ms ease 320ms;
+  backdrop-filter: none;
 }
 .win-celebration strong {
   color: #ffe285;
@@ -1174,6 +1173,20 @@
   border: 0;
   color: transparent;
   background: url("/tavern-assets/assets/continue.webp") center / contain no-repeat;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .tavern-shell .opening-continue,
+  .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue {
+    transition: translate 150ms ease-out;
+  }
+  .tavern-shell .opening-continue:hover:not(:disabled),
+  .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue:hover:not(:disabled) {
+    translate: 0 -5px;
+  }
+}
+.tavern-shell .opening-continue:disabled,
+.tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue:disabled {
+  opacity: 1;
 }
 #modal-content:has(> .tavern-screen-art[data-spine-ready]) > .scene-continue {
   position: fixed;

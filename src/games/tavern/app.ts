@@ -13,7 +13,7 @@ import {
 } from "./effects.ts";
 import { loadTavernBitmapFonts, renderAmount } from "./typography.ts";
 import { artRegion, hudIcon, tavernAsset as asset } from "./art.ts";
-import { applySceneLayers, revealScene, waitForContinue, type SceneAnchor } from "../../framework/presentation/scene.ts";
+import { applySceneLayers, revealScene, revealThroughVeil, waitForContinue, type SceneAnchor } from "../../framework/presentation/scene.ts";
 import type { BrandLoader } from "../../framework/presentation/brand-loading.ts";
 import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framework/ui/index.ts";
 import { countPayout } from "../../framework/presentation/payout.ts";
@@ -148,6 +148,28 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     mount,
   } = createSlotSession(game, transport, symbols, localStorage);
   const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const revealBonusScene = () => !reducedMotion && scene?.bonusSceneVeil
+    ? revealThroughVeil(stage, scene.bonusSceneVeil)
+    : undefined;
+  function emphasize(element: HTMLElement | null) {
+    if (reducedMotion) return;
+    element?.animate([
+      { scale: "1" },
+      { scale: "1.06 0.98", offset: 0.38 },
+      { scale: "1" },
+    ], { duration: 260, easing: "ease-out" });
+  }
+  function continueWithMotion(surface: HTMLElement, button: HTMLButtonElement, ready?: Promise<unknown>) {
+    return waitForContinue(surface, button, ready, () => {
+      if (reducedMotion) return;
+      return button.animate([
+        { scale: 1 },
+        { scale: 1.14, offset: 0.4 },
+        { scale: 0.98, offset: 0.78 },
+        { scale: 1 },
+      ], { duration: 240, easing: "ease-out" }).finished;
+    });
+  }
   let overlayMascot: Awaited<ReturnType<typeof mountMascot>> | undefined;
   let overlayMount: Promise<void> | undefined;
   let mascotAnchor: SceneAnchor | undefined;
@@ -352,6 +374,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   }
   function modal(content: string, dismissible = true, look = "", onBack?: () => void) {
     delete dialog.dataset.returning;
+    delete dialog.dataset.sceneReveal;
     dialog.dataset.look = look;
     $("modal-content").innerHTML = content;
     closeModal.hidden = !dismissible;
@@ -451,10 +474,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         let index = 0;
         while (index + 1 < marks.length && time >= marks[index + 1].time) index++;
         const stage = marks[index];
-        if (index !== active) {
+        if (index !== active && time > 0) {
           active = index;
           if (title.textContent !== stage.label) title.textContent = stage.label;
           audio.cue(stage.clip);
+          if (effects) effects.pulseScreenAmount();
+          else emphasize(value);
         }
         const next = marks[index + 1];
         const from = index ? Math.min(amount, stage.threshold) : 0;
@@ -590,7 +615,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           };
           tick();
         });
-        await Promise.all([animateWins(), countWin]);
+        await Promise.all([animateWins(), countWin, effects?.waitForChestActivations()]);
         countingFeatureBase = undefined;
         syncWin(presentingFeature);
         if (outcome.retrigger) {
@@ -602,7 +627,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (outcome.entry) {
         stopAuto();
         audio.cue("entry");
-        prepareFeatureEntry();
         await effects?.prepareBonusIntro();
         stage.dataset.bonusIntro = "true";
         modal(
@@ -621,9 +645,16 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           count: outcome.state.feature!.remaining,
           outro: bonusClip + "_outro",
         });
-        await waitForContinue(dialog, $<HTMLButtonElement>("continue"));
+        await continueWithMotion(dialog, $<HTMLButtonElement>("continue"));
+        emphasize(introArt.hasAttribute("data-spine-ready")
+          ? introArt
+          : dialog.querySelector<HTMLElement>(".bonus-preview"));
         await effects?.endScreen(bonusClip + "_outro");
+        const reveal = revealBonusScene();
         dialog.close();
+        // The trigger symbols leave with the normal reel. Prepare the empty
+        // feature grid only when the player moves past the bonus announcement.
+        prepareFeatureEntry();
         displayWin = 0;
         presentingFeature = outcome.state.feature;
         // The Spine key grid and the reel canvas must measure the same bonus layout.
@@ -633,12 +664,11 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         delete stage.dataset.bonusIntro;
         audio.cue("entryEnd");
         syncMusic(true);
-        await bonusEntry;
+        await Promise.all([bonusEntry, reveal]);
       }
     } else if (checkpoint?.curStep === "show-chest" || checkpoint?.curStep === "open-chest") {
       presentingFeature = outcome.state.feature;
       sync();
-      view.hideSymbols();
       if (checkpoint.curStep === "show-chest") {
         await waitBeforeFeatureResult();
         if (music) audio.stop(music);
@@ -687,7 +717,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           stage.dataset.chestAmount = formatted;
         };
         setAmount(c.accumulated);
-        view.hideSymbols();
         await effects?.revealChests(money(c.accumulated));
         if (!effects) stage.dataset.chestReveal = "true";
         await delay(2000);
@@ -740,8 +769,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const enter = effects?.showScreen(resultArt, "total_win_start", {
         amount, idle: "total_win_idle", outro: "total_win_end",
       });
-      await waitForContinue(dialog, $<HTMLButtonElement>("continue"), enter);
+      await continueWithMotion(dialog, $<HTMLButtonElement>("continue"), enter);
       audio.cue("totalOutro");
+      if (effects) effects.pulseScreenAmount();
+      else emphasize(dialog.querySelector<HTMLElement>(".result-total"));
       const liveReturn = effects?.hasLiveTotalWin();
       const leaving = effects?.endScreen("total_win_end");
       if (liveReturn) {
@@ -763,6 +794,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       // before the Spine frame is positioned so the frame and symbols enter together.
       shell.dataset.mode = "base";
       shell.dataset.totalWin = "returning";
+      const reveal = revealBonusScene();
+      if (reveal && liveReturn) dialog.dataset.sceneReveal = "true";
       const entering = effects?.returnFromTotalWin();
       view.setBoard(outcome.state.board);
       sync();
@@ -774,6 +807,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         await Promise.all([
           leaving,
           entering,
+          reveal,
           countPayout(beforeAward, balance, 520, (value) => {
             $("balance").textContent = money(value);
           }),
@@ -784,7 +818,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         ]);
         dialog.close();
         delete dialog.dataset.returning;
-      } else await entering;
+        delete dialog.dataset.sceneReveal;
+      } else await Promise.all([entering, reveal]);
       delete shell.dataset.totalWin;
     } else if (outcome.capped) {
       stopAuto();
@@ -1149,7 +1184,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       }
       if (entry.scene !== "base") {
         shell.dataset.entryScene = entry.scene;
-        await waitForContinue(shell, opening, mascotReady);
+        await continueWithMotion(shell, opening, mascotReady);
         await mascotReady;
         opening.remove();
         delete shell.dataset.opening;
@@ -1182,7 +1217,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         };
         return;
       }
-      const continued = waitForContinue(shell, opening, mascotReady);
+      const continued = continueWithMotion(shell, opening, mascotReady);
       await continued;
       await mascotReady;
       // The landing hides the reels and mascot. Upload them only when entering,

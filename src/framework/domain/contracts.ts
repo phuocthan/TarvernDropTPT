@@ -126,6 +126,7 @@ export interface ReelPresentation {
     slots: Record<string, string>;
     openingDimmerOpacity?: number;
     openingReveal?: { durationMs: number; symbolDelayMs: number; mascotDelayMs: number; playbackRate?: number };
+    bonusSceneVeil?: import("../presentation/scene.ts").SceneVeil;
     winScreen?: { centerY: number; paddingPx: number; landscapeFit: number; portraitFit: number };
     chestCamera?: { scale: number; originY: number; durationMs: number };
     sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };

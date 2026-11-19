@@ -104,11 +104,31 @@ export async function mountTavernEffects(
   );
   const chestAlpha = new Map<Slot, number>();
   const chestSlotIndexes = new Set(chestSlots.map(({ data }) => data.index));
+  const chestActiveFx = new Map<number, number[]>();
+  const projectedChestSlots = new Set(chestSlotIndexes);
+  const chestActivations = new Map<number, Promise<void>>();
+  const chestPrefix = (reel: number) => `${30 + reel * 2}_reel_${reel}_chest_`;
+  for (let reel = 0; reel < 5; reel++) {
+    const clip = reelhouse.skeleton.data.findAnimation(chestPrefix(reel) + "activate");
+    if (!clip) continue;
+    // Native activation also targets rays, rings and sparks outside reel_chest_*.
+    chestActiveFx.set(reel, clip.timelines.flatMap((timeline) =>
+      timeline instanceof AttachmentTimeline && !chestSlotIndexes.has(timeline.slotIndex)
+        ? [timeline.slotIndex] : []));
+  }
   let foregroundChests: Spine | undefined;
   const chestTotal = new BitmapAmount("td_gold", 240);
   chestTotal.anchor.set(0.5);
   chestTotal.visible = false;
-  reelhouse.addSlotObject("slot_finalwin", chestTotal, { followSlotColor: true });
+  const chestTotalSlot = new Container();
+  chestTotalSlot.addChild(chestTotal);
+  reelhouse.addSlotObject("slot_finalwin", chestTotalSlot, { followSlotColor: true });
+  const pulseDurationMs = 260;
+  let amountPulseStarted = -Infinity;
+  function pulseStrength() {
+    const progress = (performance.now() - amountPulseStarted) / pulseDurationMs;
+    return progress >= 0 && progress < 1 ? Math.sin(Math.PI * progress) ** 2 : 0;
+  }
   const chestMultipliers = Array.from({ length: 5 }, (_, reel) => {
     const text = new BitmapText({ style: { fontFamily: "td_gold", fontSize: 260 } });
     text.anchor.set(0.5);
@@ -180,14 +200,20 @@ export async function mountTavernEffects(
   screens.afterUpdateWorldTransforms = ({ skeleton }) => {
     // Slot objects are absent from Skeleton.getBounds(). Fit the actual amount separately,
     // on every authored pose and counter update, including long KRW values.
-    if (payout.text && host !== scene && !liveOverlay && host.closest(".win-celebration") && host.dataset.spineClip !== "addfs") {
+    const amountScreen = host.closest(".win-celebration") || host.classList.contains("total-win-screen");
+    if (payout.text && host !== scene && amountScreen && host.dataset.spineClip !== "addfs") {
       const bone = skeleton.findSlot("slot_win")!.bone;
       const content = payout.getLocalBounds();
-      payout.scale.set(Math.min(content.width ? 3000 / content.width : 1, slotContentScale(
-        content, bone,
+      const baseScale = Math.min(1, 3000 / (content.width || 1));
+      const desiredScale = baseScale * (1 + 0.10 * pulseStrength());
+      const fit = slotContentScale(
+        { width: content.width * desiredScale, height: content.height * desiredScale },
+        bone,
         { x: screens.x, y: screens.y, scaleX: screens.scale.x, scaleY: screens.scale.y },
-        { width: host.clientWidth, height: host.clientHeight }, sceneLayout?.winScreen?.paddingPx ?? 16,
-      )));
+        { width: host.clientWidth, height: host.clientHeight },
+        sceneLayout?.winScreen?.paddingPx ?? 16,
+      );
+      payout.scale.set(desiredScale * fit);
     }
     // The dialog backdrop already dims the whole viewport.
     skeleton.findSlot("fade")?.setAttachment(null);
@@ -211,7 +237,7 @@ export async function mountTavernEffects(
   stage.prepend(scene);
   scene.append(app.canvas);
   let host: HTMLElement = scene;
-  let totalWinRenderer: Promise<Application | undefined> | undefined;
+  let screenOverlayRenderer: Promise<Application | undefined> | undefined;
   let liveOverlay: Application | undefined;
   let mode: "base" | "bonus" | undefined;
   let previousFeature: FeatureState | null = null;
@@ -258,7 +284,7 @@ export async function mountTavernEffects(
       }
       skeleton.drawOrder.length = 0;
       for (const slot of source.drawOrder) {
-        if (!chestSlotIndexes.has(slot.data.index)) continue;
+        if (!projectedChestSlots.has(slot.data.index)) continue;
         const target = skeleton.slots[slot.data.index];
         target.setAttachment(slot.getAttachment());
         target.color.setFromColor(slot.color);
@@ -287,8 +313,15 @@ export async function mountTavernEffects(
     foregroundChests ??= createForegroundChests();
     if (!foregroundChests.visible) layoutForegroundChests();
     foregroundChests.visible = true;
+    projectedChestSlots.clear();
+    for (const index of chestSlotIndexes) projectedChestSlots.add(index);
+    for (const [reel, indexes] of chestActiveFx) {
+      if (reelhouse.state.getCurrent(30 + reel)?.animation?.name !== chestPrefix(reel) + "activate") continue;
+      for (const index of indexes) projectedChestSlots.add(index);
+    }
     foregroundChests.update(0);
-    for (const slot of chestSlots) {
+    for (const index of projectedChestSlots) {
+      const slot = reelhouse.skeleton.slots[index];
       chestAlpha.set(slot, slot.color.a);
       slot.color.a = 0;
     }
@@ -330,6 +363,10 @@ export async function mountTavernEffects(
     if (host !== scene && !liveOverlay) return;
     const time = tick.deltaMS / 1000;
     updateReelhouse(time);
+    if (revealingChests && chestTotal.visible) {
+      const strength = pulseStrength();
+      chestTotal.scale.set(1 + 0.065 * strength, 1 - 0.095 * strength);
+    }
     updateBackground(time);
   }, undefined, -10);
 
@@ -421,6 +458,8 @@ export async function mountTavernEffects(
     mode = next;
     revealingChests = false;
     chestAlpha.clear();
+    chestActivations.clear();
+    chestTotal.scale.set(1);
     chestTotal.text = "";
     chestTotal.visible = false;
     for (const text of chestMultipliers) {
@@ -498,10 +537,14 @@ export async function mountTavernEffects(
         if (!previousFeature) entry.trackTime = entry.animation!.duration;
       }
       if (chest.unlocked && !previous?.unlocked) {
-        const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
+        const prefix = chestPrefix(reel);
         if (previousFeature) {
-          reelhouse.state.setAnimation(30 + reel, prefix + "activate", false);
+          const activating = playClip(reelhouse, 30 + reel, prefix + "activate");
+          chestActivations.set(reel, activating);
           reelhouse.state.addAnimation(30 + reel, prefix + "idle", true, 0);
+          void activating.then(() => {
+            if (chestActivations.get(reel) === activating) chestActivations.delete(reel);
+          });
         } else {
           reelhouse.state.setAnimation(30 + reel, prefix + "idle", true);
         }
@@ -535,7 +578,7 @@ export async function mountTavernEffects(
     layout();
   }
 
-  async function createTotalWinRenderer() {
+  async function createScreenOverlayRenderer() {
     const overlay = new Application();
     try {
       await overlay.init({
@@ -543,7 +586,7 @@ export async function mountTavernEffects(
         resolution: Math.min(devicePixelRatio, 1.5), preference: "webgl",
       });
     } catch (error) {
-      console.warn("Live Total Win overlay unavailable", error);
+      console.warn("Live screen overlay unavailable", error);
       return;
     }
     overlay.ticker.maxFPS = 30;
@@ -634,6 +677,12 @@ export async function mountTavernEffects(
       if (host === scene) stage.dataset.spineScene = "true";
       startScene();
     },
+    waitForChestActivations() {
+      return Promise.all(chestActivations.values());
+    },
+    pulseScreenAmount() {
+      amountPulseStarted = performance.now();
+    },
     async enterBonus() {
       // The authored entry animates the same chests that the HUD layers above the reels during play.
       stage.setAttribute("data-bonus-entry", "");
@@ -670,12 +719,25 @@ export async function mountTavernEffects(
     shake() {
       playSceneEffects({ background: "3_shake", reelhouse: "3_shake" });
     },
-    async prepareBonusIntro(resumed = false) {
+    async prepareBonusIntro() {
       openingDimmer.visible = false;
       baseExited = true;
       background.state.setAnimation(1, "1_zoom_in", false);
-      if (!resumed) await playClip(reelhouse, 2, "2_base_exit");
-      reelhouse.visible = false;
+      const firstY = symbolAnchor?.worldY;
+      const followReels = () => {
+        if (symbolAnchor && firstY !== undefined) {
+          const y = (symbolAnchor.worldY - firstY) * reelhouse.scale.y;
+          reelHost.style.translate = `0 ${y}px`;
+        }
+      };
+      app.ticker.add(followReels, undefined, -10);
+      try {
+        await playClip(reelhouse, 2, "2_base_exit");
+        reelhouse.visible = false;
+      } finally {
+        app.ticker.remove(followReels);
+        reelHost.style.removeProperty("translate");
+      }
     },
     async revealChests(amount: string) {
       revealingChests = true;
@@ -688,7 +750,7 @@ export async function mountTavernEffects(
     },
     async prepareTotalWin() {
       openingDimmer.visible = false;
-      totalWinRenderer ??= createTotalWinRenderer();
+      screenOverlayRenderer ??= createScreenOverlayRenderer();
       bonusExited = true;
       chestZoom?.cancel();
       layout();
@@ -772,7 +834,11 @@ export async function mountTavernEffects(
         count?: number;
       } = {},
     ) {
-      mountOverlay(target, name === "total_win_start" ? await totalWinRenderer : undefined);
+      amountPulseStarted = -Infinity;
+      const keepSceneLive = name === "total_win_start" ||
+        (revealingChests && name !== "addfs" && !!target.closest(".win-celebration"));
+      if (keepSceneLive) screenOverlayRenderer ??= createScreenOverlayRenderer();
+      mountOverlay(target, keepSceneLive ? await screenOverlayRenderer : undefined);
       screens.visible = true;
       screens.autoUpdate = true;
       payout.text = amount && hasTavernBitmapFont("td_gold") ? amount : "";
@@ -820,19 +886,19 @@ export async function mountTavernEffects(
       return { duration: animation?.duration ?? 1.5, times };
     },
     screenTime() {
-      return screens.state.getCurrent(0)?.trackTime ?? 0;
+      return screens.visible ? screens.state.getCurrent(0)?.trackTime ?? 0 : 0;
     },
     restoreChest(reel: number, multiplier: number) {
       chestMultipliers[reel].text = `x${multiplier}`;
       chestMultipliers[reel].visible = true;
-      reelhouse.state.setAnimation(50 + reel, `${30 + reel * 2}_reel_${reel}_chest_open_idle`, true);
+      reelhouse.state.setAnimation(50 + reel, chestPrefix(reel) + "open_idle", true);
     },
     async openChest(reel: number, multiplier: number) {
       stage.dataset.chestOpening = String(reel);
       const text = chestMultipliers[reel];
       text.text = `x${multiplier}`;
       text.visible = true;
-      const prefix = `${30 + reel * 2}_reel_${reel}_chest_`;
+      const prefix = chestPrefix(reel);
       const done = playClip(reelhouse, 50 + reel, prefix + "open");
       reelhouse.state.addAnimation(50 + reel, prefix + "open_idle", true, 0);
       await done;

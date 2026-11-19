@@ -19,3 +19,20 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 844 
   }
  });
 }
+
+
+test("newly unlocked chest renders native activation FX before idle and opens into open idle", async ({ page }) => {
+  await page.goto("/?game=default");
+  await expect(page.locator("#reuse-spin")).toBeEnabled();
+  const clips = await page.evaluate(async () => {
+    const { mountWinScreen } = await import("/tests/browser/fixtures/win-screen.ts");
+    return (await mountWinScreen(true)).checkChestClips();
+  });
+  expect(clips).toEqual({
+    activating: "30_reel_0_chest_activate",
+    hasActivationSlots: true,
+    idle: "30_reel_0_chest_idle",
+    open: "30_reel_0_chest_open",
+    openIdle: "30_reel_0_chest_open_idle",
+  });
+});

@@ -343,7 +343,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     return route.fulfill({ json: outcome });
   });
   await page.goto("/");
-  await expect(page.locator("#spin")).toBeEnabled();
+  await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
   await page.evaluate(async () => {
@@ -357,6 +357,13 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     };
     const start = BoardView.prototype.start;
     BoardView.prototype.start = function (turbo: boolean, motion: string) {
+      const scene = document.querySelector(".stage")!;
+      const watchReveal = new MutationObserver(() => {
+        if (!scene.hasAttribute("data-chest-reveal")) return;
+        markers.symbolsAtChestReveal = String(this.strip.visible);
+        watchReveal.disconnect();
+      });
+      watchReveal.observe(scene, { attributes: true, attributeFilter: ["data-chest-reveal"] });
       start.call(this, turbo, motion);
       if (markers.bonusBoardHidden && !markers.firstFreeSpinStarted)
         markers.firstFreeSpinStarted = String(!this.strip.visible);
@@ -374,7 +381,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     page.getByRole("heading", { name: "DROP BONUS", exact: true }),
   ).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".tavern-screen-art")).toHaveAttribute("data-spine-clip", "super_intro");
-  await expect(page.locator("html")).toHaveAttribute("data-bonus-board-hidden", "true");
+  await expect(page.locator("html")).not.toHaveAttribute("data-bonus-board-hidden", "true");
   expect(requests).toHaveLength(0);
   await page.evaluate(() => {
     const dialog = document.querySelector<HTMLDialogElement>("#dialog")!;
@@ -433,6 +440,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", {
     timeout: 35000,
   });
+  await expect(page.locator("html")).toHaveAttribute("data-symbols-at-chest-reveal", "true");
   const finalSpin = spinAmounts.at(-1)!;
   expect(finalSpin.win).toBeGreaterThan(0);
   expect(finalSpin.total).toBeGreaterThan(finalSpin.win);

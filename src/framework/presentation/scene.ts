@@ -14,7 +14,12 @@ export interface SceneAnchor {
   scale: number;
 }
 
-export async function waitForContinue(surface: HTMLElement, button: HTMLButtonElement, ready?: Promise<unknown>) {
+export async function waitForContinue(
+  surface: HTMLElement,
+  button: HTMLButtonElement,
+  ready?: Promise<unknown>,
+  onAccept?: () => Promise<unknown> | undefined,
+) {
   if (ready) {
     button.hidden = true;
     button.disabled = true;
@@ -27,7 +32,9 @@ export async function waitForContinue(surface: HTMLElement, button: HTMLButtonEl
       if (button.hidden || button.disabled) return;
       surface.removeEventListener("click", accept);
       button.disabled = true;
-      resolve();
+      const motion = onAccept?.();
+      if (motion) void motion.then(() => resolve(), () => resolve());
+      else resolve();
     };
     surface.addEventListener("click", accept);
   });
@@ -73,4 +80,30 @@ export function revealScene(
     }
     requestAnimationFrame(frame);
   });
+}
+
+export interface SceneVeil {
+  durationMs: number;
+  blurPx: number;
+  opacity: number;
+}
+
+/** Cover a scene change and reveal the new scene without filtering the controls or dialog art. */
+export function revealThroughVeil(stage: HTMLElement, { durationMs, blurPx, opacity }: SceneVeil) {
+  const veil = document.createElement("div");
+  veil.className = "scene-reveal-veil";
+  veil.setAttribute("aria-hidden", "true");
+  Object.assign(veil.style, {
+    position: "absolute",
+    inset: "0",
+    pointerEvents: "none",
+    zIndex: "var(--scene-layer-transition, 6)",
+    backgroundColor: `rgb(12 16 23 / ${opacity})`,
+  });
+  stage.append(veil);
+  const reveal = veil.animate([
+    { backdropFilter: `blur(${blurPx}px)`, backgroundColor: veil.style.backgroundColor },
+    { backdropFilter: "blur(0px)", backgroundColor: "transparent" },
+  ], { duration: durationMs, easing: "ease-out" });
+  return reveal.finished.catch(() => undefined).then(() => veil.remove());
 }
