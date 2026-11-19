@@ -1,6 +1,6 @@
 # Kế hoạch triển khai công cụ so sánh game
 
-**Trạng thái:** Kế hoạch cho buổi làm việc sáng mai. Các lệnh dưới đây là giao diện dự kiến.
+**Trạng thái:** Runner P0 đã có trong repo. P1 và P2 là phạm vi mở rộng.
 
 ## Mục tiêu
 
@@ -15,7 +15,9 @@ Chạy một lệnh trên Windows để tự mở hai bản game, thực hiện 
 | **`playwright-cli`** | Skill bổ sung nếu cần khảo sát tương tác hay trace trình duyệt. Báo cáo tự động chạy từ runner chính kể cả khi máy chưa cài skill này. [Skill trên skills.sh](https://www.skills.sh/microsoft/playwright-cli/playwright-cli) |
 | **`playwright-game-testing`** | Tài liệu tham khảo cho cách kiểm tra game Canvas/WebGL bằng khung hình và trạng thái HUD. [Skill trên skills.sh](https://www.skills.sh/shipshitgames/skills/playwright-game-testing) |
 
-## Giao diện dự kiến
+## Chạy trên máy local
+
+Dùng Node.js 22.18+ và chạy `npm ci`. Cài Playwright Chromium bằng `npx playwright install chromium` hoặc đặt `CHROMIUM_PATH` vào executable Chrome/Chromium trên máy. Ví dụ PowerShell với Chrome mặc định là `$env:CHROMIUM_PATH = 'C:/Program Files/Google/Chrome/Application/chrome.exe'`.
 
 ```powershell
 # Hai bản nội bộ, dùng cùng fixture
@@ -25,8 +27,28 @@ npm run test:compare -- --baseline "http://localhost:5174/?game=tarvern" --candi
 npm run test:compare -- --reference "https://paperclipgaming.com/ko/games/tavern-drop" --candidate "http://localhost:5173/?game=tarvern" --suite smoke
 ```
 
-- **Hai bản nội bộ.** Runner cấp session sạch riêng cho mỗi bản và phát cùng board, win, trigger, chest và checkpoint đã ghi. Chế độ này cho kết quả pass/fail lặp lại được và có thể đưa vào CI sau khi ổn định. Đợt đầu hỗ trợ hai URL đang chạy, sau đó mới xem xét tự khởi động hai build từ commit.
-- **Bản tham chiếu công khai.** Runner thử mở demo, phát hiện iframe nếu có và ghi lại các trạng thái quan sát được. Khi board ngẫu nhiên, chỉ đo vùng và mốc thực sự tương ứng. Nếu demo không tải hoặc chưa quan sát được trạng thái hiếm trong thời gian chạy, báo `not observed` và đính kèm lý do. Chỉ thao tác Buy Bonus khi phiên đang dùng demo credit. Có thể dùng ảnh/video đã ghi làm bằng chứng cho trạng thái chưa gặp lại.
+### Hai URL có session
+
+Tạo `.runtime/game-compare.local.json`. Nhập URL đầy đủ để giữ query của session. Chạy bằng `--config` để tránh in URL session vào dòng lệnh npm.
+
+```json
+{
+  "reference": { "url": "https://example.com/demo?session=REPLACE_ME" },
+  "candidate": { "url": "http://localhost:5173/?game=tarvern" },
+  "timeoutMs": 45000
+}
+```
+
+```powershell
+npm run test:compare -- --config .runtime/game-compare.local.json
+```
+
+Đổi `reference` thành `baseline` khi so hai bản nội bộ. Mỗi đầu vào cũng có thể là chuỗi URL. Nếu session cần cookie/local storage, thêm `"storageState": "state.json"` vào đầu vào tương ứng. Đường dẫn tính từ thư mục chứa config, dùng file Playwright storage state của phiên được phép kiểm thử. Dùng URL mới khi phiên hết hạn. Báo cáo chỉ ghi origin, còn config/session state luôn lưu cục bộ.
+
+Dùng `--headed` để mở cửa sổ và `--video` để ghi clip Playwright. Nếu thiếu codec ghi hình, chạy `npx playwright install ffmpeg`. Bản tham chiếu kiểm thử bằng thao tác quan sát UI. Để thử Spin trên **demo**, thêm `"playDemo": true` vào `reference`; runner kiểm tra URL đích có `demo=true` trước khi bấm Spin. Các mốc Scatter ngẫu nhiên chỉ được ghi ở mức quan sát.
+
+- **Hai bản nội bộ.** Runner cấp session sạch riêng cho mỗi bản và phát cùng kết quả spin từ fixture P0. Chế độ này cho kết quả pass/fail lặp lại được và có thể đưa vào CI sau khi ổn định. Đợt đầu hỗ trợ hai URL đang chạy, sau đó mới xem xét tự khởi động hai build từ commit.
+- **Bản tham chiếu công khai.** Runner mở demo, theo iframe Tavern nếu có và nhận biết Continue, HUD và Bet Menu qua các vùng canvas. Nếu demo không tải, session hết hạn hoặc chưa quan sát được mốc tương ứng, báo `notObserved` kèm lý do. Profile P0 chỉ dùng Buy Bonus trong các bài mở rộng sau này.
 
 ## Luồng chạy
 
@@ -56,14 +78,19 @@ Runner chung quản lý browser, thời gian chờ, ảnh và báo cáo. Profile
 ## Báo cáo và nghiệm thu bản đầu
 
 - Lưu mỗi lần chạy dưới `.runtime/game-compare/<run-id>/`. `index.html` hiển thị hai ảnh cạnh nhau, ảnh diff khi so được, và mốc thời gian hoặc clip nếu có. `run.json` ghi nguồn, build nếu xác định được, viewport, fixture, trạng thái từng bước và đường dẫn bằng chứng.
-- Báo cáo phân biệt được lỗi assertion, khác biệt thị giác cần xem và trạng thái chưa quan sát được. Mã thoát khác 0 cho lỗi assertion hoặc lỗi chạy tool. Ở chế độ tham chiếu công khai, chênh lệch pixel chỉ để xem xét. Hiệu chỉnh ngưỡng diff theo từng vùng sau khi chạy lặp trên cùng build.
+- Báo cáo phân biệt được lỗi assertion, khác biệt thị giác cần xem và trạng thái chưa quan sát được. Mã thoát khác 0 cho lỗi assertion, HUD dịch quá 2 CSS px ở hai bản nội bộ, hoặc lỗi chạy tool. Ảnh animation dùng để review vì thời điểm yêu cầu screenshot có thể trễ hơn mốc renderer. JSON ghi hai mốc riêng. Ở chế độ tham chiếu công khai, chênh lệch pixel chỉ để xem xét.
 - Hoàn thành bản đầu khi một lệnh chạy hết P0 cho hai URL nội bộ, tạo báo cáo mở được trên máy và đạt cùng kết luận trong hai lần chạy liên tiếp. Dùng một sai lệch chủ động trong bản chạy thử, chẳng hạn dịch vị trí nút Bet hoặc bật lại glow trước khi vào reel, để chứng minh báo cáo phát hiện được lỗi. Chạy thêm một lần với URL tham chiếu và ghi trạng thái quan sát được.
 
-## Thứ tự triển khai sáng mai
+## Mở rộng kịch bản
 
-1. Kiểm tra Node, Chromium và chạy lại các test `landing`, `tavern-policies`, `startup-feature` đang có. Xác nhận demo tham chiếu mở được với hai viewport dự kiến và chọn bộ chọn ổn định.
-2. Tạo command và runner dùng Playwright hiện tại. Làm trước một kịch bản Landing → game và một cặp ảnh HUD để hoàn chỉnh luồng từ đầu vào đến báo cáo.
-3. Thêm fixture Drop có Scatter ở reel muộn, đo mốc như bảng P0 và chạy ở cả hai tốc độ. Hoàn thành Bet Menu, chạy lặp hai lần và thử sai lệch chủ động.
-4. Chạy chế độ tham chiếu, ghi phạm vi quan sát được rồi mở rộng P1 theo thứ tự Buy Bonus, Resume và Total Win. CI để sau khi ảnh baseline và độ lặp lại đã ổn định.
+Runner chung trong `src/framework/testing/`. Profile và fixture P0 của Tavern nằm trong `src/games/tavern/testing/`. Hai bản nội bộ nhận cùng fixture gồm ba Scatter, trong đó Scatter muộn ở reel 5 hàng 3. Bộ test theo dõi trạng thái render tại các mốc chờ, vào reel và đáp. Mở rộng P1 theo thứ tự Buy Bonus, Resume và Total Win. Thử CI sau khi quy trình ảnh và độ lặp lại đã ổn định.
+
+Để thử sai lệch bố cục nội bộ, dùng cấu hình candidate với `"testStyle": "#bet-picker { translate: 16px 0px !important; }"` và URL loopback. Tool cần báo sai lệch 16 px và trả exit code 1. Style thử chỉ tồn tại trong browser context của lần chạy.
+
+## Kết quả xác minh
+
+- Hai lượt nội bộ liên tiếp trên desktop và portrait có cùng kết quả. Cả 22 mốc đều được ghi, với 0 lỗi assertion và 16 mốc ảnh cần xem. Board, win và mốc hiện của fixture Scatter ở reel 5 được kiểm tra ở cả hai tốc độ. Lượt đối chiếu Vite preview với Vite dev cũng cho cùng kết quả.
+- Lỗi thử dịch nút Bet 16 px được phát hiện ở HUD và Bet Menu trên cả hai viewport. Lượt chạy lỗi thử trả exit code 1.
+- Demo gốc bằng URL session hiển thị Landing, chuyển cảnh, game, HUD và Bet Menu trên cả hai viewport. Normal và Turbo đều có ảnh trong và sau lượt spin quan sát được. 12 mốc Drop được ghi `notObserved` khi đối chiếu với fixture vì demo trả board ngẫu nhiên và thiếu telemetry ở đúng thời điểm Scatter muộn.
 
 Phạm vi buổi đầu là công cụ cục bộ trên repo chính. Baseline ban đầu lấy từ bản nội bộ được duyệt. Giữ ảnh, video và trace của lần chạy trong thư mục cục bộ.

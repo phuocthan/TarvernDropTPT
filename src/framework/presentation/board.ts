@@ -386,6 +386,18 @@ export class BoardView {
       Math.max(...moves.map((move) => move.start + move.fall)) +
       bounce +
       holdMs;
+    const canvas = this.app.canvas;
+    const audited = landing && canvas.hasAttribute("data-motion-audit");
+    const entered = audited ? new Set<SymbolView>() : undefined;
+    const early = audited ? new Set<SymbolView>() : undefined;
+    const publish = (phase: string, move: typeof moves[number]) => {
+      canvas.dispatchEvent(new CustomEvent("fw-pixi:drop", {
+        detail: {
+          phase, reel: move.reel, row: move.row, symbol: landing?.board[move.reel][move.row],
+          visible: move.tile.view.visible, y: move.tile.view.y, time: performance.now(),
+        },
+      }));
+    };
     const paint = (time: number) => {
       for (const move of moves) {
         const elapsed = time - move.start;
@@ -404,6 +416,17 @@ export class BoardView {
         if (entering && !move.tile.view.visible && elapsed > 0 &&
             move.tile.view.y + this.cell > 0)
           move.tile.view.visible = true;
+        if (entered && early) {
+          const inside = elapsed > 0 && move.tile.view.y + this.cell > 0;
+          if (time === 0) publish("queued", move);
+          if (inside && !entered.has(move.tile)) {
+            entered.add(move.tile);
+            publish("entered", move);
+          } else if (!inside && !entered.has(move.tile) && move.tile.view.visible && !early.has(move.tile)) {
+            early.add(move.tile);
+            publish("early-visible", move);
+          }
+        }
         if (
           entering &&
           progress === 1 &&
@@ -412,6 +435,7 @@ export class BoardView {
           !this.dropRound.skipped
         ) {
           move.landed = true;
+          if (audited) publish("landed", move);
           const edge = this.edgeTiles.get(move.tile);
           if (edge) edge.settled = true;
           const animation = move.tile.effect?.("land");

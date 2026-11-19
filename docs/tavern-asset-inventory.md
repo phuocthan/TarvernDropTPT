@@ -35,3 +35,5 @@ node scripts/audit-tavern-assets.mjs "D:/captures/tavern-new/assets"
 ```
 
 The URL mode checks the 54 baseline paths plus explicitly supplied paths. It does not crawl the CDN to discover other files. HUD SVGs, cover, favicon and local audio excerpts live outside this baseline. The audit writes to the ignored `.runtime/` directory and leaves the game's assets intact.
+
+The latest public-demo recheck observed `v13/assets/` again and verified all 54 baseline files by SHA-256. No changed, added, missing or failed files were reported. The candidate snapshot and raw report are kept in the local audit directory.

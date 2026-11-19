@@ -81,16 +81,16 @@ function requireFields(body: Payload, allowed: string[]) {
     throw new ProposalError("INVALID_FIELDS", 400);
 }
 
-/** Local synthetic implementation of FE-BE-Proposal. Persisted state is the authority. */
+/** Local synthetic implementation of FE-BE-Proposal. Null storage is for isolated fixtures. */
 export class ProposalBackend {
-  private database: Database;
+  private database: Database = { schemaVersion: 1, sessions: {}, accounts: {} };
   private definitions = new Map<string, GameDefinition>();
-  private file: string;
+  private file: string | null;
   private now: () => number;
   private rng: () => number;
   private mockGamePolicy: MockGamePolicy;
-  constructor(games: GameDefinition[], file: string, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy } = {}) {
-    this.file = resolve(file);
+  constructor(games: GameDefinition[], file: string | null, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy } = {}) {
+    this.file = file === null ? null : resolve(file);
     this.now = options.now ?? Date.now;
     this.rng = options.rng ?? Math.random;
     this.mockGamePolicy = { ...options.mockGamePolicy };
@@ -103,16 +103,17 @@ export class ProposalBackend {
       const code = game.routing.query === "tavern" ? "tavern-drop" : game.routing.query;
       this.definitions.set(code, game);
     }
+    if (!this.file) return;
     try {
       this.database = JSON.parse(readFileSync(this.file, "utf8"));
       if (this.database.schemaVersion !== 1 || !this.database.sessions || !this.database.accounts)
         throw Error("Unsupported proposal database");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      this.database = { schemaVersion: 1, sessions: {}, accounts: {} };
     }
   }
   private save() {
+    if (!this.file) return;
     mkdirSync(dirname(this.file), { recursive: true });
     const temporary = this.file + ".tmp";
     writeFileSync(temporary, JSON.stringify(this.database), { encoding: "utf8", flush: true });

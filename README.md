@@ -59,6 +59,8 @@ See the [Milestone 1 handoff and acceptance checklist](docs/milestone-1.md) and 
 
 See the [development handoff](docs/handoff-2026-11-19.md) for recent Tavern Drop changes and open API integration work.
 
+See the [game comparison runner](docs/game-comparison-test-plan.md) for local and reference-session P0 runs.
+
 See the [Tavern asset inventory](docs/tavern-asset-inventory.md) for CDN verification and the source of the HUD icons.
 
 See the [Tavern performance notes](docs/tavern-performance.md) for the local profiling results and hardware checks.
