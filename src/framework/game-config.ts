@@ -145,6 +145,10 @@ export function loadGameConfig(raw: unknown): GameDefinition {
       !positiveInt(animationGrid.reelPitch) || !positiveInt(animationGrid.rowPitch))
   )
     invalid("presentation.animationGrid");
+  const layout = display.layout;
+  if (layout !== undefined &&
+      (!layout || !positiveInt(layout.mobileWidth) || !positiveInt(layout.mobileHeight)))
+    invalid("presentation.layout");
   if (
     scene !== undefined &&
     (!scene || !scene.layers || Array.isArray(scene.layers) ||
@@ -191,7 +195,14 @@ export function loadGameConfig(raw: unknown): GameDefinition {
   if (chestCamera !== undefined &&
       (!chestCamera || !Number.isFinite(chestCamera.scale) || chestCamera.scale < 1 ||
        !nonNegative(chestCamera.originY) || chestCamera.originY > 1 ||
-       !positiveInt(chestCamera.durationMs)))
+       !positiveInt(chestCamera.durationMs) ||
+       (chestCamera.portraitScale !== undefined &&
+        (!Number.isFinite(chestCamera.portraitScale) || chestCamera.portraitScale < 1)) ||
+       (chestCamera.liftPx !== undefined &&
+        (!chestCamera.liftPx || !Number.isFinite(chestCamera.liftPx.portrait) ||
+         !Number.isFinite(chestCamera.liftPx.default) || !Array.isArray(chestCamera.liftPx.steps) ||
+         !chestCamera.liftPx.steps.every((step) => Array.isArray(step) && step.length === 2 &&
+           positiveInt(step[0]) && Number.isFinite(step[1]))))))
     invalid("presentation.scene.chestCamera");
   if (openingDimmer !== undefined && (!nonNegative(openingDimmer) || openingDimmer > 1))
     invalid("presentation.scene.openingDimmerOpacity");

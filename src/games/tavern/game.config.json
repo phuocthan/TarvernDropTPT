@@ -338,6 +338,7 @@
     "contract": "proposal-v1"
   },
   "presentation": {
+    "layout": { "mobileWidth": 661, "mobileHeight": 449 },
     "allowForceStop": false,
     "foregroundWinSymbols": ["bonus"],
     "winOverflowPaddingPx": 72,
@@ -373,8 +374,6 @@
     },
     "scene": {
       "layers": { "scenery": 1, "mascot-behind": 2, "reels": 3, "mascot": 4, "table": 5 },
-      "openingDimmerOpacity": 0.55,
-      "bonusSceneVeil": { "durationMs": 840, "blurPx": 4, "opacity": 0.3 },
       "winScreen": {
         "centerY": 0.44, "paddingPx": 16, "landscapeFit": 1.55, "portraitFit": 1.71,
         "countSeconds": { "smallwin": 0.73, "bigwin": 0.75, "superwin": 2.4, "megawin": 3.8, "epicwin": 5.2, "maxwin": 6.5 }
@@ -384,8 +383,11 @@
         "durationMs": 500, "firstTime": 0, "restartTime": -1.5, "endTime": 2.4
       },
       "totalWinOutro": { "continueFadeMs": 250, "backgroundEnterMs": 200, "reelEnterMs": 500 },
-      "openingReveal": { "durationMs": 900, "symbolDelayMs": 288, "mascotDelayMs": 225, "playbackRate": 0.8 },
-      "chestCamera": { "scale": 1.24, "originY": 0.79, "durationMs": 500 },
+      "openingReveal": { "durationMs": 900, "symbolDelayMs": 288, "mascotDelayMs": 300, "playbackRate": 1 },
+      "chestCamera": {
+        "scale": 1.4, "portraitScale": 1.125, "originY": 0.5, "durationMs": 500,
+        "liftPx": { "portrait": 20, "steps": [[600, 15], [900, 100]], "default": 200 }
+      },
       "backgroundCamera": {
         "width": 6000,
         "top": 2060,

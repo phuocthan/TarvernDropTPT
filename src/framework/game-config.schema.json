@@ -233,6 +233,16 @@
           },
           "additionalProperties": false
         },
+        "layout": {
+          "description": "Opt-in layout mode published as data-layout: landscape when wider than tall and (height < mobileHeight or width < mobileWidth); otherwise portrait when width < mobileWidth; else desktop.",
+          "type": "object",
+          "required": ["mobileWidth", "mobileHeight"],
+          "properties": {
+            "mobileWidth": { "type": "integer", "minimum": 1 },
+            "mobileHeight": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
         "scene": {
           "type": "object",
           "required": ["layers", "slots"],
@@ -320,7 +330,21 @@
               "properties": {
                 "scale": { "type": "number", "minimum": 1 },
                 "originY": { "type": "number", "minimum": 0, "maximum": 1 },
-                "durationMs": { "type": "integer", "minimum": 1 }
+                "durationMs": { "type": "integer", "minimum": 1 },
+                "portraitScale": { "type": "number", "minimum": 1 },
+                "liftPx": {
+                  "type": "object",
+                  "required": ["portrait", "steps", "default"],
+                  "properties": {
+                    "portrait": { "type": "number" },
+                    "steps": {
+                      "type": "array",
+                      "items": { "type": "array", "prefixItems": [{ "type": "integer", "minimum": 1 }, { "type": "number" }], "minItems": 2, "maxItems": 2 }
+                    },
+                    "default": { "type": "number" }
+                  },
+                  "additionalProperties": false
+                }
               },
               "additionalProperties": false
             },

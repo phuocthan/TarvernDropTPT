@@ -283,10 +283,8 @@
 .stage[data-mascot-behind-board] .mascot {
   visibility: hidden;
 }
-@media (max-aspect-ratio: 4/5) {
-  .tavern-shell .mascot {
-    z-index: var(--scene-layer-mascot-behind, 2);
-  }
+:where(html[data-layout="portrait"]) .tavern-shell .mascot {
+  z-index: var(--scene-layer-mascot-behind, 2);
 }
 .tavern-hud {
   --hud-unit: min(12px, 2.4svh, 1.153846vw);
@@ -898,7 +896,7 @@
 .tavern-dialog[data-look="total-win"][data-returning] #modal-content > :is(h2, .result-total) {
   opacity: 0;
 }
-.tavern-dialog[data-look="total-win"][data-scene-reveal]::backdrop {
+.tavern-dialog[data-look="total-win"][data-scene-reveal]:not([data-spine-dim])::backdrop {
   background: transparent;
   backdrop-filter: none;
 }
@@ -938,142 +936,134 @@
   color: #fff;
   font: inherit;
 }
-@media (max-width: 670px) and (max-aspect-ratio: 4/5) {
-  .tavern-shell .machine {
-    width: min(125vw, 70svh);
-    top: 48%;
-  }
-  .tavern-shell:not([data-mode="base"]) .machine {
-    top: 45%;
-  }
-  .mascot {
-    right: -15%;
-    bottom: 13%;
-    width: min(51vw, 40svh);
-  }
-  .scenery .barrel {
-    right: -36%;
-  }
-  .tavern-hud {
-    --hud-unit: min(10px, 2.5vw);
-    width: 96vw;
-    bottom: env(safe-area-inset-bottom, 0px);
-    row-gap: 11px;
-    column-gap: 5px;
-    grid-template-columns: 1fr 1fr;
-  }
-  .tavern-hud .hud-aux {
-    grid-column: 2;
-    grid-row: 1;
-    grid-auto-flow: column;
-    justify-self: end;
-  }
-  .hud-bar {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .tavern-hud .hud-menu {
-    width: calc(2.7 * var(--hud-unit));
-    height: calc(2.7 * var(--hud-unit));
-    padding: calc(.6 * var(--hud-unit));
-    border-radius: calc(.7 * var(--hud-unit));
-    background: rgb(9 13 14 / 85%);
-  }
-  .tavern-hud .hud-aux button {
-    width: 36px;
-    min-height: 36px;
-    font-size: 23px;
-  }
-  .tavern-hud .bet-arrows button {
-    width: calc(4.4 * var(--hud-unit));
-    height: calc(2.6 * var(--hud-unit));
-    background: rgb(9 13 14 / 80%);
-  }
-  .tavern-hud #bet-down { border-radius: calc(var(--hud-unit)) 0 0 calc(var(--hud-unit)); }
-  .tavern-hud #bet-up { border-radius: 0 calc(var(--hud-unit)) calc(var(--hud-unit)) 0; }
-  .tavern-hud .hud-bet-amount {
-    height: calc(2.6 * var(--hud-unit));
-    align-content: center;
-    border-radius: 0;
-    min-width: 82px;
-    padding: 0;
-    background: rgb(9 13 14 / 80%);
-  }
+:where(html[data-layout="portrait"]) .tavern-shell .machine {
+  width: min(125vw, 70svh);
+  top: 48%;
 }
-@media (max-aspect-ratio: 4/5) {
-  .tavern-logo {
-    top: 9%;
-    left: 50%;
-    right: auto;
-    width: min(31vw, 17svh);
-    transform: translateX(-50%);
-  }
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .machine {
+  top: 45%;
 }
-@media (orientation: portrait) {
-  .tavern-dialog[data-look="shop"] {
-    width: 100vw;
-    height: 100dvh;
-    max-width: none;
-    max-height: none;
-    overflow: hidden;
-  }
-  .tavern-dialog[data-look="shop"] .modal-inner {
-    --shop-header-height: 90px;
-    padding: var(--shop-header-height) 0 0;
-  }
-  .shop-grid {
-    grid-template-columns: minmax(0, min(56vw, 320px));
-    justify-content: center;
-    gap: clamp(12px, 4vw, 20px);
-    max-height: calc(100dvh - var(--shop-header-height));
-    padding: 10px 0 calc(56px + env(safe-area-inset-bottom, 0px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
-  .shop-controls {
-    bottom: 0;
-    display: grid;
-    justify-content: center;
-    justify-items: center;
-    gap: 1px;
-    width: auto;
-    margin: 0;
-    padding: 3px 0 max(2px, env(safe-area-inset-bottom, 0px));
-    border-radius: 0;
-    background: linear-gradient(transparent, #101210 28%);
-    pointer-events: none;
-  }
-  .shop-controls .shop-balance {
-    min-width: 66px;
-    min-height: 23px;
-    align-content: center;
-    padding-inline: 5px;
-    border-radius: 5px;
-    background: rgb(9 13 14 / 85%);
-  }
-  .shop-controls .shop-bet button { pointer-events: auto; }
-  .shop-controls .shop-bet .hud-money { min-width: 57px; }
+:where(html[data-layout="portrait"]) .mascot {
+  right: -15%;
+  bottom: 13%;
+  width: min(51vw, 40svh);
 }
-@media (max-height: 490px) and (orientation: landscape) {
-  .tavern-shell {
-    --frame-width: min(62vw, 101svh);
-  }
-  .tavern-hud {
-    width: min(76vw, 670px);
-  }
-  .tavern-shell .machine {
-    top: 45%;
-  }
+:where(html[data-layout="portrait"]) .scenery .barrel {
+  right: -36%;
 }
-@media (max-width: 670px) and (aspect-ratio > 4/5) {
-  .tavern-hud {
+:where(html[data-layout="portrait"]) .tavern-hud {
+  --hud-unit: min(10px, 2.5vw);
+  width: 96vw;
+  bottom: env(safe-area-inset-bottom, 0px);
+  row-gap: 11px;
+  column-gap: 5px;
+  grid-template-columns: 1fr 1fr;
+}
+:where(html[data-layout="portrait"]) .tavern-hud .hud-aux {
+  grid-column: 2;
+  grid-row: 1;
+  grid-auto-flow: column;
+  justify-self: end;
+}
+:where(html[data-layout="portrait"]) .hud-bar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+:where(html[data-layout="portrait"]) .tavern-hud .hud-menu {
+  width: calc(2.7 * var(--hud-unit));
+  height: calc(2.7 * var(--hud-unit));
+  padding: calc(.6 * var(--hud-unit));
+  border-radius: calc(.7 * var(--hud-unit));
+  background: rgb(9 13 14 / 85%);
+}
+:where(html[data-layout="portrait"]) .tavern-hud .hud-aux button {
+  width: 36px;
+  min-height: 36px;
+  font-size: 23px;
+}
+:where(html[data-layout="portrait"]) .tavern-hud .bet-arrows button {
+  width: calc(4.4 * var(--hud-unit));
+  height: calc(2.6 * var(--hud-unit));
+  background: rgb(9 13 14 / 80%);
+}
+:where(html[data-layout="portrait"]) .tavern-hud #bet-down { border-radius: calc(var(--hud-unit)) 0 0 calc(var(--hud-unit)); }
+:where(html[data-layout="portrait"]) .tavern-hud #bet-up { border-radius: 0 calc(var(--hud-unit)) calc(var(--hud-unit)) 0; }
+:where(html[data-layout="portrait"]) .tavern-hud .hud-bet-amount {
+  height: calc(2.6 * var(--hud-unit));
+  align-content: center;
+  border-radius: 0;
+  min-width: 82px;
+  padding: 0;
+  background: rgb(9 13 14 / 80%);
+}
+:where(html[data-layout="portrait"]) .tavern-logo {
+  top: 9%;
+  left: 50%;
+  right: auto;
+  width: min(31vw, 17svh);
+  transform: translateX(-50%);
+}
+:where(html[data-layout="portrait"]) .tavern-dialog[data-look="shop"] {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
+}
+:where(html[data-layout="portrait"]) .tavern-dialog[data-look="shop"] .modal-inner {
+  --shop-header-height: 90px;
+  padding: var(--shop-header-height) 0 0;
+}
+:where(html[data-layout="portrait"]) .shop-grid {
+  grid-template-columns: minmax(0, min(56vw, 320px));
+  justify-content: center;
+  gap: clamp(12px, 4vw, 20px);
+  max-height: calc(100dvh - var(--shop-header-height));
+  padding: 10px 0 calc(56px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+:where(html[data-layout="portrait"]) .shop-controls {
+  bottom: 0;
+  display: grid;
+  justify-content: center;
+  justify-items: center;
+  gap: 1px;
+  width: auto;
+  margin: 0;
+  padding: 3px 0 max(2px, env(safe-area-inset-bottom, 0px));
+  border-radius: 0;
+  background: linear-gradient(transparent, #101210 28%);
+  pointer-events: none;
+}
+:where(html[data-layout="portrait"]) .shop-controls .shop-balance {
+  min-width: 66px;
+  min-height: 23px;
+  align-content: center;
+  padding-inline: 5px;
+  border-radius: 5px;
+  background: rgb(9 13 14 / 85%);
+}
+:where(html[data-layout="portrait"]) .shop-controls .shop-bet button { pointer-events: auto; }
+:where(html[data-layout="portrait"]) .shop-controls .shop-bet .hud-money { min-width: 57px; }
+:where(html[data-layout="landscape"]) .tavern-shell {
+  --frame-width: min(62vw, 101svh);
+}
+:where(html[data-layout="landscape"]) .tavern-hud {
+  width: min(76vw, 670px);
+}
+:where(html[data-layout="landscape"]) .tavern-shell .machine {
+  top: 45%;
+}
+@media (max-width: 670px) {
+  :where(html:not([data-layout="portrait"])) .tavern-hud {
     left: 48%;
     width: 81vw;
   }
-  .hud-bar { padding-inline: calc(1.25 * var(--hud-unit)); }
+  :where(html:not([data-layout="portrait"])) .hud-bar { padding-inline: calc(1.25 * var(--hud-unit)); }
 }
 
 .chest-coins {
@@ -1125,13 +1115,11 @@
   width: min(92vw, 1100px);
   height: min(70svh, 620px);
 }
-@media (max-aspect-ratio: 4/5) {
-  .tavern-screen-art.total-win-screen { width: 100vw; }
-  .tavern-dialog[data-look="total-win"] #modal-content { top: -6svh; }
-  .win-celebration:not(.retrigger-celebration) .tavern-screen-art {
-    width: 100vw;
-    height: 100svh;
-  }
+:where(html[data-layout="portrait"]) .tavern-screen-art.total-win-screen { width: 100vw; }
+:where(html[data-layout="portrait"]) .tavern-dialog[data-look="total-win"] #modal-content { top: -6svh; }
+:where(html[data-layout="portrait"]) .win-celebration:not(.retrigger-celebration) .tavern-screen-art {
+  width: 100vw;
+  height: 100svh;
 }
 .chest-result-fallback {
   position: absolute;
@@ -1183,12 +1171,9 @@
 .tavern-shell[data-entering="before-mascot"] .mascot {
   visibility: hidden;
 }
-.tavern-shell[data-entering] :is(.tavern-top, .scenery, .tavern-logo, .machine, .tavern-foreground, .tavern-hud) {
-  filter: brightness(var(--opening-brightness));
-}
-.tavern-shell[data-entering] .reel-host > canvas {
-  opacity: var(--opening-symbol-opacity);
-  filter: blur(var(--opening-symbol-blur));
+/* DOM layers that the reference draws under the reelhouse `fade` slot share its dim. */
+.stage[data-reel-fade] :is(.mascot, .tavern-foreground) {
+  filter: brightness(var(--reel-fade-brightness, 1));
 }
 .opening-continue {
   position: absolute;
@@ -1212,11 +1197,10 @@
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .tavern-shell .opening-continue,
   .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue {
-    transition: translate 180ms cubic-bezier(.3, 1.6, .5, 1), filter 180ms ease-out;
+    transition: filter 180ms ease-out;
   }
   .tavern-shell .opening-continue:hover:not(:disabled),
   .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue:hover:not(:disabled) {
-    translate: 0 -10px;
     filter: brightness(1.15) drop-shadow(0 0 8px #ffdd64b3);
   }
 }
@@ -1286,49 +1270,47 @@
 .tavern-shell:not([data-mode="base"]) .tavern-hud :is(#feature-total-amount, #free-spins span) {
   color: black;
 }
-@media (min-width: 671px), (aspect-ratio > 4/5) {
-  .tavern-shell:not([data-mode="base"]) .tavern-hud {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .tavern-shell:not([data-mode="base"]) .hud-bar {
-    display: grid;
-    grid-template-columns: repeat(4, auto) minmax(0, 1fr) minmax(9em, auto) auto;
-    grid-template-rows: repeat(2, auto);
-    row-gap: 3px;
-  }
-  .tavern-shell:not([data-mode="base"]) .hud-bar > :is(.hud-menu, .hud-balance, .hud-bet, .win-value) {
-    grid-row: 1 / 3;
-    align-self: center;
-  }
-  .tavern-shell:not([data-mode="base"]) .hud-menu { grid-column: 1; }
-  .tavern-shell:not([data-mode="base"]) .hud-balance { grid-column: 2; }
-  .tavern-shell:not([data-mode="base"]) .hud-bet { grid-column: 3; margin: 0; }
-  .tavern-shell:not([data-mode="base"]) .win-value { grid-column: 4; }
-  .tavern-shell:not([data-mode="base"]) .hud-bet-amount {
-    min-width: 0;
-    padding: 0;
-    text-align: left;
-    background: transparent;
-  }
-  .tavern-shell:not([data-mode="base"]) #feature-total {
-    grid-area: 1 / 6;
-    align-content: center;
-  }
-  .tavern-shell:not([data-mode="base"]) #free-spins {
-    grid-area: 2 / 6;
-    margin: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .tavern-shell:not([data-mode="base"]) .hud-spin-control { grid-area: 1 / 7; }
-  .tavern-shell:not([data-mode="base"]) #spin {
-    width: calc(3 * var(--hud-unit));
-    height: calc(3 * var(--hud-unit));
-    box-shadow: 0 0 0 calc(.3 * var(--hud-unit)) black;
-  }
-  .tavern-shell:not([data-mode="base"]) .hud-quick { grid-area: 2 / 7; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .tavern-hud {
+  grid-template-columns: minmax(0, 1fr);
 }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-bar {
+  display: grid;
+  grid-template-columns: repeat(4, auto) minmax(0, 1fr) minmax(9em, auto) auto;
+  grid-template-rows: repeat(2, auto);
+  row-gap: 3px;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-bar > :is(.hud-menu, .hud-balance, .hud-bet, .win-value) {
+  grid-row: 1 / 3;
+  align-self: center;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-menu { grid-column: 1; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-balance { grid-column: 2; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-bet { grid-column: 3; margin: 0; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .win-value { grid-column: 4; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-bet-amount {
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) #feature-total {
+  grid-area: 1 / 6;
+  align-content: center;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) #free-spins {
+  grid-area: 2 / 6;
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-spin-control { grid-area: 1 / 7; }
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) #spin {
+  width: calc(3 * var(--hud-unit));
+  height: calc(3 * var(--hud-unit));
+  box-shadow: 0 0 0 calc(.3 * var(--hud-unit)) black;
+}
+:where(html:not([data-layout="portrait"])) .tavern-shell:not([data-mode="base"]) .hud-quick { grid-area: 2 / 7; }
 .tavern-hud .hud-quick #speed[aria-pressed="true"] {
   color: var(--hud-accent);
   background: #000;
@@ -1459,111 +1441,109 @@
 }
 .share-card p { margin-top: 6px; }
 .share-card button { margin-top: 10px; }
-@media (min-width: 671px) and (orientation: landscape) {
-  .tavern-hud {
+@media (min-width: 661px) {
+  :where(html:not([data-layout="portrait"])) .tavern-hud {
     bottom: calc(max(7px, env(safe-area-inset-bottom, 0px)) + clamp(10px, 2svh, 18px));
     left: auto;
     right: calc((100% - var(--frame-width)) / 2);
     transform: none;
     max-width: calc((100% + var(--frame-width)) / 2 - 12px);
   }
-  .tavern-shell[data-mode="base"] .hud-bar > :is(.hud-menu, .hud-balance, .win-value, .hud-bet) {
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-bar > :is(.hud-menu, .hud-balance, .win-value, .hud-bet) {
     position: relative;
     top: calc(-1 * var(--base-bar-rise));
   }
-  .tavern-shell[data-mode="base"] .tavern-hud .feature-button {
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .tavern-hud .feature-button {
     position: relative;
     top: calc((var(--hud-buy-size) - var(--base-bar-height)) / 2 - var(--base-bar-rise));
   }
-  .tavern-shell[data-mode="base"] .hud-spin-control { top: -10px; }
-  .tavern-shell[data-mode="base"] .hud-quick #auto {
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-spin-control { top: -10px; }
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-quick #auto {
     position: relative;
     top: -15px;
   }
-  .tavern-shell[data-mode="base"] .hud-quick #speed {
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-quick #speed {
     position: relative;
     top: -5px;
   }
-  .tavern-hud .hud-menu { anchor-name: --tavern-menu; }
-  #hud-menu-panel:popover-open {
+  :where(html:not([data-layout="portrait"])) .tavern-hud .hud-menu { anchor-name: --tavern-menu; }
+  :where(html:not([data-layout="portrait"])) #hud-menu-panel:popover-open {
     position-anchor: --tavern-menu;
     left: anchor(left, max(4vw, calc((100vw - 670px) / 2)));
     bottom: calc(anchor(top, 12svh) + 8px);
   }
-  #hud-menu-panel input { cursor: pointer; }
+  :where(html:not([data-layout="portrait"])) #hud-menu-panel input { cursor: pointer; }
 }
-@media (max-width: 670px) and (max-aspect-ratio: 4/5) {
-  .tavern-hud:has(.hud-menu) {
-    grid-template-columns: 1fr 36px auto 36px 1fr;
-    justify-items: center;
-  }
-  .tavern-hud:has(.hud-menu) :is(.hud-bar, .hud-quick) { display: contents; }
-  .tavern-hud:has(.hud-menu) .hud-bar::before { display: none; }
-  .tavern-hud:has(.hud-menu) :is(.hud-aux, #bet-track) { display: none; }
-  .tavern-hud .hud-menu { grid-area: 1 / 1; }
-  .tavern-hud #auto { grid-area: 1 / 2; }
-  .tavern-hud .hud-spin-control { grid-area: 1 / 3; }
-  .tavern-hud #speed { grid-area: 1 / 4; }
-  .tavern-hud:has(.hud-menu) #buy { grid-area: 1 / 5; }
-  .tavern-hud:has(.hud-menu) .hud-balance { grid-area: 2 / 1; justify-self: start; }
-  .tavern-hud:has(.hud-menu) .hud-bet { grid-area: 2 / 2 / 3 / 5; margin: 0; gap: 0; }
-  .tavern-hud:has(.hud-menu) .win-value { grid-area: 2 / 5; justify-self: end; }
-  .tavern-hud:has(.hud-menu) :is(.hud-balance, .win-value) {
-    min-height: calc(2.6 * var(--hud-unit));
-    align-content: center;
-    padding-inline: 9px;
-    border-radius: calc(var(--hud-unit)) calc(var(--hud-unit)) 0 0;
-    background: rgb(9 13 14 / 80%);
-  }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    row-gap: 6px;
-  }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) :is(.hud-menu, .hud-balance) { justify-self: start; }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .hud-spin-control { grid-area: 1 / 2; }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) #speed { grid-area: 1 / 3; justify-self: end; }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .hud-bet { grid-area: 2 / 2; }
-  .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .win-value { grid-area: 2 / 3; }
-  .tavern-hud:has(.hud-menu) #feature-total { grid-area: 3 / 1 / 4 / 3; justify-self: stretch; }
-  .tavern-hud:has(.hud-menu) #free-spins { grid-area: 3 / 3; justify-self: stretch; margin: 0; }
-  .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) {
-    row-gap: 14px;
-    column-gap: 0;
-    grid-template-columns: 20% 22% 10% 20% 12% 16%;
-  }
-  .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) .win-value { grid-column: 5 / 7; }
-  .tavern-hud .bet-arrows { display: contents; }
-  .tavern-hud #bet-down { order: -1; }
-  #auto-panel:popover-open,
-  #bet-panel:popover-open,
-  #hud-menu-panel:popover-open {
-    inset: auto auto 125px 50%;
-    transform: translateX(-50%);
-  }
-  #bet-panel:popover-open { width: min(92vw, 420px); }
-  #auto-panel:popover-open {
-    bottom: calc(anchor(top, 115px) + 10px);
-    width: min(65vw, 330px);
-    padding: 10px;
-  }
-  #auto-panel > strong { font-size: clamp(13px, 3.35vw, 17px); }
-  #auto-panel > span { font-size: clamp(11px, 2.8vw, 14px); }
-  #auto-panel .round-picker-options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 7px;
-    margin-top: 9px;
-  }
-  #auto-panel button {
-    min-height: clamp(28px, 7.5vw, 38px);
-    font-size: clamp(12px, 2.8vw, 14px);
-  }
-  #hud-menu-panel:popover-open {
-    inset-inline: 3vw auto;
-    transform: none;
-  }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) {
+  grid-template-columns: 1fr 36px auto 36px 1fr;
+  justify-items: center;
 }
-@media (450px <= width <= 670px) and (max-aspect-ratio: 4/5) {
-  .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) {
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) :is(.hud-bar, .hud-quick) { display: contents; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) .hud-bar::before { display: none; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) :is(.hud-aux, #bet-track) { display: none; }
+:where(html[data-layout="portrait"]) .tavern-hud .hud-menu { grid-area: 1 / 1; }
+:where(html[data-layout="portrait"]) .tavern-hud #auto { grid-area: 1 / 2; }
+:where(html[data-layout="portrait"]) .tavern-hud .hud-spin-control { grid-area: 1 / 3; }
+:where(html[data-layout="portrait"]) .tavern-hud #speed { grid-area: 1 / 4; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) #buy { grid-area: 1 / 5; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) .hud-balance { grid-area: 2 / 1; justify-self: start; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) .hud-bet { grid-area: 2 / 2 / 3 / 5; margin: 0; gap: 0; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) .win-value { grid-area: 2 / 5; justify-self: end; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) :is(.hud-balance, .win-value) {
+  min-height: calc(2.6 * var(--hud-unit));
+  align-content: center;
+  padding-inline: 9px;
+  border-radius: calc(var(--hud-unit)) calc(var(--hud-unit)) 0 0;
+  background: rgb(9 13 14 / 80%);
+}
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  row-gap: 6px;
+}
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) :is(.hud-menu, .hud-balance) { justify-self: start; }
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .hud-spin-control { grid-area: 1 / 2; }
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) #speed { grid-area: 1 / 3; justify-self: end; }
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .hud-bet { grid-area: 2 / 2; }
+:where(html[data-layout="portrait"]) .tavern-shell:not([data-mode="base"]) .tavern-hud:has(.hud-menu) .win-value { grid-area: 2 / 3; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) #feature-total { grid-area: 3 / 1 / 4 / 3; justify-self: stretch; }
+:where(html[data-layout="portrait"]) .tavern-hud:has(.hud-menu) #free-spins { grid-area: 3 / 3; justify-self: stretch; margin: 0; }
+:where(html[data-layout="portrait"]) .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) {
+  row-gap: 14px;
+  column-gap: 0;
+  grid-template-columns: 20% 22% 10% 20% 12% 16%;
+}
+:where(html[data-layout="portrait"]) .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) .win-value { grid-column: 5 / 7; }
+:where(html[data-layout="portrait"]) .tavern-hud .bet-arrows { display: contents; }
+:where(html[data-layout="portrait"]) .tavern-hud #bet-down { order: -1; }
+:where(html[data-layout="portrait"]) #auto-panel:popover-open,
+:where(html[data-layout="portrait"]) #bet-panel:popover-open,
+:where(html[data-layout="portrait"]) #hud-menu-panel:popover-open {
+  inset: auto auto 125px 50%;
+  transform: translateX(-50%);
+}
+:where(html[data-layout="portrait"]) #bet-panel:popover-open { width: min(92vw, 420px); }
+:where(html[data-layout="portrait"]) #auto-panel:popover-open {
+  bottom: calc(anchor(top, 115px) + 10px);
+  width: min(65vw, 330px);
+  padding: 10px;
+}
+:where(html[data-layout="portrait"]) #auto-panel > strong { font-size: clamp(13px, 3.35vw, 17px); }
+:where(html[data-layout="portrait"]) #auto-panel > span { font-size: clamp(11px, 2.8vw, 14px); }
+:where(html[data-layout="portrait"]) #auto-panel .round-picker-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 9px;
+}
+:where(html[data-layout="portrait"]) #auto-panel button {
+  min-height: clamp(28px, 7.5vw, 38px);
+  font-size: clamp(12px, 2.8vw, 14px);
+}
+:where(html[data-layout="portrait"]) #hud-menu-panel:popover-open {
+  inset-inline: 3vw auto;
+  transform: none;
+}
+@media (min-width: 450px) {
+  :where(html[data-layout="portrait"]) .tavern-shell[data-mode="base"] .tavern-hud:has(.hud-menu) {
     grid-template-columns: 32% 9% 17% 12% 18% 12%;
     row-gap: 10px;
   }
@@ -1593,9 +1573,7 @@ dialog.info-screen {
   animation: info-screen-in 60ms linear;
 }
 dialog.info-screen::backdrop { background: transparent; }
-@media (max-aspect-ratio: 4/5) {
-  dialog.info-screen { font-size: min(15px, calc(100vw * 15 / 400)); }
-}
+:where(html[data-layout="portrait"]) dialog.info-screen { font-size: min(15px, calc(100vw * 15 / 400)); }
 @keyframes info-screen-in { from { opacity: 0; } }
 .info-screen .info-close-button {
   position: absolute;
@@ -1707,4 +1685,13 @@ dialog.info-screen p {
   width: 180px;
   height: auto;
   object-fit: contain;
+}
+
+/* Spine screens (bonus intro, Total Win, win tiers, retrigger) dim the scene like reference v13:
+   plain black driven by the screens `fade` slot alpha, without blurring the scene. */
+.tavern-dialog[data-spine-dim]::backdrop,
+.win-celebration[data-spine-dim] {
+  background: rgb(0 0 0 / var(--spine-screen-dim, 0));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }

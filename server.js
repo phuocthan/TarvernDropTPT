@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import { MockGame } from "./server/mock-game.ts";
 import mockGamePolicy from "./server/demo-check.config.json" with { type: "json" };
@@ -22,7 +23,12 @@ if (profile) {
 
 const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_ID);
 const debugRequested = process.argv.includes("--bonus-debug");
-const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ?? (onRailway || debugRequested ? "1" : "0")) === "1";
+// Optional developer override in the ignored .runtime folder: { "bonusDebug": true }.
+// Precedence: MOCK_DEBUG_BONUS env > --bonus-debug / Railway > local file > off.
+const localOverridePath = ".runtime/mock-server.local.json";
+const localOverride = existsSync(localOverridePath) ? JSON.parse(readFileSync(localOverridePath, "utf8")) : {};
+const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ??
+  (onRailway || debugRequested || localOverride.bonusDebug === true ? "1" : "0")) === "1";
 const localMockBonus = enableMockBonus && !onRailway;
 const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE ||
   (localMockBonus ? ".runtime/backend-debug-bonus.json" : ".runtime/backend-v1.json"), { mockGamePolicy, enableMockBonus });

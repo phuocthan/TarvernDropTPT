@@ -62,8 +62,11 @@ export async function mountMascot(host: HTMLElement, resources: ResourceManager)
         const ratio = worldScale / scale;
         const displayRatio = Math.min(devicePixelRatio, 2) * ratio;
         const resolution = Math.max(1, Math.min(4, Math.ceil(displayRatio * 8) / 8));
-        if (app.renderer.resolution !== resolution)
+        if (app.renderer.resolution !== resolution) {
           app.renderer.resize(bufferWidth, bufferHeight, resolution);
+          // Resizing clears the canvas; repaint at once so the mascot never blinks out.
+          app.render();
+        }
         host.dataset.anchored = "true";
         const left = `${x - mascot.x * ratio}px`;
         const top = `${y - mascot.y * ratio}px`;

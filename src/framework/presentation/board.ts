@@ -107,8 +107,11 @@ export class BoardView {
     host.appendChild(this.app.canvas);
     this.resizeObserver = new ResizeObserver(() => {
       const resolution = boardResolution();
-      if (Math.abs(this.app.renderer.resolution - resolution) > 0.05)
+      if (Math.abs(this.app.renderer.resolution - resolution) > 0.05) {
         this.app.renderer.resize(renderWidth, renderHeight, resolution);
+        // Resizing clears the canvas; an idle board has no ticker render to repaint it.
+        this.app.render();
+      }
     });
     this.resizeObserver.observe(host);
     this.app.canvas.setAttribute(

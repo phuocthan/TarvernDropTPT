@@ -9,7 +9,8 @@ import {
   type TrackEntry,
 } from "@esotericsoftware/spine-pixi-v8";
 import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
-import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/presentation/scene.ts";
+import type { SceneAnchor } from "../../framework/presentation/scene.ts";
+import type { LayoutModeWatcher } from "../../framework/presentation/layout-mode.ts";
 import { createShockwave, defaultShockwave } from "../../framework/presentation/shockwave.ts";
 import { hasTavernBitmapFont } from "./typography.ts";
 import { createMascot, loadMascot, playMascotWin } from "./mascot.ts";
@@ -58,6 +59,12 @@ function screenBounds(
   ) ?? { x: -3000, y: -2000, width: 6000, height: 4000 };
 }
 
+/** GSAP power2.out, used by the reference chest camera. */
+const POWER2_OUT = "cubic-bezier(0.25, 0.46, 0.45, 0.94)";
+
+/** Alpha of the black rectangle that reference v13 adds to the screens `fade` slot. */
+const SCREEN_DIM_RECT_ALPHA = 0.75;
+
 export async function mountTavernEffects(
   stage: HTMLElement,
   frame: HTMLElement,
@@ -67,6 +74,7 @@ export async function mountTavernEffects(
   placeMascot: (anchor?: SceneAnchor | null) => void,
   resources: ResourceManager,
   boardApp: Application,
+  layoutMode?: LayoutModeWatcher,
 ) {
   const atlas = resources.url("atlas");
   const backgroundUrl = resources.url("scene.background");
@@ -150,8 +158,33 @@ export async function mountTavernEffects(
   chestMultipliers.forEach((text, reel) =>
     foregroundChests!.addSlotObject(`slot_reel_mult_${reel}`, text, { followSlotColor: true }));
   // Paylines have their own renderer; fade dims the symbol layers instead of covering the canvas.
-  const notProjected = /^(payline_|line_holder|fade$)/;
+  // The board canvas only spans the reel frame. The logo (`title`) sits above the frame and never
+  // overlaps symbols, so it stays in the scene canvas instead of being clipped at the board edge.
+  const notProjected = /^(payline_|line_holder|fade$|title$)/;
   const fadeSlot = reelhouse.skeleton.findSlot("fade");
+  // Reference v13 adds a black 0.75-alpha rectangle to the reelhouse `fade` slot, shown with the
+  // slot alpha while the authored (slot-tinted) attachment is present. Together they are the only
+  // scene dim of the landing, game entry and chest finale. It sits above the frame, symbols and
+  // portrait mascot and below the logo and chests. (Its BlurFilter only softened edges that lie
+  // outside the viewport, so the rectangle is simply made large enough to cover any viewport.)
+  const reelFadeRect = new Graphics().rect(-50000, -50000, 100000, 100000).fill({ color: 0x000000, alpha: SCREEN_DIM_RECT_ALPHA });
+  reelhouse.addSlotObject("fade", reelFadeRect, { followAttachmentTimeline: true });
+  /** Combined darkness of the reelhouse fade attachment and rectangle (0 = none). */
+  function reelFadeDim() {
+    if (!fadeSlot?.getAttachment()) return 0;
+    const alpha = fadeSlot.color.a;
+    return 1 - (1 - alpha) * (1 - SCREEN_DIM_RECT_ALPHA * alpha);
+  }
+  /** DOM layers that sit under the reference fade (landscape mascot, table) follow the same dim. */
+  let domFadeDim = -1;
+  function dimDomLayers(amount: number) {
+    const rounded = Math.round(amount * 1000) / 1000;
+    if (rounded === domFadeDim) return;
+    domFadeDim = rounded;
+    stage.toggleAttribute("data-reel-fade", rounded > 0);
+    if (rounded > 0) stage.style.setProperty("--reel-fade-brightness", String(1 - rounded));
+    else stage.style.removeProperty("--reel-fade-brightness");
+  }
   let symbolDim = -1;
   function dimSymbols(amount: number) {
     if (amount === symbolDim) return;
@@ -161,9 +194,18 @@ export async function mountTavernEffects(
     for (const child of boardApp.stage.children) if (child !== foregroundChests) child.tint = tint;
   }
   let chestZoom: Animation | undefined;
+  /** Ease the chest camera back to the full scene, as the reference does after the last chest. */
+  function releaseChestZoom() {
+    if (!chestZoom) return;
+    const { scale, translate, transformOrigin } = getComputedStyle(stage);
+    chestZoom.cancel();
+    const durationMs = sceneLayout?.chestCamera?.durationMs ?? 500;
+    chestZoom = scale === "none" || scale === "1" ? undefined : stage.animate([
+      { scale, translate, transformOrigin },
+      { scale: "1", translate: "0 0", transformOrigin },
+    ], { duration: durationMs, easing: POWER2_OUT });
+  }
   let reelExit: Animation | undefined;
-  const openingDimmer = new Graphics();
-  openingDimmer.visible = false;
   const tables = [
     [background.skeleton.findSlot(slots.baseTable ?? ""), foreground.querySelector<HTMLElement>(".base-art")],
     [background.skeleton.findSlot(slots.bonusTable ?? ""), foreground.querySelector<HTMLElement>(".bonus-art")],
@@ -198,6 +240,33 @@ export async function mountTavernEffects(
       slot.color.a = 0;
     }
   };
+  // Dark layer behind Spine screens, matching the reference `fade` slot (see screens below).
+  let dimContainer: HTMLElement | null = null;
+  function publishScreenDim(amount: number, target: HTMLElement = host) {
+    const container = target === scene ? null : target.closest<HTMLElement>("dialog, .win-celebration");
+    if (container !== dimContainer) clearScreenDim();
+    if (!container) return;
+    dimContainer = container;
+    container.dataset.spineDim = "true";
+    container.style.setProperty("--spine-screen-dim", Math.max(0, Math.min(1, amount)).toFixed(3));
+  }
+  function clearScreenDim() {
+    const container = dimContainer;
+    if (!container) return;
+    dimContainer = null;
+    const release = () => {
+      if (container === dimContainer) return;
+      delete container.dataset.spineDim;
+      container.style.removeProperty("--spine-screen-dim");
+    };
+    // The screen's own fade has already cleared the dim. A dialog can stay open after it (Total
+    // Win waits for the payout count and reel entry), so keep its backdrop clear until it closes;
+    // otherwise the generic dialog backdrop (dark + blur) would flash in for those frames.
+    if (container instanceof HTMLDialogElement && container.open) {
+      container.style.setProperty("--spine-screen-dim", "0");
+      container.addEventListener("close", release, { once: true });
+    } else release();
+  }
   const screens = Spine.from({
     skeleton: screensUrl,
     atlas,
@@ -249,13 +318,26 @@ export async function mountTavernEffects(
       );
       payout.scale.set(desiredScale * fit);
     }
-    // The dialog backdrop already dims the whole viewport.
-    skeleton.findSlot("fade")?.setAttachment(null);
+    // Reference v13 dims everything under a screen through the authored `fade` slot: its black
+    // attachment plus a black 0.75-alpha rectangle added as a slot object, both scaled by the
+    // slot alpha (BlurFilter on that solid rectangle only softens its off-screen edges, so it
+    // never blurs the scene). This canvas covers the art box only, so the same darkness is
+    // published to the full-viewport container behind it instead of being drawn here.
+    // The authored attachment is always present in the reference (only `fade` is ever keyed),
+    // so its alpha comes from the skin while the canvas copy is removed.
+    const fadeSlot = skeleton.findSlot("fade");
+    if (fadeSlot) {
+      const fadeAlpha = fadeSlot.color.a;
+      const fadeArt = skeleton.data.defaultSkin?.getAttachment(fadeSlot.data.index, "fade");
+      const authored = fadeArt instanceof RegionAttachment ? fadeArt.color.a : 0;
+      publishScreenDim(1 - (1 - authored * fadeAlpha) * (1 - SCREEN_DIM_RECT_ALPHA * fadeAlpha));
+      fadeSlot.setAttachment(null);
+    }
     // Only the exact count of ten can use the authored text sprite.
     if (spinCount.text) skeleton.findSlot("fs")?.setAttachment(null);
   };
   screens.visible = false;
-  app.stage.addChild(background, openingDimmer, reelhouse, screens);
+  app.stage.addChild(background, reelhouse, screens);
   const portraitMascot = mascotLoaded ? createMascot(app, resources) : undefined;
   if (portraitMascot) {
     portraitMascot.visible = portraitMascot.autoUpdate = false;
@@ -275,8 +357,11 @@ export async function mountTavernEffects(
   let liveOverlay: Application | undefined;
   let mode: "base" | "bonus" | undefined;
   let previousFeature: FeatureState | null = null;
+  // The portrait Spine poses (0_mobile, 4_mobile, mobile mascot) follow the shared layout mode,
+  // exactly as the reference does; without one, fall back to a narrow-aspect check.
   const compactScene = matchMedia("(max-aspect-ratio: 4/5)");
-  let portrait = compactScene.matches;
+  const isPortrait = () => layoutMode ? layoutMode.mode === "portrait" : compactScene.matches;
+  let portrait = isPortrait();
   let baseExited = false;
   let bonusExited = false;
   let revealingChests = false;
@@ -340,9 +425,12 @@ export async function mountTavernEffects(
     reelhouse.update(time);
     const foreground = mode === "bonus" && !stage.hasAttribute("data-bonus-entry") && !bonusExited;
     stage.toggleAttribute("data-foreground-chests", foreground);
+    // Symbols live on the board canvas above this scene, so they take the fade as a tint.
+    const fadeDim = reelFadeDim();
+    dimDomLayers(fadeDim);
     if (!foreground) {
       if (foregroundChests) foregroundChests.visible = false;
-      dimSymbols(0);
+      dimSymbols(fadeDim);
       return;
     }
     foregroundChests ??= createForegroundChests();
@@ -360,9 +448,7 @@ export async function mountTavernEffects(
       if (slot === symbolSlot) aboveSymbols = true;
       else if (aboveSymbols && !notProjected.test(slot.data.name)) projectedChestSlots.add(slot.data.index);
     }
-    // The reference fade slot contains a black rectangle with alpha 0.75;
-    // its Spine slot alpha modulates that rectangle rather than replacing it.
-    dimSymbols(fadeSlot?.getAttachment() ? 0.75 * fadeSlot.color.a : 0);
+    dimSymbols(fadeDim);
     foregroundChests.update(0);
     for (const index of projectedChestSlots) {
       const slot = reelhouse.skeleton.slots[index];
@@ -375,14 +461,19 @@ export async function mountTavernEffects(
     for (const [slot, alpha] of foregroundAlpha) slot.color.a = alpha;
     background.update(time);
     const source = portrait ? reelhouse : background;
-    const anchor = source.skeleton.findSlot((portrait ? slots.portraitMascot : slots.landscapeMascot) ?? "")?.bone;
+    const anchorSlot = source.skeleton.findSlot((portrait ? slots.portraitMascot : slots.landscapeMascot) ?? "");
+    const anchor = anchorSlot?.bone;
     const inlineMascot = portrait && !!anchor && !!portraitMascot;
     stage.toggleAttribute("data-mascot-behind-board", inlineMascot);
     const shell = stage.parentElement;
     const mascotHidden = !mode || shell?.hasAttribute("data-opening") || shell?.dataset.entering === "before-mascot";
     if (portraitMascot) {
+      // The reelhouse fades slot_character with the frame (2_base_exit, 2_bonus_exit and the
+      // enter clips), so the inline portrait mascot follows the slot alpha as well as its bone.
+      const slotAlpha = inlineMascot ? anchorSlot!.color.a : 0;
+      portraitMascot.alpha = slotAlpha;
       portraitMascot.visible = portraitMascot.autoUpdate =
-        inlineMascot && !mascotHidden;
+        inlineMascot && !mascotHidden && slotAlpha > 0.001;
     }
     if (mascotHidden) {
       placeMascot(null);
@@ -419,9 +510,11 @@ export async function mountTavernEffects(
       const { clientWidth: width, clientHeight: height } = host;
       if (width && height) {
         const overlay = liveOverlay ?? app;
-        if (overlay.screen.width !== width || overlay.screen.height !== height)
+        if (overlay.screen.width !== width || overlay.screen.height !== height) {
           overlay.renderer.resize(width, height);
-        const mobile = compactScene.matches;
+          overlayResized = overlay;
+        }
+        const mobile = isPortrait();
         const retrigger = host.dataset.spineClip === "addfs";
         const celebration = host.closest(".win-celebration");
         const totalWin = host.classList.contains("total-win-screen");
@@ -439,18 +532,26 @@ export async function mountTavernEffects(
           height * (celebration && !retrigger ? sceneLayout?.winScreen?.centerY ?? 0.44 : 0.5) - (bounds.y + bounds.height / 2) * scale,
         );
       }
+      // Resizing clears a WebGL canvas. Redraw now: ResizeObserver runs after this frame's
+      // ticker render, so waiting for the next tick would paint an empty frame (flicker).
+      overlayResized?.render();
+      overlayResized = undefined;
       if (!liveOverlay) return;
     }
     const { clientWidth: width, clientHeight: height } = scene;
     if (!width || !height) return;
-    if (app.screen.width !== width || app.screen.height !== height)
+    let redraw = false;
+    if (app.screen.width !== width || app.screen.height !== height) {
       app.renderer.resize(width, height);
-    if (openingDimmer.visible)
-      drawDimmer(openingDimmer, width, height, sceneLayout?.openingDimmerOpacity ?? 0);
-    const nextPortrait = compactScene.matches;
+      redraw = true;
+    }
+    const nextPortrait = isPortrait();
     if (nextPortrait !== portrait) {
       portrait = nextPortrait;
       applyOrientation();
+      // Apply the orientation pose in this frame instead of on the next tick.
+      updateReelhouse(0);
+      redraw = true;
     }
     const sceneRect = scene.getBoundingClientRect();
     const frameRect = frame.getBoundingClientRect();
@@ -475,8 +576,11 @@ export async function mountTavernEffects(
     );
     layoutForegroundChests();
     updateBackground(0);
+    if (redraw && host === scene) app.render();
   }
+  let overlayResized: Application | undefined;
   const observer = new ResizeObserver(layout);
+  layoutMode?.subscribe(() => layout());
   observer.observe(stage);
   observer.observe(frame);
   layout();
@@ -486,8 +590,10 @@ export async function mountTavernEffects(
       reelhouse.state.setAnimation(0, "0_mobile", false);
       background.state.setAnimation(4, "4_mobile", false);
     } else {
-      reelhouse.state.clearTrack(0);
-      background.state.clearTrack(4);
+      // Like the reference, mix the mobile pose out so title, character slot and background
+      // return to their landscape (setup) pose; clearTrack would leave the mobile pose applied.
+      reelhouse.state.setEmptyAnimation(0, 0);
+      background.state.setEmptyAnimation(4, 0);
     }
   }
 
@@ -604,6 +710,7 @@ export async function mountTavernEffects(
 
   function hideScreen() {
     if (host === scene) return;
+    clearScreenDim();
     observer.unobserve(host);
     host.removeAttribute("data-spine-ready");
     host.removeAttribute("data-spine-amount");
@@ -735,7 +842,6 @@ export async function mountTavernEffects(
       if (portraitMascot?.visible) playMascotWin(portraitMascot, playbackRate);
     },
     async showOpening() {
-      openingDimmer.visible = true;
       setMode("base", true);
       stage.dataset.spineScene = "true";
       app.render();
@@ -750,7 +856,6 @@ export async function mountTavernEffects(
       return done.then(() => { stage.dataset.openingAnimation = "complete"; });
     },
     async enterGame(playbackRate = 1) {
-      openingDimmer.visible = false;
       background.state.setAnimation(1, "1_zoom_out", false).timeScale = playbackRate;
       const done = playClip(
         reelhouse,
@@ -761,11 +866,16 @@ export async function mountTavernEffects(
       reelhouse.state.addAnimation(1, "1_idle", true, 0);
       updateReelhouse(0);
       updateBackground(0);
-      await done;
-    },
-    setOpeningBrightness(brightness: number) {
-      const channel = Math.round(brightness * 255);
-      background.tint = reelhouse.tint = channel * 0x010101;
+      // Reference v13 attaches the reels to slot_symbols: 1_game_enter keeps them hidden until
+      // 0.47 s and fades them in by 0.97 s, under the entry fade.
+      followSymbolAlpha();
+      app.ticker.add(followSymbolAlpha, undefined, -10);
+      try {
+        await done;
+      } finally {
+        app.ticker.remove(followSymbolAlpha);
+        reelHost.style.removeProperty("opacity");
+      }
     },
     revealOpeningMascot() {
       updateBackground(0);
@@ -796,7 +906,6 @@ export async function mountTavernEffects(
       }
     },
     restoreFeature(feature: FeatureState | null) {
-      openingDimmer.visible = false;
       // The initial bonus pose is restored at its end frame; no base exit or game-enter clip.
       mode = undefined;
       setMode("bonus");
@@ -820,7 +929,6 @@ export async function mountTavernEffects(
       playSceneEffects({ background: "3_shake", reelhouse: "3_shake" });
     },
     async prepareBonusIntro() {
-      openingDimmer.visible = false;
       baseExited = true;
       background.state.setAnimation(1, "1_zoom_in", false);
       const firstY = symbolAnchor?.worldY;
@@ -844,28 +952,30 @@ export async function mountTavernEffects(
       chestTotal.text = amount;
       chestTotal.visible = true;
       stage.dataset.chestReveal = "true";
-      if (sceneLayout?.chestCamera) {
-        const sceneRect = stage.getBoundingClientRect();
-        const frameRect = frame.getBoundingClientRect();
-        const hud = stage.parentElement?.querySelector<HTMLElement>(".tavern-hud")?.getBoundingClientRect();
-        const center = sceneRect.top + sceneRect.height / 2;
-        const topLimit = (center - sceneRect.top - 8) / Math.max(1, center - frameRect.top);
-        const bottomLimit = (Math.min(sceneRect.bottom, hud?.top ?? sceneRect.bottom) - center - 8) /
-          Math.max(1, frameRect.bottom - center);
-        const target = portrait ? 1.125 : sceneLayout.chestCamera.scale;
-        chestZoom = zoomScene(stage, {
-          ...sceneLayout.chestCamera,
-          scale: Math.max(1, Math.min(target, topLimit, bottomLimit)),
-          originY: 0.5,
-        });
+      const camera = sceneLayout?.chestCamera;
+      if (camera) {
+        // Reference v13 (playChestFinalWins): scale the whole scene about the viewport centre
+        // (1.4, portrait 1.125) and lift it by a width-dependent offset over 0.5 s, power2.out.
+        // The HUD lives outside the stage and stays put, as in the reference.
+        const width = stage.clientWidth;
+        const lift = !camera.liftPx ? 0 : portrait ? camera.liftPx.portrait
+          : camera.liftPx.steps.find(([maxWidth]) => width < maxWidth)?.[1] ?? camera.liftPx.default;
+        chestZoom?.cancel();
+        chestZoom = stage.animate([
+          { scale: "1", translate: "0 0", transformOrigin: `50% ${100 * camera.originY}%` },
+          {
+            scale: String(portrait ? camera.portraitScale ?? camera.scale : camera.scale),
+            translate: `0 ${-lift}px`,
+            transformOrigin: `50% ${100 * camera.originY}%`,
+          },
+        ], { duration: camera.durationMs, easing: POWER2_OUT, fill: "forwards" });
       }
       await Promise.all([chestZoom?.finished, playClip(reelhouse, 4, "4_finalwin")]);
     },
     async prepareTotalWin() {
-      openingDimmer.visible = false;
       screenOverlayRenderer ??= createScreenOverlayRenderer();
       bonusExited = true;
-      chestZoom?.cancel();
+      releaseChestZoom();
       layout();
       background.state.setAnimation(1, "1_zoom_in", false);
       const exit = reelhouse.skeleton.data.findAnimation("2_bonus_exit")!;
@@ -953,6 +1063,8 @@ export async function mountTavernEffects(
       } = {},
     ) {
       amountPulseStarted = -Infinity;
+      // Start from the clip's own (clear) fade before the overlay renderer is ready.
+      publishScreenDim(0, target);
       const intro = name === "bonus_intro" || name === "super_intro";
       const keepSceneLive = intro || name === "total_win_start" ||
         (revealingChests && name !== "addfs" && !!target.closest(".win-celebration"));

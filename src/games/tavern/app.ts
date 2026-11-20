@@ -21,6 +21,7 @@ import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framewor
 import { countPayout } from "../../framework/presentation/payout.ts";
 import { loadTavernAudio } from "./audio.ts";
 import { mountMascot } from "./mascot.ts";
+import { observeLayoutMode } from "../../framework/presentation/layout-mode.ts";
 import type {
   Chance,
   Chest,
@@ -116,6 +117,20 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const scene = game.presentation.scene;
   const stage = root.querySelector<HTMLElement>(".stage")!;
   if (scene) applySceneLayers(stage, scene.layers);
+  // Reference v13 picks desktop / landscape / portrait from the game viewport size. The CSS
+  // reads data-layout from <html> (dialogs and overlays included) and the scene follows it.
+  // The reference measures a full-viewport layer (.main-wrap); the shell has a min-height,
+  // so measure an invisible fixed probe that always equals the game viewport.
+  const gameShell = root.querySelector<HTMLElement>(".game-shell")!;
+  let layoutMode: ReturnType<typeof observeLayoutMode> | undefined;
+  if (game.presentation.layout) {
+    const probe = document.createElement("div");
+    probe.className = "layout-probe";
+    probe.setAttribute("aria-hidden", "true");
+    Object.assign(probe.style, { position: "fixed", inset: "0", visibility: "hidden", pointerEvents: "none" });
+    root.append(probe);
+    layoutMode = observeLayoutMode(probe, game.presentation.layout, [gameShell, document.documentElement]);
+  }
   const audioReady = loadTavernAudio(resources);
   const showLoadingError = () => {
     const boardLoading = $("loading");
@@ -235,6 +250,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     placeOverlayMascot,
     resources,
     view.app,
+    layoutMode,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     return undefined;
@@ -1366,11 +1382,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       delete shell.dataset.opening;
       if (reveal && !reducedMotion) {
         shell.dataset.entering = "before-mascot";
-        revealed = revealScene(reveal, scene.openingDimmerOpacity ?? 0, (brightness, symbolOpacity, elapsedMs) => {
-          shell.style.setProperty("--opening-brightness", String(brightness));
-          shell.style.setProperty("--opening-symbol-opacity", String(symbolOpacity));
-          shell.style.setProperty("--opening-symbol-blur", `${(1 - symbolOpacity) * 2}px`);
-          effects?.setOpeningBrightness(brightness);
+        // Like reference v13, the only entry dim is the reelhouse `fade` slot of 1_game_enter
+        // (held, then cleared by 0.87 s). The board stays visible under it; nothing else darkens.
+        revealed = revealScene(reveal, 0, (_brightness, _symbolOpacity, elapsedMs) => {
           if (elapsedMs >= reveal.mascotDelayMs && shell.dataset.entering === "before-mascot") {
             shell.dataset.entering = "true";
             effects?.revealOpeningMascot();
@@ -1384,9 +1398,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (!controller.state?.feature) sync();
       await Promise.all([entered, revealed]);
       delete shell.dataset.entering;
-      shell.style.removeProperty("--opening-brightness");
-      shell.style.removeProperty("--opening-symbol-opacity");
-      shell.style.removeProperty("--opening-symbol-blur");
       hud.inert = false;
     }
     sync();

@@ -93,14 +93,16 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
     }).observe(shell, { attributes: true, attributeFilter: ["data-entering"] });
   });
   await page.locator(".game-shell").click({ position: { x: 20, y: 20 } });
+  // Reference v13: the board stays visible under the reelhouse fade; the HUD is never filtered.
   await expect(page.locator("html")).toHaveAttribute("data-opening-sample", JSON.stringify({
-    boardOpacity: "0",
-    hudFilter: "brightness(0.45)",
+    boardOpacity: "1",
+    hudFilter: "none",
     hudLocked: true,
     mascotVisibility: "hidden",
     mascotFilter: "none",
   }));
-  await expect(page.locator("html")).toHaveAttribute("data-opening-mascot", /"mascotVisibility":"visible","mascotFilter":"none"/);
+  // The landscape mascot appears while the entry fade is still dimming the scene.
+  await expect(page.locator("html")).toHaveAttribute("data-opening-mascot", /"mascotVisibility":"visible","mascotFilter":"(none|brightness\([0-9.]+\))"/);
   await expect(page.locator(".game-shell")).not.toHaveAttribute("data-entering");
   await expect(page.locator("#board canvas")).toHaveCSS("opacity", "1");
   await expect(page.locator(".tavern-hud")).toHaveCSS("filter", "none");

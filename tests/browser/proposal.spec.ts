@@ -121,7 +121,8 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     const continueButton = bonusDialog.locator("#continue");
     await expect(bonusDialog).toHaveCSS("overflow-y", "clip");
     await continueButton.hover();
-    await expect(continueButton).toHaveCSS("translate", "0px -10px");
+    // Hovering Continue only brightens it; it no longer moves up.
+    await expect(continueButton).toHaveCSS("translate", "none");
     const veil = page.locator(".scene-reveal-veil");
     const hasClickMotion = await continueButton.evaluate((button: HTMLButtonElement) => {
       button.click();
@@ -129,7 +130,8 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
         (animation.effect as KeyframeEffect).getKeyframes().some((frame) => frame.scale === "1.14"));
     });
     expect(hasClickMotion).toBe(true);
-    await expect(veil).toHaveCount(1);
+    // Reference v13 has no extra veil; the screens fade slot alone clears the dim.
+    await expect(veil).toHaveCount(0);
     expect(requests.filter((req) => req.curStep === "intro")).toHaveLength(0);
     await expect(page.locator('dialog[data-look="total-win"]')).toBeVisible({ timeout: 90000 });
     expect(requests.filter((req) => req.curStep === "open-chest")).toHaveLength(5);
@@ -140,7 +142,7 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     await expect(page.locator("#continue")).toBeVisible();
     await expect(page.locator("#continue")).toBeEnabled();
     await page.locator("#dialog").click({ position: { x: 20, y: 20 } });
-    await expect(veil).toHaveCount(1);
+    await expect(veil).toHaveCount(0);
     await expect.poll(() => requests.filter((req) => req.curStep === "free-end").length).toBe(1);
     await expect(page.locator("#spin")).toBeEnabled({ timeout: 15000 });
     await expect(veil).toHaveCount(0);

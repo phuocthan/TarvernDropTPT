@@ -127,6 +127,8 @@ export interface ReelPresentation {
   controls?: { menu: boolean; autoRounds: number[]; autoUnlimited?: boolean; autoTopUp?: number; betMenuCloseDelayMs?: number };
   checkWinDelayMs?: { normal: number; turbo: number };
   animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };
+  /** Opt-in layout mode (desktop / landscape / portrait) published as `data-layout`. */
+  layout?: import("../presentation/layout-mode.ts").LayoutModeConfig;
   scene?: {
     layers: Record<string, number>;
     slots: Record<string, string>;
@@ -141,7 +143,15 @@ export interface ReelPresentation {
     shockwave?: import("../presentation/shockwave.ts").ShockwaveConfig;
     /** Milliseconds after the Total Win click: background base entry and chest text clear, then reel entry. */
     totalWinOutro?: { continueFadeMs: number; backgroundEnterMs: number; reelEnterMs: number };
-    chestCamera?: { scale: number; originY: number; durationMs: number };
+    chestCamera?: {
+      scale: number;
+      originY: number;
+      durationMs: number;
+      /** Zoom used by the portrait layout; defaults to `scale`. */
+      portraitScale?: number;
+      /** Upward camera lift in CSS px: portrait, then the first `[maxWidthExclusive, px]` step, else `default`. */
+      liftPx?: { portrait: number; steps: [number, number][]; default: number };
+    };
     sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };
     backgroundCamera?: {
       width: number;
