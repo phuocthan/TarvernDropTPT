@@ -24,6 +24,7 @@ import type {
   Chest,
   FeatureState,
   GameDefinition,
+  MockBonusScenario,
   Outcome,
   ReelMotion,
 } from "../../framework/domain/contracts.ts";
@@ -844,6 +845,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     action: "spin" | "buy-tavern" | "buy-drop",
     recover = false,
     startupResume = false,
+    mockBonus?: MockBonusScenario,
   ) {
     if (!recover && controller.phase !== "ready") {
       if (view.isMoving && !view.allowForceStop) return;
@@ -869,6 +871,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           action,
           bet: controller.state?.round?.bet || game.bets[betIndex],
           chance: controller.state?.feature ? "standard" : chance,
+          ...(mockBonus ? { mockBonus } : {}),
         });
     if (!startupResume) sync();
     try {
@@ -978,9 +981,42 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const shopArt = (option: ShopOption) =>
     `<img src="${asset(option.image)}" alt="">
      <span class="shop-bolts" aria-hidden="true">${hudIcon("turbo").repeat(option.bolts)}<i>${hudIcon("turbo").repeat(5 - option.bolts)}</i></span>`;
+  let debugMode = "drop";
+  let debugScenario: MockBonusScenario = { spins: 1, chests: [true, false, false, false, false], winTier: "big" };
+  function openDebugBonus() {
+    const tiers = [["normal", "No Big Win"], ["big", "Big Win"], ["super", "Super Win"],
+      ["mega", "Mega Win"], ["epic", "Epic Win"], ["max", "Max Win"]] as const;
+    modal(`<h2>Bonus debug</h2>
+      <form id="debug-bonus-form" class="debug-bonus-form">
+        <label>Bonus <select name="mode"><option value="drop">Drop</option><option value="tavern">Tavern</option></select></label>
+        <label>Free spins <input name="spins" type="number" min="1" max="${game.demo.maxFeatureSpins}" step="1" value="${debugScenario.spins}" required></label>
+        <fieldset><legend>Chests to open (×2 each)</legend><div class="debug-chests">
+          ${debugScenario.chests.map((enabled, reel) => `<label><input type="checkbox" name="chest-${reel}" aria-label="Chest ${reel + 1}"${enabled ? " checked" : ""}>${reel + 1}</label>`).join("")}
+        </div></fieldset>
+        <label>Final win tier <select name="win-tier">${tiers.map(([id, label]) => `<option value="${id}">${label}</option>`).join("")}</select></label>
+        <button class="primary" type="submit">Run test bonus</button>
+      </form>`, true, "debug-bonus", () => { openShop(); $("open-bonus-debug").focus(); });
+    const form = $<HTMLFormElement>("debug-bonus-form");
+    form.querySelector<HTMLSelectElement>('[name="mode"]')!.value = debugMode;
+    form.querySelector<HTMLSelectElement>('[name="win-tier"]')!.value = debugScenario.winTier;
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      if (controller.phase !== "ready" || controller.state?.feature) return;
+      const values = new FormData(form);
+      debugMode = String(values.get("mode"));
+      debugScenario = {
+        spins: Number(values.get("spins")),
+        chests: debugScenario.chests.map((_, reel) => values.has(`chest-${reel}`)),
+        winTier: values.get("win-tier") as MockBonusScenario["winTier"],
+      };
+      dialog.close();
+      void run(debugMode === "tavern" ? "buy-tavern" : "buy-drop", false, false, debugScenario);
+    };
+  }
   function openShop() {
     modal(
       `<h2 class="visually-hidden">Feature buy</h2>
+      ${transport.mockBonusEnabled ? '<button id="open-bonus-debug" class="shop-debug-entry" type="button">Bonus debug</button>' : ""}
       <div class="shop-grid">${shopOptions
         .map(
           (option) => `
@@ -1005,6 +1041,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       true,
       "shop",
     );
+    if (transport.mockBonusEnabled) $("open-bonus-debug").onclick = openDebugBonus;
     $("shop-bet-down").onclick = () => {
       updateShopBet(betIndex - 1, "shop-bet-down");
     };

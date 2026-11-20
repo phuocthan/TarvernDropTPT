@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { Board, FeatureState, GameDefinition, Outcome } from "../src/framework/domain/contracts.ts";
+import type { Board, FeatureState, GameDefinition, MockBonusScenario, Outcome } from "../src/framework/domain/contracts.ts";
+import { settleFeature } from "../src/framework/domain/rules.ts";
 import { MockGame, type MockGamePolicy } from "./mock-game.ts";
 
 type Payload = Record<string, unknown>;
@@ -89,11 +90,13 @@ export class ProposalBackend {
   private now: () => number;
   private rng: () => number;
   private mockGamePolicy: MockGamePolicy;
-  constructor(games: GameDefinition[], file: string | null, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy } = {}) {
+  private enableMockBonus: boolean;
+  constructor(games: GameDefinition[], file: string | null, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy; enableMockBonus?: boolean } = {}) {
     this.file = file === null ? null : resolve(file);
     this.now = options.now ?? Date.now;
     this.rng = options.rng ?? Math.random;
     this.mockGamePolicy = { ...options.mockGamePolicy };
+    this.enableMockBonus = options.enableMockBonus === true;
     for (const source of games) {
       const game = structuredClone(source);
       game.bets = [100, 500, 1000, 2000, 5000, 10000];
@@ -200,9 +203,62 @@ export class ProposalBackend {
       paylines: definition.lines.map((line, index) => ({ lineId: index + 1, positions: line.map((row, reel) => row * definition.reels + reel + 1) })),
       chancePrices: { normal: definition.demo.chancePrices.standard, extra: definition.demo.chancePrices.extra, super: definition.demo.chancePrices.super },
       buyPrices: definition.demo.buyPrices,
+      ...(this.canDebugBonus(definition) ? { mockBonusEnabled: true } : {}),
     };
   }
-  private buildRound(definition: GameDefinition, bet: number, action: "spin" | "buy-tavern" | "buy-drop", chance: "standard" | "extra" | "super"): Round {
+  private canDebugBonus(definition: GameDefinition) {
+    return this.enableMockBonus && definition.routing.skin === "tavern" && definition.reels === 5;
+  }
+  private mockBonusScenario(definition: GameDefinition, value: unknown): MockBonusScenario {
+    if (!value || Array.isArray(value) || typeof value !== "object") throw new ProposalError("INVALID_MOCK_BONUS", 400);
+    requireFields(value as Payload, ["spins", "chests", "winTier"]);
+    const { spins, chests, winTier } = value as MockBonusScenario;
+    if (!Number.isInteger(spins) || spins < 1 || spins > definition.demo.maxFeatureSpins ||
+        !Array.isArray(chests) || chests.length !== definition.reels || !chests.every((chest) => typeof chest === "boolean") ||
+        !["normal", "big", "super", "mega", "epic", "max"].includes(winTier))
+      throw new ProposalError("INVALID_MOCK_BONUS", 400);
+    return { spins, chests, winTier };
+  }
+  private mockFreeSpins(definition: GameDefinition, intro: Outcome, scenario: MockBonusScenario, steps: Step[]): Outcome {
+    const feature = structuredClone(intro.state.feature!);
+    const multipliers = scenario.chests.map((enabled) => enabled ? 2 : 1);
+    const product = multipliers.reduce<number>((total, multiplier) => total * multiplier, 1);
+    const cap = intro.bet * definition.demo.capMultiplier;
+    const target = scenario.winTier === "max" ? cap : intro.bet * (definition.demo.winTiers.find(
+      ({ label }) => label.toLowerCase() === `${scenario.winTier} win`,
+    )?.multiplier ?? 1);
+    const accumulated = Math.ceil(target / product);
+    const symbols = definition.symbols.filter(({ kind }) => kind !== "bonus" && kind !== "wild");
+    const line = definition.lines[0];
+    const positions = line.map((row, reel) => ({ reel, row }));
+    const winningSymbol = symbols[0].id;
+    const board = Array.from({ length: definition.reels }, (_, reel) =>
+      Array.from({ length: definition.rows }, (_, row) => symbols[(reel * 2 + row) % symbols.length].id));
+    const winningBoard = board.map((column, reel) => column.map((symbol, row) => row === line[reel] ? winningSymbol : symbol));
+    let outcome = intro;
+    for (let played = 1; played <= scenario.spins; played++) {
+      const final = played === scenario.spins;
+      feature.played = played;
+      feature.remaining = scenario.spins - played;
+      if (final) {
+        feature.accumulated = accumulated;
+        feature.chests = multipliers.map((multiplier) => ({
+          rows: multiplier === 1 ? [] : Array.from({ length: definition.rows }, (_, row) => row),
+          unlocked: multiplier !== 1, multiplier,
+        }));
+      }
+      outcome = {
+        ...intro, entry: null, state: { ...intro.state, board: final ? winningBoard : board, feature },
+        wins: final ? [{ line: 0, symbol: winningSymbol, positions, amount: accumulated }] : [],
+        spinWin: final ? accumulated : 0,
+        finalFeature: final ? feature : null,
+        completion: final ? settleFeature(accumulated, multipliers, 0, cap) : null,
+      };
+      steps.push(this.spinStep(outcome, this.feature(feature, 0, "freespin"), "free_spin", "freespin"));
+    }
+    return outcome;
+  }
+  private buildRound(definition: GameDefinition, bet: number, action: "spin" | "buy-tavern" | "buy-drop", chance: "standard" | "extra" | "super", scenario?: MockBonusScenario): Round {
     const mock = new MockGame(definition, this.rng, this.mockGamePolicy);
     mock.state.balance = Number.MAX_SAFE_INTEGER / 2;
     let outcome = mock.execute({ requestId: randomUUID(), expectedVersion: 0, action, bet, chance });
@@ -212,9 +268,11 @@ export class ProposalBackend {
     const steps = [this.spinStep(outcome, null, "base_spin", "base")];
     let finalAward = baseWin;
     if (mode && outcome.state.feature) {
+      if (scenario) outcome.state.feature.remaining = scenario.spins;
       const feature = this.feature(outcome.state.feature, baseWin, "intro");
       steps.push(this.spinStep(outcome, feature, "bonus_enter", "intro"));
-      while (mock.state.feature) {
+      if (scenario) outcome = this.mockFreeSpins(definition, outcome, scenario, steps);
+      else while (mock.state.feature) {
         outcome = mock.execute({ requestId: randomUUID(), expectedVersion: mock.state.version, action: "spin", bet, chance: "standard" });
         const state = outcome.finalFeature ?? outcome.state.feature!;
         if (outcome.completion) state.remaining = 0;
@@ -400,7 +458,10 @@ export class ProposalBackend {
         account.acknowledgments[key] = { fingerprint: fingerprint(body), response };
         return response;
       }
-      requireFields(body, path === "/spin" ? ["isFreespin", "betMinor", "chanceMode"] : ["betMinor", "featureMode"]);
+      requireFields(body, path === "/spin" ? ["isFreespin", "betMinor", "chanceMode"] : [
+        "betMinor", "featureMode", ...(this.canDebugBonus(definition) ? ["mockBonus"] : []),
+      ]);
+      const scenario = body.mockBonus === undefined ? undefined : this.mockBonusScenario(definition, body.mockBonus);
       if (!auth.playToken) throw new ProposalError("PLAY_TOKEN_REQUIRED", 400);
       const requestHash = fingerprint({ path, body });
       const saved = account.wagers[auth.playToken];
@@ -427,7 +488,7 @@ export class ProposalBackend {
         : definition.demo.buyPrices[action === "buy-drop" ? "drop" : "tavern"]);
       if (!cost) throw new ProposalError("MODE_UNAVAILABLE", 400);
       if (account.balance < cost) throw new ProposalError("INSUFFICIENT_BALANCE");
-      const round = this.buildRound(definition, body.betMinor as number, action, chance);
+      const round = this.buildRound(definition, body.betMinor as number, action, chance, scenario);
       account.balance -= round.chargedMinor;
       account.walletVersion++;
       account.rounds[round.roundId] = round;

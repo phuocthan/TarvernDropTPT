@@ -37,12 +37,18 @@ export interface Snapshot {
   feature: FeatureState | null;
   round: RoundState | null;
 }
+export interface MockBonusScenario {
+  spins: number;
+  chests: boolean[];
+  winTier: "normal" | "big" | "super" | "mega" | "epic" | "max";
+}
 export interface Command {
   requestId: string;
   expectedVersion: number;
   action: "spin" | "buy-tavern" | "buy-drop";
   bet: number;
   chance: Chance;
+  mockBonus?: MockBonusScenario;
 }
 export interface Completion {
   accumulated: number;
@@ -191,6 +197,7 @@ export interface GameDefinition {
 }
 export interface GameTransport {
   hasResume?: boolean;
+  mockBonusEnabled?: boolean;
   resume?(refresh?: boolean): Promise<Outcome>;
   completePresentation?(): Promise<Snapshot>;
   nextPresentation?(): Outcome | null;

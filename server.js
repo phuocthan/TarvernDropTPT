@@ -20,7 +20,9 @@ if (profile) {
   ({ games: catalog } = await import("./src/games/catalog.ts"));
 }
 
-const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE || ".runtime/backend-v1.json", { mockGamePolicy });
+const enableMockBonus = process.env.MOCK_DEBUG_BONUS === "1";
+const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE ||
+  (enableMockBonus ? ".runtime/backend-debug-bonus.json" : ".runtime/backend-v1.json"), { mockGamePolicy, enableMockBonus });
 proposal.sweepExpired();
 setInterval(() => {
   try { proposal.sweepExpired(); } catch (error) { console.error("Proposal settlement sweep failed", error); }
@@ -157,4 +159,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end("Not found");
   }
-}).listen(Number(process.env.PORT) || 4000, "0.0.0.0");
+}).listen(Number(process.env.PORT) || 4000, enableMockBonus ? "127.0.0.1" : "0.0.0.0");

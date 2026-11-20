@@ -650,6 +650,34 @@
   padding: 0;
 }
 .tavern-dialog .close-modal[hidden] { display: none; }
+.shop-debug-entry {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  z-index: 2;
+  min-height: 44px;
+  padding-inline: 14px;
+  border-radius: 9px;
+  background: #101b20;
+  color: #6ee9ff;
+  font: inherit;
+}
+.tavern-dialog[data-look="debug-bonus"] { width: min(92vw, 420px); }
+.tavern-dialog[data-look="debug-bonus"] h2 { font-family: inherit; }
+.debug-bonus-form { display: grid; gap: 12px; }
+.debug-bonus-form > label { display: grid; grid-template-columns: 1fr minmax(0, 1fr); align-items: center; gap: 8px; }
+.debug-bonus-form :is(input[type="number"], select) {
+  min-width: 0;
+  min-height: 42px;
+  padding-inline: 8px;
+  border-radius: 6px;
+  font: inherit;
+}
+.debug-bonus-form fieldset { min-width: 0; margin: 0; padding: 8px; }
+.debug-chests { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.debug-chests label { display: flex; min-height: 44px; align-items: center; justify-content: center; gap: 3px; cursor: pointer; }
+.debug-chests input { margin: 0; accent-color: #41e1fb; }
+.debug-bonus-form .primary { min-height: 44px; }
 .tavern-dialog[data-look^="shop"] .close-modal {
   position: fixed;
   top: max(16px, env(safe-area-inset-top, 0px));

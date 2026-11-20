@@ -44,6 +44,50 @@ test("proposal KRW wager is durable and duplicate token never creates another de
   assert.equal(f.call("POST", "/rounds/status").wallet.walletVersion, result.wallet.walletVersion);
   assert.throws(() => f.call("POST", "/spin", { ...body, wallet: 10000 }), /INVALID_FIELDS/);
 });
+test("local bonus QA plays only selected chests and settles the requested win tier", () => {
+  for (const { chests, opened, spins, winTier, payout } of [
+    { chests: [false, false, false, false, false], opened: [], spins: 1, winTier: "big", payout: 20_000 },
+    { chests: [true, false, true, false, false], opened: [1, 3], spins: 2, winTier: "mega", payout: 75_000 },
+    { chests: [true, true, true, true, true], opened: [1, 2, 3, 4, 5], spins: 1, winTier: "max", payout: 10_000_000 },
+  ]) {
+    const backend = new ProposalBackend([tavern], null, { enableMockBonus: true });
+    const login = backend.login({ userId: "qa-bonus" });
+    const auth = { sessionId: login.sessionId, token: login.token, playToken: "" };
+    const call = (path: string, body = {}): any => backend.handle("POST", path, body, auth);
+    const info = call("/game-info");
+    assert.equal(info.settings.mockBonusEnabled, true);
+    auth.playToken = info.playToken;
+    const buy = { betMinor: 1000, featureMode: "drop", mockBonus: { chests, spins, winTier } };
+    assert.throws(() => call("/buy-feature", { ...buy, mockBonus: { ...buy.mockBonus, spins: 0 } }), /INVALID_MOCK_BONUS/);
+    let result = call("/buy-feature", buy);
+    const balanceAfterBuy = result.wallet.confirmedBalanceMinor;
+    assert.deepEqual(call("/buy-feature", buy), result);
+    assert.equal(result.freegame.remainSpin, spins);
+    const reveals: number[] = [];
+    let count = 0;
+    while (result.step) {
+      const step = result.step;
+      if (step.curStep === "freespin") count++;
+      if (step.curStep === "show-chest") assert.deepEqual(step.eligibleReels, opened);
+      if (step.curStep === "open-chest") reveals.push(step.reel);
+      if (step.curStep === "free-end") assert.equal(step.finalRoundAwardMinor, payout);
+      assert.equal(result.wallet.confirmedBalanceMinor, balanceAfterBuy);
+      const ack = { isFreespin: 1, curStep: step.curStep, stepId: step.stepId };
+      result = call("/spin", ack);
+      assert.deepEqual(call("/spin", ack), result);
+    }
+    assert.deepEqual(reveals, opened);
+    assert.equal(count, spins);
+    assert.equal(result.canStartPaidRound, true);
+    assert.equal(result.wallet.confirmedBalanceMinor, balanceAfterBuy + payout);
+  }
+  const normal = new ProposalBackend([tavern], null);
+  const login = normal.login({ userId: "normal-player" });
+  const auth = { sessionId: login.sessionId, token: login.token, playToken: "" };
+  const info = normal.handle("POST", "/game-info", {}, auth);
+  auth.playToken = info.playToken as string;
+  assert.throws(() => normal.handle("POST", "/buy-feature", { betMinor: 1000, featureMode: "drop", mockBonus: {} }, auth), /INVALID_FIELDS/);
+});
 test("proposal bonus releases one step, resumes after-result state, and settles once", (t) => {
   const f = fixture(t);
   const info = f.call("POST", "/game-info");
