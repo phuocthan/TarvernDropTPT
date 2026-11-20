@@ -234,7 +234,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   let mascotAnchor: SceneAnchor | undefined;
   let overlayVisible = false;
   function prepareOverlayMascot() {
-    return overlayMount ??= mountMascot($("mascot"), resources).then((mounted) => {
+    return overlayMount ??= mountMascot($("mascot"), resources, onMascotEvent).then((mounted) => {
       overlayMascot = mounted;
       if (mascotAnchor) mounted.place(mascotAnchor);
       mounted.setActive(overlayVisible);
@@ -262,6 +262,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   let countingFeatureBase: number | undefined;
   let payline: ReturnType<typeof createTavernPayline>;
   let effects: Awaited<ReturnType<typeof mountTavernEffects>> | undefined;
+  // Reference v13 characterEvent: giggle -> td_girl_gigle, mug -> td_girl_takes_mug.
+  const mascotSounds: Record<string, string> = { giggle: "td_girl_gigle", mug: "td_girl_takes_mug" };
+  const onMascotEvent = (name: string) => {
+    const clip = mascotSounds[name];
+    if (clip) audio?.cue(clip);
+  };
   function celebrate(playbackRate?: number) {
     if (overlayVisible) overlayMascot?.win(playbackRate);
     effects?.celebrateMascot(playbackRate);
@@ -276,6 +282,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     resources,
     view.app,
     layoutMode,
+    onMascotEvent,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     // Fall back to the DOM art (it fetches the hd atlas pages only now).
@@ -725,8 +732,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           }
           if (scatter.length && (outcome.entry || !skipped)) {
             await view.waitForLandings(scatter);
+            // Reference bonusEnter: 380 ms, then the mascot win with the Scatters.
+            // bonusRetrigger: 500 ms (turbo 300). Other Scatters do not cheer.
+            if (outcome.entry || outcome.retrigger) {
+              await delay(outcome.entry ? 380 : turbo || skipped ? 300 : 500);
+              celebrate();
+            }
             await view.focusWins(scatter);
-            celebrate();
           }
           view.clearHighlight();
         };
@@ -852,7 +864,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           if (effects) await effects.openChest(reel, chest.multiplier!);
           else $("chests").children[reel].outerHTML = chestMarkup(chest, reel, true);
         }
-        celebrate();
         let runningAmount = c.accumulated;
         for (const [index, { chest, reel }] of unlocked.entries()) {
           const nextAmount = Math.min(runningAmount * chest.multiplier!, c.featureAward);
@@ -874,6 +885,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         delete stage.dataset.chestOpening;
         delete stage.dataset.chestOpened;
       }
+      // Reference bonusExit: the mascot cheers only from a mega win (75x).
+      if (c.featureAward >= outcome.bet * 75) celebrate();
       if (c.featureAward >= outcome.bet * 20 || c.capped)
         await showWinSequence(c.featureAward, outcome.bet, c.capped);
       await effects?.prepareTotalWin();
@@ -962,6 +975,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       stopAuto();
       await showWinSequence(outcome.paidAward, outcome.bet, true);
     } else if (tier && !outcome.entry) {
+      // Reference boardWin: the mascot cheers from a super win (50x) up, below the max win.
+      if (outcome.spinWin >= outcome.bet * 50) celebrate();
       await showWinSequence(outcome.spinWin, outcome.bet);
     }
     await controller.completePresentation();
@@ -1436,6 +1451,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           if (elapsedMs >= reveal.mascotDelayMs && shell.dataset.entering === "before-mascot") {
             shell.dataset.entering = "true";
             effects?.revealOpeningMascot();
+            // Reference: playCharacterWin with 1_game_enter while the mascot fades in from
+            // 0.3 s; the hidden mascot is not updated, so the win starts as it appears.
             if (celebrateOpening) celebrate(reveal.playbackRate);
           }
         });

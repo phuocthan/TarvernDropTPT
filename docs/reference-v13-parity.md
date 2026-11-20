@@ -168,6 +168,22 @@ In `fw-pixi`:
 - Tavern loads `{quality}/td_master.atlas`.
 - The DOM fallback art inside the stage is not painted while the Spine scene runs (`data-native-scene`), so phones no longer download the hd pages for it. If the scene fails to load, the attribute is removed and the fallback art loads.
 
+### Mascot animation calls — ✅
+
+The reference `playCharacterWin()` plays `win` with a 0.2 s mix, then loops `idle`, on both the landscape and the portrait character. It is called in five places only:
+
+| Moment | Reference trigger | Tavern |
+| --- | --- | --- |
+| Game entry | With `1_game_enter`; the landscape character fades in over 0.4 s after a 0.3 s delay | When the mascot appears (`openingReveal.mascotDelayMs` 300). The hidden mascot is not updated, so it starts as it appears. |
+| Base win | `boardWin` when the board total is ≥ 50× (super) and below max, before the big-win screen | Same, before `showWinSequence` |
+| Bonus entry | `bonusEnter`: 380 ms, then the cheer, then the Scatters animate | Same order |
+| Retrigger | `bonusRetrigger`: 500 ms (turbo 300), then the cheer | Same |
+| Bonus end | `bonusExit` only when the total is ≥ 75× (mega) | Same; the chest-opening cheer was removed |
+
+- Non-triggering Scatters no longer cheer.
+- **Spine events:** `idle` emits `giggle` at 5.5 s and `win` emits `mug` at 0 s. As in the reference `characterEvent`, they play `td_girl_gigle` and `td_girl_takes_mug`. Only the mascot being updated (landscape overlay or inline portrait) reports events, so the sounds are never doubled.
+- **Not changed yet:** the reference shows the big-win screen from 10× in base play, and at the end of a bonus only from 75×. Tavern shows it from 5× in base play and from 20× at the end of a bonus.
+
 ### Bets and prices — ⚠️ (pending client confirmation)
 
 The client sent only the range KRW 200–200,000. A permitted ladder was not sent. On the user's instruction (20 November 2026), Tavern uses the reference USD step pattern ($0.01–$10.00) scaled by 20,000:

@@ -6,19 +6,26 @@ import { animationBounds } from "./spine-bounds.ts";
 
 export const loadMascot = (resources: ResourceManager) => resources.loadBundle("scene");
 
-export function createMascot(app: Application, resources: ResourceManager) {
+/** Spine events of td_character: `giggle` in idle (5.5 s), `mug` at the start of win. */
+export type MascotEvent = (name: string) => void;
+
+export function createMascot(app: Application, resources: ResourceManager, onEvent?: MascotEvent) {
   const mascot = Spine.from({ skeleton: resources.url("scene.mascot"), atlas: resources.url("atlas"), ticker: app.ticker });
+  if (onEvent) mascot.state.addListener({ event: (_entry, event) => onEvent(event.data.name) });
   mascot.state.setAnimation(0, "idle", true);
   mascot.update(0);
   return mascot;
 }
 
+/** Reference v13 playCharacterWin: `win` mixed in over 0.2 s, then `idle` loops. */
 export function playMascotWin(mascot: Spine, playbackRate = 1) {
-  mascot.state.setAnimation(0, "win", false).timeScale = playbackRate;
+  const win = mascot.state.setAnimation(0, "win", false);
+  win.mixDuration = 0.2;
+  win.timeScale = playbackRate;
   mascot.state.addAnimation(0, "idle", true, 0);
 }
 
-export async function mountMascot(host: HTMLElement, resources: ResourceManager) {
+export async function mountMascot(host: HTMLElement, resources: ResourceManager, onEvent?: MascotEvent) {
   const app = new Application();
   await app.init({
     width: 1,
@@ -31,7 +38,7 @@ export async function mountMascot(host: HTMLElement, resources: ResourceManager)
   app.ticker.maxFPS = 60;
   try {
     await loadMascot(resources);
-    const mascot = createMascot(app, resources);
+    const mascot = createMascot(app, resources, onEvent);
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const bounds = animationBounds(mascot.skeleton.data, ["idle", "win"]) ?? mascot.getLocalBounds();
     const scale = 360 / Math.max(bounds.width, bounds.height);

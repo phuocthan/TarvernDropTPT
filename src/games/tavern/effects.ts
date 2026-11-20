@@ -75,6 +75,7 @@ export async function mountTavernEffects(
   resources: ResourceManager,
   boardApp: Application,
   layoutMode?: LayoutModeWatcher,
+  onMascotEvent?: (name: string) => void,
 ) {
   const atlas = resources.url("atlas");
   const backgroundUrl = resources.url("scene.background");
@@ -340,7 +341,10 @@ export async function mountTavernEffects(
   };
   screens.visible = false;
   app.stage.addChild(background, reelhouse, screens);
-  const portraitMascot = mascotLoaded ? createMascot(app, resources) : undefined;
+  const portraitMascot = mascotLoaded ? createMascot(app, resources, (name) => {
+    // Only the visible mascot is updated, so its events never double the landscape one.
+    if (portraitMascot?.visible) onMascotEvent?.(name);
+  }) : undefined;
   if (portraitMascot) {
     portraitMascot.visible = portraitMascot.autoUpdate = false;
     app.stage.addChildAt(portraitMascot, app.stage.getChildIndex(reelhouse));
