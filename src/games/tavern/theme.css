@@ -1887,6 +1887,8 @@ dialog.info-screen p {
   height: calc(1.15 * var(--buy-unit));
 }
 @media (orientation: portrait) and (max-width: 767px) {
+  /* .buy-cards-rows.portrait: padding-bottom 7.5em keeps the last card above the panel. */
+  :where(html) .tavern-dialog[data-look="shop"] .shop-grid { padding-bottom: calc(7.5 * var(--buy-unit) + env(safe-area-inset-bottom, 0px)); }
   :where(html) .tavern-dialog[data-look="shop"] .shop-controls {
     inset-inline: calc(.75 * var(--buy-unit));
     width: auto;

@@ -127,6 +127,21 @@ The reference `.bottom-panel.svelte-1vd6a7q` uses the buy-screen font: `min(16px
 
 Tavern used fixed sizes of 7, 11 and 18 px. It now uses `--buy-unit`; at 1280×720 the label is 12.8 px and the value 18.4 px.
 
+### Bets and prices — ⚠️ (pending client confirmation)
+
+The client sent only the range KRW 200–200,000. A permitted ladder was not sent. On the user's instruction (20 November 2026), Tavern uses the reference USD step pattern ($0.01–$10.00) scaled by 20,000:
+
+`200, 400, 1000, 2000, 4000, 8000, 12000, 16000, 20000, 24000, 28000, 32000, 36000, 40000, 60000, 80000, 100000, 120000, 140000, 160000, 180000, 200000`
+
+- **Default bet:** ₩20,000, matching the reference default of $1.00.
+- **Prices:** Normal 1×, Extra 3×, Super 6×, Tavern Buy 125×, Drop Buy 300×.
+- **Round cap:** 10,000× the original base bet.
+- **Mock wallet:** starts at ₩10,000,000.
+- **Where the values live:** `game.config.json`. The proposal backend no longer hard-codes its own ladder. Rule tests use their own small fixed amounts.
+- **Before production:** A and the math specialist still need to confirm the ladder and the rounding rules.
+
+On the portrait buy screen, the card list keeps `padding-bottom: 7.5em`, as the reference `.buy-cards-rows.portrait` does. The last card's BUY button can therefore scroll above the bottom panel.
+
 ### HUD position — ✅ (base structure ❌)
 
 - The reference `.game-wrap` uses flex `justify-content: center` around `.desktop-panel-wrap`, which holds the Buy button and the main panel. Tavern now centres the HUD on the viewport.

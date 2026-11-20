@@ -99,8 +99,8 @@ export class ProposalBackend {
     this.enableMockBonus = options.enableMockBonus === true;
     for (const source of games) {
       const game = structuredClone(source);
-      game.bets = [100, 500, 1000, 2000, 5000, 10000];
-      game.defaultBet = 1000;
+      // Bets, default bet and Chance/Buy prices come from the game config (Tavern: the
+      // client's KRW 200-200,000 range on the reference USD step pattern, prices 1/3/6/125/300).
       game.demo.capMultiplier = 10000;
       game.demo.initialBalance = 10000000;
       const code = game.routing.query === "tavern" ? "tavern-drop" : game.routing.query;

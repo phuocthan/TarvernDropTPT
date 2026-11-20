@@ -1,6 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { tavern } from "../src/games/tavern/definition.ts";
+import { tavern as configuredTavern } from "../src/games/tavern/definition.ts";
+// Rule tests use fixed small amounts so wins, caps and wallet math stay readable. Commercial
+// bets and prices (KRW 200-200,000, 1/3/6/125/300) live in game.config.json.
+const tavern = structuredClone(configuredTavern);
+tavern.bets = [100, 200];
+tavern.defaultBet = 100;
+Object.assign(tavern.demo, {
+  initialBalance: 100000,
+  capMultiplier: 5000,
+  buyPrices: { tavern: 50, drop: 100 },
+  chancePrices: { standard: 1, extra: 2, super: 5 },
+});
 import {
   evaluate,
   collect,
