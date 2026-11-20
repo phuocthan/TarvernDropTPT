@@ -887,7 +887,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       }
       // Reference bonusExit: the mascot cheers only from a mega win (75x).
       if (c.featureAward >= outcome.bet * 75) celebrate();
-      if (c.featureAward >= outcome.bet * 20 || c.capped)
+      // Reference bonusExit: the win screen only from a mega win (75x), or at the cap.
+      if (c.featureAward >= outcome.bet * 75 || c.capped)
         await showWinSequence(c.featureAward, outcome.bet, c.capped);
       await effects?.prepareTotalWin();
       view.hideSymbols();
@@ -974,7 +975,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     } else if (outcome.capped) {
       stopAuto();
       await showWinSequence(outcome.paidAward, outcome.bet, true);
-    } else if (tier && !outcome.entry) {
+    } else if (tier && !outcome.entry && outcome.spinWin >= outcome.bet * 10) {
+      // Reference boardWin: the win screen from a nice win (10x); 5x wins only count up.
       // Reference boardWin: the mascot cheers from a super win (50x) up, below the max win.
       if (outcome.spinWin >= outcome.bet * 50) celebrate();
       await showWinSequence(outcome.spinWin, outcome.bet);

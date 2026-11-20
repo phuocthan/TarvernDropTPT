@@ -182,7 +182,7 @@ The reference `playCharacterWin()` plays `win` with a 0.2 s mix, then loops `idl
 
 - Non-triggering Scatters no longer cheer.
 - **Spine events:** `idle` emits `giggle` at 5.5 s and `win` emits `mug` at 0 s. As in the reference `characterEvent`, they play `td_girl_gigle` and `td_girl_takes_mug`. Only the mascot being updated (landscape overlay or inline portrait) reports events, so the sounds are never doubled.
-- **Not changed yet:** the reference shows the big-win screen from 10× in base play, and at the end of a bonus only from 75×. Tavern shows it from 5× in base play and from 20× at the end of a bonus.
+- **Win screens:** as in the reference, Tavern shows the win screen from 10× (nice) for a spin, and at the end of a bonus only from 75× (mega) or at the cap. It used to show it from 5× and 20×.
 
 ### Bets and prices — ⚠️ (pending client confirmation)
 
