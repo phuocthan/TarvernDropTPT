@@ -28,7 +28,7 @@ export async function mountMascot(host: HTMLElement, resources: ResourceManager)
     antialias: true,
     preference: "webgl",
   });
-  app.ticker.maxFPS = 30;
+  app.ticker.maxFPS = 60;
   try {
     await loadMascot(resources);
     const mascot = createMascot(app, resources);
@@ -61,7 +61,9 @@ export async function mountMascot(host: HTMLElement, resources: ResourceManager)
       place({ x, y, scale: worldScale }: SceneAnchor) {
         const ratio = worldScale / scale;
         const displayRatio = Math.min(devicePixelRatio, 2) * ratio;
-        const resolution = Math.max(1, Math.min(4, Math.ceil(displayRatio * 8) / 8));
+        // Match the display density (like the reference min(2, dpr)); cap only by a safe 4096px buffer.
+        const maxResolution = 4096 / Math.max(bufferWidth, bufferHeight);
+        const resolution = Math.max(1, Math.min(maxResolution, Math.ceil(displayRatio * 8) / 8));
         if (app.renderer.resolution !== resolution) {
           app.renderer.resize(bufferWidth, bufferHeight, resolution);
           // Resizing clears the canvas; repaint at once so the mascot never blinks out.

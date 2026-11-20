@@ -92,10 +92,12 @@ export async function mountTavernEffects(
     autoStart: false,
     backgroundAlpha: 0,
     antialias: false,
-    resolution: Math.min(devicePixelRatio, 1.25),
+    // Reference v13 renders every Pixi canvas at min(2, devicePixelRatio). A lower cap made
+    // the scene visibly soft on phones (dpr 2-3) after the browser upscaled it.
+    resolution: Math.min(devicePixelRatio, 2),
     preference: "webgl",
   });
-  app.ticker.maxFPS = 30;
+  app.ticker.maxFPS = 60;
   app.ticker.minFPS = 0;
 
   const background = Spine.from({
@@ -747,13 +749,13 @@ export async function mountTavernEffects(
     try {
       await overlay.init({
         width: 1, height: 1, autoStart: false, backgroundAlpha: 0,
-        resolution: Math.min(devicePixelRatio, 1.5), preference: "webgl",
+        resolution: Math.min(devicePixelRatio, 2), preference: "webgl",
       });
     } catch (error) {
       console.warn("Live screen overlay unavailable", error);
       return;
     }
-    overlay.ticker.maxFPS = 30;
+    overlay.ticker.maxFPS = 60;
     overlay.canvas.className = "tavern-spine-canvas";
     overlay.canvas.setAttribute("aria-hidden", "true");
     return overlay;
