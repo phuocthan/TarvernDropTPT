@@ -203,7 +203,6 @@ export class ProposalBackend {
       paylines: definition.lines.map((line, index) => ({ lineId: index + 1, positions: line.map((row, reel) => row * definition.reels + reel + 1) })),
       chancePrices: { normal: definition.demo.chancePrices.standard, extra: definition.demo.chancePrices.extra, super: definition.demo.chancePrices.super },
       buyPrices: definition.demo.buyPrices,
-      ...(this.canDebugBonus(definition) ? { mockBonusEnabled: true } : {}),
     };
   }
   private canDebugBonus(definition: GameDefinition) {
@@ -405,7 +404,10 @@ export class ProposalBackend {
         } : null;
         return {
           ...this.envelope(account, current),
-          settings: current?.presentationStatus === "pending" || current?.summaryId ? current.settings : this.settings(definition),
+          settings: {
+            ...(current?.presentationStatus === "pending" || current?.summaryId ? current.settings : this.settings(definition)),
+            mockBonusEnabled: this.canDebugBonus(definition),
+          },
           lastReels: [...account.lastReels], resume,
           freegame: current?.presentationStatus === "pending" ? current.steps[current.releasedThrough - 1].freegame : null,
         };

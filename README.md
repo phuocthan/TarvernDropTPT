@@ -32,6 +32,8 @@ npm start
 
 The Node server serves `dist` and `/api` on `$PORT` (default 4000). Railway configuration is included. This version requires a Node host; static GitHub Pages alone is insufficient.
 
+The Railway mock demo enables **Buy → Bonus debug** by default. In the Railway service variables, set `MOCK_DEBUG_BONUS=0` to hide the button and reject debug round requests, or `MOCK_DEBUG_BONUS=1` to enable them again. Deploy the variable change and reload the game. Local development defaults to off. A local server started with `MOCK_DEBUG_BONUS=1` listens on loopback and uses its own mock wallet file unless `MOCK_API_DATA_FILE` specifies another path.
+
 ```sh
 npm test
 npm run test:browser
