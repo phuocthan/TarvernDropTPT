@@ -1,3 +1,4 @@
+import { ApiError } from "../../framework/network/json-client.ts";
 import "./theme.css";
 import { createSlotSession } from "../../framework/slot-core/index.ts";
 import { gameRuntime } from "../../framework/app/game-runtime.ts";
@@ -456,6 +457,65 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     if (onModalBack) onModalBack();
     else dialog.close();
   };
+  /**
+   * Base-game state popups (insufficient balance, connection loss, reconnect, retry) share the
+   * Resume Active Game look. Actions are buttons; a `null` handler shows a disabled button.
+   */
+  interface NoticeAction { id: string; label: string; secondary?: boolean; onClick: (() => void) | null }
+  function notice(kind: string, title: string, body: string, actions: NoticeAction[]) {
+    modal(
+      `<h2>${title}</h2><p>${body}</p><div class="notice-actions">${actions.map((action) =>
+        `<button id="${action.id}" type="button" class="${action.secondary ? "notice-secondary" : "primary notice-primary"}"${action.onClick ? "" : " disabled"}>${action.label}</button>`).join("")}</div>`,
+      false, "resume",
+    );
+    dialog.dataset.notice = kind;
+    for (const action of actions) if (action.onClick) $(action.id).onclick = action.onClick;
+  }
+  const closeNotice = (kind?: string) => {
+    if (dialog.open && dialog.dataset.notice && (!kind || dialog.dataset.notice === kind)) dialog.close();
+  };
+  dialog.addEventListener("close", () => { delete dialog.dataset.notice; });
+  const spinCost = (action: "spin" | "buy-tavern" | "buy-drop") =>
+    game.bets[betIndex] * (action === "spin"
+      ? game.demo.chancePrices[chance]
+      : game.demo.buyPrices[action === "buy-drop" ? "drop" : "tavern"]);
+  function showInsufficientBalance() {
+    stopAuto();
+    notice("balance", "Insufficient Balance",
+      "Your balance is too low for this bet. Lower the bet or add funds to continue.",
+      [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
+  }
+  /** Network failures: the paid request may already be recorded, so Retry re-sends the same one. */
+  function showConnectionLost(pending: boolean, retry: () => void) {
+    notice("connection", "Connection Lost",
+      pending
+        ? "We could not confirm your last round. Your bet is safe: Retry fetches the same result without placing another bet."
+        : "Please check your internet connection and try again.",
+      [{ id: "retry", label: "Retry", onClick: () => {
+        if (!navigator.onLine) { showReconnecting(retry); return; }
+        dialog.close();
+        retry();
+      } }]);
+  }
+  function showReconnecting(retry: () => void) {
+    notice("reconnecting", "Reconnecting…",
+      "Waiting for your internet connection. The game continues automatically when you are back online.",
+      [{ id: "retry", label: "Retry", onClick: null }]);
+    const resume = () => {
+      if (dialog.dataset.notice !== "reconnecting") return;
+      dialog.close();
+      retry();
+    };
+    addEventListener("online", resume, { once: true });
+  }
+  // Losing the connection while idle shows the reconnect state; it closes itself when back online.
+  addEventListener("offline", () => {
+    if (dialog.open && dialog.dataset.look !== "resume") return;
+    if (dialog.open && dialog.dataset.notice !== "connection") return;
+    showReconnecting(() => {
+      if (controller.phase === "recovery") void run("spin", true);
+    });
+  });
   dialog.addEventListener("cancel", (event) => {
     if (closeModal.hidden || onModalBack) {
       event.preventDefault();
@@ -1012,6 +1072,18 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       return;
     }
     clearSpinTimer();
+    if (!recover && !controller.state?.feature && controller.state &&
+        spinCost(action) > controller.state.balance) {
+      showInsufficientBalance();
+      sync();
+      return;
+    }
+    if (!recover && !navigator.onLine) {
+      stopAuto();
+      // Back online only closes the popup: a new bet always needs the player's own press.
+      showReconnecting(() => undefined);
+      return;
+    }
     displayWin = 0;
     syncWin(controller.state?.feature);
     const spinTurbo = turbo;
@@ -1060,14 +1132,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         if (controller.state.feature?.played === 0) prepareFeatureEntry();
       }
       const pending = controller.phase === "recovery";
-      modal(
-        `<span class="eyebrow">${pending ? "PENDING ROUND" : "REQUEST DECLINED"}</span><h2>${pending ? "Recover your result" : "Please try again"}</h2><p>${pending ? "Retry retrieves the same request without placing another bet." : error instanceof Error ? error.message : "Server unavailable"}</p><button id="retry" class="primary">${pending ? "RECOVER RESULT" : "CONTINUE"}</button>`,
-        false,
-      );
-      $("retry").onclick = () => {
-        dialog.close();
-        if (pending) void run("spin", true, startupResume);
-      };
+      const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : "";
+      if (/INSUFFICIENT/.test(code)) showInsufficientBalance();
+      else if (pending || (error instanceof TypeError) ||
+          (error instanceof Error && /Timeout|Abort/.test(error.name)) || /NETWORK|TIMEOUT|OFFLINE/.test(code))
+        showConnectionLost(pending, () => {
+          if (pending) void run("spin", true, startupResume);
+        });
+      else
+        notice("declined", "Please Try Again",
+          "The server could not accept this request. Your balance has not changed.",
+          [{ id: "retry", label: "OK", onClick: () => dialog.close() }]);
       sync();
     }
   }

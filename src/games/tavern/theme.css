@@ -618,6 +618,28 @@ html:has(.tavern-shell) {
   font-weight: 600;
 }
 .tavern-dialog[data-look="resume"] #recover:hover { background: #33d9ff; }
+/* State popups (balance, connection, reconnect, retry) reuse the Resume Active Game look. */
+.tavern-dialog[data-look="resume"] .notice-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+.tavern-dialog[data-look="resume"] :is(.notice-primary, .notice-secondary) {
+  flex: 0 1 50%;
+  min-height: 44px;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: .75em;
+  background: #00ccff;
+  color: #fff;
+  font-weight: 600;
+}
+.tavern-dialog[data-look="resume"] .notice-secondary { background: transparent; }
+.tavern-dialog[data-look="resume"] .notice-primary:hover:not(:disabled) { background: #33d9ff; }
+.tavern-dialog[data-look="resume"] .notice-secondary:hover { background: rgb(255 255 255 / 10%); }
+.tavern-dialog[data-look="resume"] :is(.notice-primary, .notice-secondary):disabled {
+  opacity: .5;
+  cursor: default;
+}
 .tavern-dialog[data-look="shop"],
 .tavern-dialog[data-look="shop-confirm"],
 .tavern-dialog[data-look="bonus"],

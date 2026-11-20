@@ -1081,7 +1081,7 @@ test("lost response recovers the exact request without charging another spin", a
   await expect(page.locator("#spin")).toBeEnabled();
   await page.locator("#spin").click();
   await expect(
-    page.getByRole("heading", { name: "Recover your result" }),
+    page.getByRole("heading", { name: "Connection Lost" }),
   ).toBeVisible();
   await page.reload();
   await expect(
