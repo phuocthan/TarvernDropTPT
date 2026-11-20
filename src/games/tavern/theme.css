@@ -40,7 +40,7 @@
   font-family: Outfit, sans-serif;
 }
 .tavern-shell {
-  --frame-width: min(68vw, 101svh, 960px);
+  --frame-width: min(68vw, 92svh, 960px);
   position: relative;
   max-width: none;
   height: 100svh;
@@ -148,6 +148,9 @@
 }
 .tavern-shell:not([data-mode="base"]) .machine {
   top: 43%;
+}
+.stage[data-chest-reveal] .machine {
+  z-index: calc(var(--scene-layer-table, 5) + 1);
 }
 .tavern-shell .reel-frame {
   padding: 0;
@@ -937,7 +940,7 @@
 }
 @media (max-width: 670px) and (max-aspect-ratio: 4/5) {
   .tavern-shell .machine {
-    width: min(125vw, 103svh);
+    width: min(125vw, 70svh);
     top: 48%;
   }
   .tavern-shell:not([data-mode="base"]) .machine {
@@ -1209,11 +1212,12 @@
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .tavern-shell .opening-continue,
   .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue {
-    transition: translate 150ms ease-out;
+    transition: translate 180ms cubic-bezier(.3, 1.6, .5, 1), filter 180ms ease-out;
   }
   .tavern-shell .opening-continue:hover:not(:disabled),
   .tavern-dialog:is([data-look="bonus"], [data-look="total-win"]) .scene-continue:hover:not(:disabled) {
-    translate: 0 -5px;
+    translate: 0 -10px;
+    filter: brightness(1.15) drop-shadow(0 0 8px #ffdd64b3);
   }
 }
 .tavern-shell .opening-continue:disabled,
@@ -1398,7 +1402,7 @@
   gap: 6px;
   background: rgb(9 13 14 / 85%);
 }
-#hud-menu-panel :is(button, label) {
+#hud-menu-panel :is(#menu-rules, .menu-volume) {
   display: grid;
   grid-template-columns: 22px 1fr;
   align-items: center;
@@ -1410,6 +1414,22 @@
   text-align: left;
 }
 #hud-menu-panel span { font-size: 16px; }
+/* Reference menu: each row highlights on hover; the channel icon toggles mute. */
+#hud-menu-panel :is(#menu-rules, .menu-volume) {
+  gap: 0;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+#hud-menu-panel :is(#menu-rules, .menu-volume):hover { background: rgb(0 0 0 / 30%); }
+#hud-menu-panel .menu-volume > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
 #hud-menu-panel .hud-icon { height: 13px; }
 #hud-menu-panel input {
   width: 100%;
@@ -1547,4 +1567,144 @@
     grid-template-columns: 32% 9% 17% 12% 18% 12%;
     row-gap: 10px;
   }
+}
+
+/* Game information page, measured from the reference info screen. */
+dialog.info-screen {
+  --info-theme-color: #41e1fb;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgb(0 0 0 / 80%);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  color: #fff;
+  font: 400 min(18px, calc(100svh * 18 / 500), calc(100vw * 18 / 1040)) Outfit, sans-serif;
+  animation: info-screen-in 60ms linear;
+}
+dialog.info-screen::backdrop { background: transparent; }
+@media (max-aspect-ratio: 4/5) {
+  dialog.info-screen { font-size: min(15px, calc(100vw * 15 / 400)); }
+}
+@keyframes info-screen-in { from { opacity: 0; } }
+.info-screen .info-close-button {
+  position: absolute;
+  top: 1.8em;
+  right: 2.4em;
+  z-index: 10;
+  width: 4em;
+  height: 4em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.8em;
+  background: rgb(0 0 0 / 40%);
+  color: #fff;
+  cursor: pointer;
+}
+/* The reference close SVG keeps its 43px authored size inside the 4em button. */
+.info-screen .info-close-button .hud-icon { width: 2.4em; height: 2.4em; }
+.info-screen .info-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3em;
+  width: 80%;
+  height: 80%;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  text-align: center;
+}
+.info-screen .info-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5em;
+}
+.info-screen h1 {
+  margin: 0;
+  color: var(--info-theme-color);
+  font-size: 1.6em;
+  font-weight: 600;
+}
+dialog.info-screen p {
+  margin: 0;
+  color: #fff;
+  font-size: 1em;
+  font-weight: 400;
+  line-height: normal;
+  white-space: pre-wrap;
+}
+.info-screen .info-content-image { width: 12em; height: auto; }
+.info-screen .info-image-row {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  gap: 1em;
+}
+.info-screen .info-payline-wrap {
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
+  gap: 1em;
+  width: 80%;
+}
+.info-screen .info-payline {
+  position: relative;
+  display: grid;
+  width: 100px;
+  height: 80px;
+  border: 1px solid #ffe;
+  border-radius: 1px;
+}
+.info-screen .info-payline-index {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ffe;
+  background: transparent;
+  transition: background-color 0.3s ease;
+}
+.info-screen .info-payline-index.is-active {
+  border-radius: 0.5px;
+  background: var(--info-theme-color);
+}
+.info-screen .info-paysection {
+  display: flex;
+  flex-flow: wrap;
+  justify-content: center;
+  color: #ffe;
+  text-align: center;
+}
+.info-screen .info-paytable-column-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.info-screen .info-paytable-column {
+  display: flex;
+  flex-flow: column;
+  gap: 1em;
+  width: 120px;
+  padding-block: 1em;
+  border: 1px solid #ffe;
+  border-radius: 0.25em;
+  background: rgb(0 0 0 / 15%);
+}
+.info-screen .info-paytable-image {
+  width: 180px;
+  height: auto;
+  object-fit: contain;
 }

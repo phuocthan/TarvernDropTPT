@@ -2,6 +2,7 @@ import { Application, BitmapText, Container, Graphics, Text } from "pixi.js";
 import {
   RegionAttachment,
   AttachmentTimeline,
+  EventTimeline,
   Spine,
   type Skeleton,
   type Slot,
@@ -9,6 +10,7 @@ import {
 } from "@esotericsoftware/spine-pixi-v8";
 import type { FeatureState, ReelPresentation, SymbolLandingEffects } from "../../framework/domain/contracts.ts";
 import { drawDimmer, zoomScene, type SceneAnchor } from "../../framework/presentation/scene.ts";
+import { createShockwave, defaultShockwave } from "../../framework/presentation/shockwave.ts";
 import { hasTavernBitmapFont } from "./typography.ts";
 import { createMascot, loadMascot, playMascotWin } from "./mascot.ts";
 import { animationBounds } from "./spine-bounds.ts";
@@ -97,6 +99,12 @@ export async function mountTavernEffects(
   const reelhouse = createReelhouse(app, false, resources);
   const symbolAnchor = reelhouse.skeleton.findSlot("slot_symbols")?.bone
     ?? reelhouse.skeleton.findBone("slot_symbols");
+  // The HTML reel canvas is outside Spine. Mirror the authored slot_symbols fade
+  // so symbols leave and return together with the reel frame.
+  const symbolSlot = reelhouse.skeleton.findSlot("slot_symbols");
+  const followSymbolAlpha = () => {
+    if (symbolSlot) reelHost.style.opacity = String(symbolSlot.color.a);
+  };
   reelhouse.update(0);
   const baseSymbolY = symbolAnchor?.worldY;
   const chestSlots = reelhouse.skeleton.slots.filter((slot) =>
@@ -122,7 +130,6 @@ export async function mountTavernEffects(
   chestTotal.visible = false;
   const chestTotalSlot = new Container();
   chestTotalSlot.addChild(chestTotal);
-  reelhouse.addSlotObject("slot_finalwin", chestTotalSlot, { followSlotColor: true });
   const pulseDurationMs = 260;
   let amountPulseStarted = -Infinity;
   function pulseStrength() {
@@ -133,9 +140,26 @@ export async function mountTavernEffects(
     const text = new BitmapText({ style: { fontFamily: "td_gold", fontSize: 260 } });
     text.anchor.set(0.5);
     text.visible = false;
-    reelhouse.addSlotObject(`slot_reel_mult_${reel}`, text, { followSlotColor: true });
     return text;
   });
+  // The reference attaches the symbol container to reelhouse slot_symbols, so every slot drawn
+  // after it (fade, winbar, final win, chests, multipliers) covers the symbols. Here the symbols
+  // have their own canvas: those slots, and the texts in them, are projected into a layer above.
+  foregroundChests = createForegroundChests();
+  foregroundChests.addSlotObject("slot_finalwin", chestTotalSlot, { followSlotColor: true });
+  chestMultipliers.forEach((text, reel) =>
+    foregroundChests!.addSlotObject(`slot_reel_mult_${reel}`, text, { followSlotColor: true }));
+  // Paylines have their own renderer; fade dims the symbol layers instead of covering the canvas.
+  const notProjected = /^(payline_|line_holder|fade$)/;
+  const fadeSlot = reelhouse.skeleton.findSlot("fade");
+  let symbolDim = -1;
+  function dimSymbols(amount: number) {
+    if (amount === symbolDim) return;
+    symbolDim = amount;
+    const channel = Math.round(255 * (1 - amount));
+    const tint = (channel << 16) | (channel << 8) | channel;
+    for (const child of boardApp.stage.children) if (child !== foregroundChests) child.tint = tint;
+  }
   let chestZoom: Animation | undefined;
   let reelExit: Animation | undefined;
   const openingDimmer = new Graphics();
@@ -186,6 +210,16 @@ export async function mountTavernEffects(
   const payoutSlot = new Container();
   payoutSlot.addChild(payout);
   screens.addSlotObject("slot_win", payoutSlot, { followSlotColor: true });
+  // Win tiers are announced by authored Spine events (big, super, mega, epic, max).
+  const screenEventListeners = new Set<(name: string) => void>();
+  screens.state.addListener({
+    event: (_entry, event) => {
+      for (const listener of screenEventListeners) listener(event.data.name);
+    },
+  });
+  const shockwave = createShockwave(sceneLayout?.shockwave ?? defaultShockwave);
+  // Set when the Total Win outro has already started the base background.
+  let backgroundBaseEntered = false;
   const spinCount = new Text({
     style: {
       fontFamily: "Outfit",
@@ -251,9 +285,10 @@ export async function mountTavernEffects(
   const viewports = new Map<string, typeof bounds>();
 
   function layoutForegroundChests() {
-    if (!foregroundChests) return;
+    const boardRenderer = boardApp.renderer;
+    if (!foregroundChests || !boardRenderer) return;
     const stageRect = scene.getBoundingClientRect();
-    const boardRect = boardApp.canvas.getBoundingClientRect();
+    const boardRect = boardRenderer.canvas.getBoundingClientRect();
     if (!boardRect.width || !boardRect.height || !stageRect.width || !stageRect.height) return;
     const boardScaleX = boardApp.screen.width / boardRect.width;
     const boardScaleY = boardApp.screen.height / boardRect.height;
@@ -303,22 +338,31 @@ export async function mountTavernEffects(
     for (const [slot, alpha] of chestAlpha) slot.color.a = alpha;
     chestAlpha.clear();
     reelhouse.update(time);
-    const foreground = mode === "bonus" && !stage.hasAttribute("data-bonus-entry") &&
-      !revealingChests && !bonusExited;
+    const foreground = mode === "bonus" && !stage.hasAttribute("data-bonus-entry") && !bonusExited;
     stage.toggleAttribute("data-foreground-chests", foreground);
     if (!foreground) {
       if (foregroundChests) foregroundChests.visible = false;
+      dimSymbols(0);
       return;
     }
     foregroundChests ??= createForegroundChests();
-    if (!foregroundChests.visible) layoutForegroundChests();
+    // Effects can finish loading before BoardView mounts its symbol containers.
+    // Keep the projected authored foreground above those later-added layers.
+    if (boardApp.stage.getChildIndex(foregroundChests) !== boardApp.stage.children.length - 1)
+      boardApp.stage.setChildIndex(foregroundChests, boardApp.stage.children.length - 1);
+    // The chest camera zooms the stage, so follow the scene every frame.
+    layoutForegroundChests();
     foregroundChests.visible = true;
     projectedChestSlots.clear();
-    for (const index of chestSlotIndexes) projectedChestSlots.add(index);
-    for (const [reel, indexes] of chestActiveFx) {
-      if (reelhouse.state.getCurrent(30 + reel)?.animation?.name !== chestPrefix(reel) + "activate") continue;
-      for (const index of indexes) projectedChestSlots.add(index);
+    // Current draw order: 4_finalwin reorders slots.
+    let aboveSymbols = false;
+    for (const slot of reelhouse.skeleton.drawOrder) {
+      if (slot === symbolSlot) aboveSymbols = true;
+      else if (aboveSymbols && !notProjected.test(slot.data.name)) projectedChestSlots.add(slot.data.index);
     }
+    // The reference fade slot contains a black rectangle with alpha 0.75;
+    // its Spine slot alpha modulates that rectangle rather than replacing it.
+    dimSymbols(fadeSlot?.getAttachment() ? 0.75 * fadeSlot.color.a : 0);
     foregroundChests.update(0);
     for (const index of projectedChestSlots) {
       const slot = reelhouse.skeleton.slots[index];
@@ -452,6 +496,7 @@ export async function mountTavernEffects(
     if (next === "base") {
       chestZoom?.cancel();
       reelExit?.cancel();
+      reelHost.style.removeProperty("opacity");
     }
     const was = mode;
     let transition: TrackEntry | undefined;
@@ -468,15 +513,19 @@ export async function mountTavernEffects(
     }
     delete stage.dataset.chestReveal;
     previousFeature = null;
-    background.state.clearTracks();
+    const keepBackground = next === "base" && backgroundBaseEntered;
+    backgroundBaseEntered = false;
+    if (!keepBackground) background.state.clearTracks();
     reelhouse.state.clearTracks();
     foregroundAlpha.clear();
-    background.skeleton.setToSetupPose();
+    if (!keepBackground) background.skeleton.setToSetupPose();
     reelhouse.skeleton.setToSetupPose();
     applyOrientation();
     if (opening) {
       background.state.setAnimation(0, "0_base_idle", true);
       background.state.setAnimation(1, "1_zoom_in", false);
+    } else if (keepBackground) {
+      // The background entered at the authored Total Win beat; keep its tracks running.
     } else if (was || next === "base") {
       background.state.setAnimation(0, `0_${next}_enter`, false);
       background.state.addAnimation(0, `0_${next}_idle`, true, 0);
@@ -503,7 +552,7 @@ export async function mountTavernEffects(
         reelhouse.state.setAnimation(2, `2_${was}_exit`, false);
         transition = reelhouse.state.addAnimation(2, `2_${next}_enter`, false, 0);
       }
-      background.state.setAnimation(1, "1_zoom_out", false);
+      if (!keepBackground) background.state.setAnimation(1, "1_zoom_out", false);
       if (next === "base") reelhouse.state.addAnimation(2, "1_idle", true, 0);
     } else {
       const entry = reelhouse.state.setAnimation(2, "2_bonus_enter", false);
@@ -632,6 +681,56 @@ export async function mountTavernEffects(
   }
 
   return {
+    /** One viewport-centred shockwave across the scene, the live overlay and any extra canvases. */
+    shockwave(extra: (Application | undefined)[] = []) {
+      return shockwave.play([app, liveOverlay, ...extra]);
+    },
+    onScreenEvent(listener: (name: string) => void) {
+      screenEventListeners.add(listener);
+      return () => screenEventListeners.delete(listener);
+    },
+    winScreenEvents(name: string) {
+      const animation = screens.skeleton.data.findAnimation(name);
+      return (animation?.timelines ?? [])
+        .flatMap((timeline) => timeline instanceof EventTimeline
+          ? timeline.events.map((event) => ({ name: event.data.name, time: event.time })) : [])
+        .sort((a, b) => a.time - b.time);
+    },
+    /** Moves the current win screen forward only; Spine fires the events it passes. */
+    seekScreen(time: number) {
+      const entry = screens.visible ? screens.state.getCurrent(0) : null;
+      if (!entry?.animation || time <= entry.trackTime) return;
+      entry.trackTime = Math.min(time, entry.animation.duration);
+    },
+    /**
+     * Starts the authored Total Win exit at the click: total_win_end, background zoom-out
+     * and a shockwave; the base background and chest text clear follow after backgroundEnterMs.
+     * Resolves when total_win_end has finished and the screen is removed.
+     */
+    startTotalWinOutro(backgroundEnterMs: number, extra: (Application | undefined)[] = []) {
+      if (host === scene) return Promise.resolve();
+      void shockwave.play([app, liveOverlay, ...extra]);
+      background.state.setAnimation(1, "1_zoom_out", false);
+      host.dataset.spineClip = "total_win_end";
+      const entry = screens.state.setAnimation(0, "total_win_end", false);
+      entry.mixDuration = 0.125;
+      const leaving = waitForClip(entry);
+      if (liveOverlay) {
+        setTimeout(() => {
+          entry.mixDuration = 0;
+          backgroundBaseEntered = true;
+          background.state.setAnimation(0, "0_base_enter", false);
+          background.state.addAnimation(0, "0_base_idle", true, 0);
+          chestTotal.text = "";
+          chestTotal.visible = false;
+          for (const text of chestMultipliers) {
+            text.text = "";
+            text.visible = false;
+          }
+        }, backgroundEnterMs);
+      }
+      return leaving.then(() => hideScreen());
+    },
     celebrateMascot(playbackRate?: number) {
       if (portraitMascot?.visible) playMascotWin(portraitMascot, playbackRate);
     },
@@ -687,6 +786,7 @@ export async function mountTavernEffects(
       // The authored entry animates the same chests that the HUD layers above the reels during play.
       stage.setAttribute("data-bonus-entry", "");
       try {
+        reelhouse.visible = true;
         const entry = setMode("bonus");
         if (entry) await waitForClip(entry);
       } finally {
@@ -744,8 +844,21 @@ export async function mountTavernEffects(
       chestTotal.text = amount;
       chestTotal.visible = true;
       stage.dataset.chestReveal = "true";
-      if (sceneLayout?.chestCamera)
-        chestZoom = zoomScene(stage, sceneLayout.chestCamera);
+      if (sceneLayout?.chestCamera) {
+        const sceneRect = stage.getBoundingClientRect();
+        const frameRect = frame.getBoundingClientRect();
+        const hud = stage.parentElement?.querySelector<HTMLElement>(".tavern-hud")?.getBoundingClientRect();
+        const center = sceneRect.top + sceneRect.height / 2;
+        const topLimit = (center - sceneRect.top - 8) / Math.max(1, center - frameRect.top);
+        const bottomLimit = (Math.min(sceneRect.bottom, hud?.top ?? sceneRect.bottom) - center - 8) /
+          Math.max(1, frameRect.bottom - center);
+        const target = portrait ? 1.125 : sceneLayout.chestCamera.scale;
+        chestZoom = zoomScene(stage, {
+          ...sceneLayout.chestCamera,
+          scale: Math.max(1, Math.min(target, topLimit, bottomLimit)),
+          originY: 0.5,
+        });
+      }
       await Promise.all([chestZoom?.finished, playClip(reelhouse, 4, "4_finalwin")]);
     },
     async prepareTotalWin() {
@@ -767,15 +880,18 @@ export async function mountTavernEffects(
           const y = (reelBone.worldY - firstY) * reelhouse.scale.y;
           reelHost.style.translate = `0 ${y}px`;
         }
+        followSymbolAlpha();
       };
-      if (reelBone) app.ticker.add(followReels, undefined, -10);
-      else reelExit = reelHost.animate(
+      app.ticker.add(followReels, undefined, -10);
+      if (!reelBone) reelExit = reelHost.animate(
         [{ translate: "0 0" }, { translate: `0 ${distance}px` }],
         { duration, fill: "forwards", easing: "ease-in" },
       );
       await finished;
       app.ticker.remove(followReels);
       reelHost.style.removeProperty("translate");
+      // Stay hidden behind Total Win; returnFromTotalWin fades the symbols back in.
+      if (symbolSlot) reelHost.style.opacity = "0";
       chestTotal.text = "";
       for (const text of chestMultipliers) text.text = "";
       updateReelhouse(0);
@@ -809,6 +925,7 @@ export async function mountTavernEffects(
           const y = (symbolAnchor.worldY - baseSymbolY) * reelhouse.scale.y;
           reelHost.style.translate = `0 ${y}px`;
         }
+        followSymbolAlpha();
       };
       followReels();
       app.ticker.add(followReels, undefined, -10);
@@ -817,6 +934,7 @@ export async function mountTavernEffects(
       } finally {
         app.ticker.remove(followReels);
         reelHost.style.removeProperty("translate");
+        reelHost.style.removeProperty("opacity");
       }
     },
     async showScreen(
@@ -835,7 +953,8 @@ export async function mountTavernEffects(
       } = {},
     ) {
       amountPulseStarted = -Infinity;
-      const keepSceneLive = name === "total_win_start" ||
+      const intro = name === "bonus_intro" || name === "super_intro";
+      const keepSceneLive = intro || name === "total_win_start" ||
         (revealingChests && name !== "addfs" && !!target.closest(".win-celebration"));
       if (keepSceneLive) screenOverlayRenderer ??= createScreenOverlayRenderer();
       mountOverlay(target, keepSceneLive ? await screenOverlayRenderer : undefined);
@@ -849,7 +968,6 @@ export async function mountTavernEffects(
       target.toggleAttribute("data-spine-count", count !== undefined);
       target.toggleAttribute("data-spine-amount", !!payout.text);
       const key = [name, idle, outro].join(":");
-      const intro = name === "bonus_intro" || name === "super_intro";
       bounds =
         viewports.get(key) ??
         screenBounds(

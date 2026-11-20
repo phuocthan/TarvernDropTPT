@@ -74,6 +74,17 @@ export class AudioBus<Cue extends string> {
     if (active) for (const { howl, id } of [...active]) howl.stop(id);
     active?.clear();
   }
+  /** Fades every playing instance of a cue (including loops) to silence, then stops it. */
+  fade(name: Cue, durationMs: number) {
+    const active = this.playing.get(name); this.playing.delete(name);
+    if (!active) return;
+    for (const { howl, id } of [...active]) {
+      if (durationMs <= 0) { howl.stop(id); continue; }
+      howl.once("fade", () => howl.stop(id), id);
+      howl.fade(Number(howl.volume(id)), 0, durationMs, id);
+    }
+    active.clear();
+  }
   dispose() {
     this.closed = true;
     for (const name of [...this.playing.keys()]) this.stop(name);

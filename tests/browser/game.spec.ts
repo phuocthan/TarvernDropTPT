@@ -108,10 +108,9 @@ test("real demo API boots the Pixi board, spins and opens rules", async ({
   await expect(page.locator("#balance")).toHaveText("$1,000.00");
   await page.getByRole("button", { name: "Open menu" }).click();
   await page.getByRole("button", { name: "Game Rules" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Inside the tavern" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Close dialog" }).click();
+  await expect(page.locator("dialog.info-screen").getByRole("heading", { name: "Game Rules" })).toBeVisible();
+  await page.locator("dialog.info-screen .info-close-button").click();
+  await expect(page.locator("dialog.info-screen")).toHaveCount(0);
   await page.getByRole("button", { name: "Spin", exact: true }).click();
   await expect
     .poll(
@@ -349,9 +348,20 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
   await page.evaluate(async () => {
-    const boardUrl = "/src/framework/presentation/board.ts";
+    const resources = performance.getEntriesByType("resource");
+    const boardUrl = resources
+      .find(({ name }) => /\/src\/framework\/presentation\/board\.ts(?:\?|$)/.test(name))!.name;
     const { BoardView } = await import(boardUrl);
     const markers = document.documentElement.dataset;
+    const spineUrl = resources
+      .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
+    const { Spine } = await import(spineUrl);
+    const updateSpine = Spine.prototype.update;
+    Spine.prototype.update = function (delta: number) {
+      if (this.state.getCurrent(2)?.animation?.name === "2_bonus_enter" && markers.bonusFrameVisible === undefined)
+        markers.bonusFrameVisible = String(this.visible);
+      return updateSpine.call(this, delta);
+    };
     const hideSymbols = BoardView.prototype.hideSymbols;
     BoardView.prototype.hideSymbols = function () {
       hideSymbols.call(this);
@@ -432,12 +442,14 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     });
     resultPopup.observe(stage, { attributes: true, attributeFilter: ["data-chest-reveal"] });
   });
+  await expect(page.locator("#continue")).toBeEnabled();
   await page.mouse.click(5, 5);
   await expect(page.locator(".game-shell")).toHaveAttribute(
     "data-mode",
     "drop",
   );
   await expect(page.locator(".stage")).toHaveAttribute("data-foreground-chests", "");
+  await expect(page.locator("html")).toHaveAttribute("data-bonus-frame-visible", "true");
   await expect(page.locator("#chests .chest")).toHaveCount(0);
   await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", {
     timeout: 35000,
@@ -1002,6 +1014,7 @@ for (const scatterCount of [2, 3]) {
       const observed = new WeakSet<object>();
       const setAnimation = AnimationState.prototype.setAnimation;
       AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
+        if (name === "bonus_spin") events.push(name);
         if (name === "bonus_land" && !observed.has(this)) {
           observed.add(this);
           this.addListener({
@@ -1029,6 +1042,8 @@ for (const scatterCount of [2, 3]) {
       await expect(page.locator('dialog[data-look="bonus"]')).toBeHidden();
     }
     const events = await page.evaluate(() => (window as any).scatterAnimations as string[]);
+    expect(events.filter((event) => event === "bonus_spin")).toHaveLength(scatterCount);
+    expect(events.lastIndexOf("bonus_spin")).toBeLessThan(events.indexOf("bonus_land"));
     expect(events.filter((event) => event === "bonus_land")).toHaveLength(scatterCount);
     expect(events.filter((event) => event === "bonus_win")).toHaveLength(scatterCount === 3 ? 3 : 0);
     if (scatterCount === 3) {

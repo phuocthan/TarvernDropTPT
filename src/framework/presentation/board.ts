@@ -290,7 +290,7 @@ export class BoardView {
       await drop.exit;
       if (this.dropRound !== drop) return;
       if (!drop.skipped) {
-        board.forEach((symbols, reel) => this.setReel(reel, symbols, "idle"));
+        board.forEach((symbols, reel) => this.setReel(reel, symbols, "spin"));
         this.strip.visible = true;
         await this.animateDrop(true, { board, onLand, events });
       }

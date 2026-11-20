@@ -167,6 +167,20 @@ export function loadGameConfig(raw: unknown): GameDefinition {
       !nonNegativeInt(winScreen.paddingPx) ||
       ![winScreen.landscapeFit, winScreen.portraitFit].every((fit) => Number.isFinite(fit) && fit > 0)))
     invalid("presentation.scene.winScreen");
+  if (winScreen?.countSeconds !== undefined && (!winScreen.countSeconds || typeof winScreen.countSeconds !== "object" ||
+      !Object.values(winScreen.countSeconds).every((seconds) => Number.isFinite(seconds) && seconds > 0)))
+    invalid("presentation.scene.winScreen.countSeconds");
+  const shockwave = scene?.shockwave;
+  if (shockwave !== undefined && (!shockwave ||
+      ![shockwave.amplitude, shockwave.radius, shockwave.firstTime, shockwave.restartTime, shockwave.endTime].every(Number.isFinite) ||
+      !(shockwave.wavelength > 0) || !(shockwave.speed > 0) || !nonNegative(shockwave.brightness) ||
+      !positiveInt(shockwave.durationMs)))
+    invalid("presentation.scene.shockwave");
+  const totalWinOutro = scene?.totalWinOutro;
+  if (totalWinOutro !== undefined && (!totalWinOutro ||
+      ![totalWinOutro.continueFadeMs, totalWinOutro.backgroundEnterMs, totalWinOutro.reelEnterMs].every(nonNegativeInt) ||
+      totalWinOutro.reelEnterMs < totalWinOutro.backgroundEnterMs))
+    invalid("presentation.scene.totalWinOutro");
   const openingReveal = scene?.openingReveal;
   const chestCamera = scene?.chestCamera;
   const sideLogo = scene?.sideLogo;

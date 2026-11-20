@@ -121,7 +121,7 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     const continueButton = bonusDialog.locator("#continue");
     await expect(bonusDialog).toHaveCSS("overflow-y", "clip");
     await continueButton.hover();
-    await expect(continueButton).toHaveCSS("translate", "0px -5px");
+    await expect(continueButton).toHaveCSS("translate", "0px -10px");
     const veil = page.locator(".scene-reveal-veil");
     const hasClickMotion = await continueButton.evaluate((button: HTMLButtonElement) => {
       button.click();

@@ -24,6 +24,11 @@ const symbols = [
   ["bonus", "bonus", 351, 285, 680, 789],
 ] as const;
 
+/** File name of the static symbol art used by the info page, e.g. "l1_static.webp". */
+export function staticSymbolImage(id: string) {
+  return symbols.find(([symbol]) => symbol === id)![1] + "_static.webp";
+}
+
 export function paytableIcon(id: string) {
   const [, file, x, y, width, height] = symbols.find(
     ([symbol]) => symbol === id,

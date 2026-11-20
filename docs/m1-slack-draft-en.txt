@@ -1,0 +1,7 @@
+Hi @알레스카, the first runnable M1 build is ready for review. The staging package includes the reusable TypeScript/PixiJS core, the 5×5 Drop and 3×3 examples running on that same core, and the asset inventory and playback evidence.
+
+Start here: https://github.com/phuocthan/DropTarvernRelease/blob/2f93a9983c36802f54ecb16beace3fc871ae1816/korRelease/slot-client-main/docs/than/START_HERE.md
+
+I verified a clean install, both builds, and playback and reload on both board sizes in Chromium. I’ve also prepared the English M1 review notes and the API draft with the four KRW request/response sequences. I’m attaching the M1 notes here and will put the API draft and JSON in the existing API thread for Team A.
+
+I’m using GitLab as the official delivery repo. Once access is available, I’ll verify the approved starting commit, create `feat/than-m1-client-core` from it and open a Draft MR into `main`. Could you confirm when access is ready? The remaining review items are the API mapping, reference asset permissions and physical-device playback.

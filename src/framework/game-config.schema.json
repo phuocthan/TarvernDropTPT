@@ -279,7 +279,38 @@
                 "centerY": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
                 "paddingPx": { "type": "integer", "minimum": 0 },
                 "landscapeFit": { "type": "number", "exclusiveMinimum": 0 },
-                "portraitFit": { "type": "number", "exclusiveMinimum": 0 }
+                "portraitFit": { "type": "number", "exclusiveMinimum": 0 },
+                "countSeconds": {
+                  "description": "Win counter duration per final win clip.",
+                  "type": "object",
+                  "additionalProperties": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              },
+              "additionalProperties": false
+            },
+            "shockwave": {
+              "type": "object",
+              "required": ["amplitude", "wavelength", "speed", "brightness", "radius", "durationMs", "firstTime", "restartTime", "endTime"],
+              "properties": {
+                "amplitude": { "type": "number" },
+                "wavelength": { "type": "number", "exclusiveMinimum": 0 },
+                "speed": { "type": "number", "exclusiveMinimum": 0 },
+                "brightness": { "type": "number", "minimum": 0 },
+                "radius": { "type": "number" },
+                "durationMs": { "type": "integer", "minimum": 1 },
+                "firstTime": { "type": "number" },
+                "restartTime": { "type": "number" },
+                "endTime": { "type": "number" }
+              },
+              "additionalProperties": false
+            },
+            "totalWinOutro": {
+              "type": "object",
+              "required": ["continueFadeMs", "backgroundEnterMs", "reelEnterMs"],
+              "properties": {
+                "continueFadeMs": { "type": "integer", "minimum": 0 },
+                "backgroundEnterMs": { "type": "integer", "minimum": 0 },
+                "reelEnterMs": { "type": "integer", "minimum": 0 }
               },
               "additionalProperties": false
             },

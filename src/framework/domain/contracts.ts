@@ -133,7 +133,14 @@ export interface ReelPresentation {
     openingDimmerOpacity?: number;
     openingReveal?: { durationMs: number; symbolDelayMs: number; mascotDelayMs: number; playbackRate?: number };
     bonusSceneVeil?: import("../presentation/scene.ts").SceneVeil;
-    winScreen?: { centerY: number; paddingPx: number; landscapeFit: number; portraitFit: number };
+    winScreen?: {
+      centerY: number; paddingPx: number; landscapeFit: number; portraitFit: number;
+      /** Win counter duration in seconds per final win clip; the count runs continuously across tiers. */
+      countSeconds?: Record<string, number>;
+    };
+    shockwave?: import("../presentation/shockwave.ts").ShockwaveConfig;
+    /** Milliseconds after the Total Win click: background base entry and chest text clear, then reel entry. */
+    totalWinOutro?: { continueFadeMs: number; backgroundEnterMs: number; reelEnterMs: number };
     chestCamera?: { scale: number; originY: number; durationMs: number };
     sideLogo?: { referenceAspect: number; leftFactor: number; upFactor: number };
     backgroundCamera?: {

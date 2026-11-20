@@ -1,0 +1,22 @@
+{
+  "version": "v1.0.0",
+  "rtp": null,
+  "copyright": "",
+  "headings": {
+    "rules": "Game Rules",
+    "paytable": "Paytable",
+    "waysToWin": "Ways to Win",
+    "features": "Features",
+    "general": "General Terms"
+  },
+  "rules": "Tavern Drop is a {reels}-reel, {rows}-row slot game with winning combinations paying in lines from left to right.\n{rtpLine}Wild symbols substitutes for all symbols except for Bonus symbols.\nThe max win is {maxWin}x the bet.",
+  "rtpLine": "The theoretical RTP for all modes is {rtp}.\n",
+  "waysToWin": "Winning combinations in the base game are also used in bonus features unless otherwise stated. Land 3 or more symbols of the same kind on a winning payline to get a winning combination.",
+  "features": "[./assets/bonus_static.webp]\nThe bonus symbol lands on all reels and triggers bonus modes in the base game, or additional free spins in the bonus games.\n\nExtra Chance is a side bet feature that increases the chance of entering a free spins feature game for {extraPrice}x the bet cost.\n\nSuper Chance is a side bet feature that increases the chance of entering a free spins feature game for {superPrice}x the bet cost, and the bonus entered is guaranteed to be a Drop Bonus.\n\nTavern Bonus is a feature mode triggered by landing 3 Bonus symbols in the base game. During the Tavern Bonus free spins game, the rules are the same as base game with an additional chest feature. At the bottom of the reels, there are {reels} chests which can be unlocked. They are unlocked by winning on all positions in their respective reel. At the end of the bonus, unlocked chests will open to reveal a multiplier which is applied to the final win. The possible multipliers are: {multipliers}. Multiple chests multiply the win multiplicatively. Landing 3 bonus symbols retriggers for an additional {retriggerSpins} free spins.\n\nDrop Bonus is a feature mode triggered by landing 4 Bonus symbols in the base game. {dropSpins} free spins are awarded and the rules are the same as Tavern Bonus with an additional guarantee that the minimum chest multiplier is {dropMinMultiplier}x.",
+  "general": "Malfunction voids all pays and plays. A consistent internet connection is required. In the event of a disconnection, reload the game to finish any uncompleted bets. The expected return is calculated over many spins. Movement of reels are not representative of any physical device, and is for illustrative purposes only.{copyrightLine}",
+  "paytable": [
+    ["10", "J", "Q", "K", "A"],
+    ["ale", "coin", "barrel", "crown"],
+    ["wild"]
+  ]
+}

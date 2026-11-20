@@ -4,7 +4,9 @@ import { gameRuntime } from "../../framework/app/game-runtime.ts";
 import { resolveSessionEntry } from "../../framework/app/session-entry.ts";
 import { createGameTransport } from "../../framework/transport/proposal.ts";
 import { formatMoney } from "../../framework/ui/index.ts";
-import { loadTavernSymbols, paytableIcon } from "./skin.ts";
+import { loadTavernSymbols, paytableIcon, staticSymbolImage } from "./skin.ts";
+import { openInfoScreen } from "../../framework/ui/info-screen.ts";
+import info from "./info.json" with { type: "json" };
 import { createTavernPayline } from "./payline.ts";
 import {
   createReelhouse,
@@ -92,9 +94,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
    <div id="bet-panel" class="tavern-hud-panel" popover="auto" aria-label="Bet menu"><strong>Bet menu</strong><div class="bet-picker-options"></div></div>
    ${gameMenuEnabled ? `<div id="hud-menu-panel" class="tavern-hud-panel" popover="auto" aria-label="Game menu">
      <button id="menu-rules" type="button" aria-label="Game Rules">${hudIcon("info")} Info</button>
-     <button id="menu-share" type="button">${hudIcon("share")} Share</button>
-     <label><span id="effects-icon">${hudIcon("effects-muted")}</span><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></label>
-     <label><span id="music-icon">${hudIcon("music-muted")}</span><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></label>
+     <div class="menu-volume"><button id="effects-icon" type="button" aria-label="Toggle sound effects">${hudIcon("effects-muted")}</button><input id="effects-volume" type="range" min="0" max="100" aria-label="Sound effects volume"></div>
+     <div class="menu-volume"><button id="music-icon" type="button" aria-label="Toggle music">${hudIcon("music-muted")}</button><input id="music-volume" type="range" min="0" max="100" aria-label="Music volume"></div>
    </div>` : ""}
   </section>
  </main>
@@ -160,15 +161,32 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       { scale: "1" },
     ], { duration: 260, easing: "ease-out" });
   }
-  function continueWithMotion(surface: HTMLElement, button: HTMLButtonElement, ready?: Promise<unknown>) {
+  /**
+   * Every "Press to continue" zooms in, settles back, then disappears. With fadeMs the
+   * button leaves within that time and the click resolves at once, so a scene outro can
+   * start on the same click.
+   */
+  function continueWithMotion(
+    surface: HTMLElement, button: HTMLButtonElement, ready?: Promise<unknown>, fadeMs?: number,
+  ) {
     return waitForContinue(surface, button, ready, () => {
-      if (reducedMotion) return;
-      return button.animate([
-        { scale: 1 },
-        { scale: 1.14, offset: 0.4 },
-        { scale: 0.98, offset: 0.78 },
-        { scale: 1 },
-      ], { duration: 240, easing: "ease-out" }).finished;
+      if (reducedMotion) {
+        button.style.visibility = "hidden";
+        return;
+      }
+      const motion = fadeMs === undefined
+        ? button.animate([
+          { scale: 1, opacity: 1 },
+          { scale: 1.14, opacity: 1, offset: 0.3 },
+          { scale: 0.92, opacity: 1, offset: 0.6 },
+          { scale: 1.18, opacity: 0 },
+        ], { duration: 420, easing: "ease-out", fill: "forwards" })
+        : button.animate([
+          { scale: 1, opacity: 1 },
+          { scale: 1.14, opacity: 1, offset: 0.35 },
+          { scale: 1.06, opacity: 0 },
+        ], { duration: fadeMs, easing: "ease-out", fill: "forwards" });
+      return fadeMs === undefined ? motion.finished : undefined;
     });
   }
   let overlayMascot: Awaited<ReturnType<typeof mountMascot>> | undefined;
@@ -202,7 +220,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     autoTimer: ReturnType<typeof setTimeout> | null = null;
   let displayWin = 0;
   let countingFeatureBase: number | undefined;
-  let lastShareableWin: { amount: number; bet: number } | undefined;
   let payline: ReturnType<typeof createTavernPayline>;
   let effects: Awaited<ReturnType<typeof mountTavernEffects>> | undefined;
   function celebrate(playbackRate?: number) {
@@ -395,6 +412,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   dialog.addEventListener("close", () => scheduleNextSpin());
   const winTier = (amount: number, bet: number) =>
     game.demo.winTiers.filter((tier) => amount >= bet * tier.multiplier).at(-1);
+  // Tier cues of the reference wincap sequence.
+  const winTierCues: Record<string, string> = {
+    big: "td_wincap_bigwin", super: "td_wincap_superwin", mega: "td_wincap_megawin",
+    epic: "td_wincap_epicwin", max: "td_wincap_maxwin",
+  };
+  let winSkip: (() => void) | undefined;
   const winAnimation = (label: string) =>
     label === "NICE WIN" ? "smallwin" : label.toLowerCase().replace(/\s/g, "");
   const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -454,48 +477,98 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     renderAmount(value, money(0), "td_gold");
     overlay.append(title, art, value);
     root.append(overlay);
-    // Higher Spine clips already include the lower win tiers. Play the final
-    // clip once and follow its authored transition times with one counter.
+    // Higher Spine clips already include the lower win tiers. Play the clip of the final
+    // tier once; its authored events (big, super, mega, epic, max) announce each tier.
     const finalClip = stages[stages.length - 1].clip;
-    const timing = effects?.winScreenTiming(finalClip) ?? { duration: 1.5, times: {} };
-    const slotNames: Record<string, string> = {
-      bigwin: "big_win_text", superwin: "super_win_text", megawin: "mega_win_text",
-      epicwin: "epic_win_text", maxwin: "max_win_text",
-    };
-    const marks = stages.map((stage, index) => ({
-      ...stage,
-      time: timing.times[slotNames[stage.clip]] ?? (index * timing.duration / stages.length),
+    const duration = effects?.winScreenTiming(finalClip).duration ?? 1.5;
+    const authored = effects?.winScreenEvents(finalClip) ?? [];
+    const events = authored.length ? authored : stages.map((stage, index) => ({
+      name: stage.clip.replace(/win$/, ""), time: index * duration / stages.length,
     }));
+    // The amount counts continuously across all tiers, like the reference tween.
+    const countSeconds = Math.min(duration, scene?.winScreen?.countSeconds?.[finalClip] ?? duration);
     const start = performance.now();
-    const screen = effects?.showScreen(art, finalClip, { amount: money(0) }) ?? delay(timing.duration * 1000);
-    let active = -1;
-    const counting = new Promise<void>((resolve) => {
-      const tick = () => {
-        const time = Math.min(timing.duration, effects ? effects.screenTime() : (performance.now() - start) / 1000);
-        let index = 0;
-        while (index + 1 < marks.length && time >= marks[index + 1].time) index++;
-        const stage = marks[index];
-        if (index !== active && time > 0) {
-          active = index;
-          if (title.textContent !== stage.label) title.textContent = stage.label;
-          audio.cue(stage.clip);
-          if (effects) effects.pulseScreenAmount();
-          else emphasize(value);
-        }
-        const next = marks[index + 1];
-        const from = index ? Math.min(amount, stage.threshold) : 0;
-        const to = next ? Math.min(amount, next.threshold) : amount;
-        const end = next?.time ?? timing.duration;
-        const progress = Math.max(0, Math.min(1, (time - stage.time) / (end - stage.time || 1)));
-        const formatted = money(Math.round(from + (to - from) * progress));
-        renderAmount(value, formatted, "td_gold");
-        effects?.setScreenAmount(formatted);
-        if (time < timing.duration) requestAnimationFrame(tick);
-        else resolve();
-      };
-      requestAnimationFrame(tick);
-    });
-    await Promise.all([screen, counting]);
+    let skippedSeconds = 0;
+    const clock = () => effects ? effects.screenTime() : (performance.now() - start) / 1000 + skippedSeconds;
+    let time = 0;
+    let level = -1;
+    let pending = -1;
+    let flush = 0;
+    let counted = false;
+    let countForced = false;
+    let screenDone = false;
+    const levelCues: string[] = [];
+    const applyLevel = () => {
+      flush = 0;
+      const rank = pending;
+      pending = -1;
+      // Skip can pass several events in one frame. Announce only the highest new tier.
+      if (rank <= level) return;
+      level = rank;
+      const stage = stages[Math.min(rank, stages.length - 1)];
+      if (title.textContent !== stage.label) title.textContent = stage.label;
+      for (const cue of levelCues.splice(0)) audio.fade(cue, 150);
+      const cue = winTierCues[events[rank].name] ?? winTierCues.big;
+      audio.cue(cue);
+      levelCues.push(cue);
+      void effects?.shockwave([view.app]);
+      if (effects) effects.pulseScreenAmount();
+      else emphasize(value);
+    };
+    const onTierEvent = (name: string) => {
+      const rank = events.findIndex((event) => event.name === name);
+      if (rank < 0 || rank <= level) return;
+      pending = Math.max(pending, rank);
+      flush ||= requestAnimationFrame(applyLevel);
+    };
+    const unsubscribe = effects?.onScreenEvent(onTierEvent);
+    const finishCount = () => {
+      if (counted) return;
+      counted = true;
+      audio.fade("count", 200);
+      audio.cue("countEnd");
+      audio.cue("td_wincap_end");
+      for (const cue of levelCues.splice(0)) audio.fade(cue, 500);
+    };
+    // Skip moves forward to the next authored tier, never backwards. On the final tier it
+    // only completes the amount; the clip keeps its authored ending.
+    winSkip = () => {
+      const now = Math.max(time, clock());
+      const next = events.find((event) => event.time > now + 0.001);
+      if (!next) {
+        countForced = true;
+        return;
+      }
+      if (effects) effects.seekScreen(next.time);
+      else skippedSeconds += next.time - now;
+    };
+    audio.cue("td_wincap_start");
+    audio.cue("count", true);
+    const screen = (effects?.showScreen(art, finalClip, { amount: money(0) }) ?? delay(duration * 1000))
+      .finally(() => { screenDone = true; });
+    try {
+      const counting = new Promise<void>((resolve) => {
+        const tick = () => {
+          time = Math.max(time, Math.min(duration, clock()), screenDone ? duration : 0);
+          if (!effects) for (const [rank, event] of events.entries()) if (event.time <= time) onTierEvent(events[rank].name);
+          const countTime = countForced ? countSeconds : time;
+          const shown = countTime >= countSeconds ? amount : Math.round(amount * countTime / countSeconds);
+          const formatted = money(shown);
+          renderAmount(value, formatted, "td_gold");
+          effects?.setScreenAmount(formatted);
+          if (countTime >= countSeconds) finishCount();
+          if (time < duration) requestAnimationFrame(tick);
+          else resolve();
+        };
+        requestAnimationFrame(tick);
+      });
+      await Promise.all([screen, counting]);
+    } finally {
+      winSkip = undefined;
+      unsubscribe?.();
+      if (flush) cancelAnimationFrame(flush);
+      finishCount();
+    }
     await delay(800);
     await effects?.endScreen();
     overlay.remove();
@@ -642,14 +715,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         );
         const bonusClip = outcome.entry === "drop" ? "super" : "bonus";
         const introArt = dialog.querySelector<HTMLElement>(".tavern-screen-art")!;
-        if (effects) void effects.showScreen(introArt, bonusClip + "_intro", {
+        const intro = effects?.showScreen(introArt, bonusClip + "_intro", {
           count: outcome.state.feature!.remaining,
           outro: bonusClip + "_outro",
         });
-        await continueWithMotion(dialog, $<HTMLButtonElement>("continue"));
-        emphasize(introArt.hasAttribute("data-spine-ready")
-          ? introArt
-          : dialog.querySelector<HTMLElement>(".bonus-preview"));
+        await continueWithMotion(dialog, $<HTMLButtonElement>("continue"), intro, 250);
+        if (effects) void effects.shockwave([view.app]);
+        else emphasize(dialog.querySelector<HTMLElement>(".bonus-preview"));
         await effects?.endScreen(bonusClip + "_outro");
         const reveal = revealBonusScene();
         dialog.close();
@@ -770,24 +842,32 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const enter = effects?.showScreen(resultArt, "total_win_start", {
         amount, idle: "total_win_idle", outro: "total_win_end",
       });
-      await continueWithMotion(dialog, $<HTMLButtonElement>("continue"), enter);
-      audio.cue("totalOutro");
-      if (effects) effects.pulseScreenAmount();
-      else emphasize(dialog.querySelector<HTMLElement>(".result-total"));
+      const outroTiming = scene?.totalWinOutro ?? { continueFadeMs: 250, backgroundEnterMs: 200, reelEnterMs: 500 };
+      // One accepted click starts the outro; the Continue art fades while the scene leaves.
+      // Continue appears only after total_win_start, so the live overlay is known by then.
+      await continueWithMotion(dialog, $<HTMLButtonElement>("continue"), enter, outroTiming.continueFadeMs);
+      const clickedAt = performance.now();
       const liveReturn = effects?.hasLiveTotalWin();
-      const leaving = effects?.endScreen("total_win_end");
+      audio.cue("totalOutro");
+      if (!effects) emphasize(dialog.querySelector<HTMLElement>(".result-total"));
+      const leaving = effects?.startTotalWinOutro(outroTiming.backgroundEnterMs, [view.app]);
+      // The confirmation is the same checkpoint request as before. Scene timing follows the
+      // click; the balance only counts up after this request has returned.
+      const balanceBefore = controller.state!.balance;
+      const confirming = checkpoint
+        ? controller.completePresentation().then(() => {
+          outcome.state.balance = controller.state!.balance;
+          outcome.paidAward = Math.max(0, outcome.state.balance - balanceBefore);
+        })
+        : Promise.resolve();
+      confirming.catch(() => undefined);
       if (liveReturn) {
         dialog.dataset.returning = "true";
-        await effects?.waitForTotalWinReturn(leaving!);
+        await delay(Math.max(0, outroTiming.reelEnterMs - (performance.now() - clickedAt)));
       } else {
         await leaving;
         dialog.close();
-      }
-      if (checkpoint) {
-        const before = controller.state!.balance;
-        await controller.completePresentation();
-        outcome.state.balance = controller.state!.balance;
-        outcome.paidAward = Math.max(0, outcome.state.balance - before);
+        await confirming;
       }
       presentingFeature = null;
       displayWin = liveReturn ? 0 : c.roundAward;
@@ -800,11 +880,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const entering = effects?.returnFromTotalWin();
       view.setBoard(outcome.state.board);
       sync();
+      // Until the payout counts up, keep showing the balance from before this round's award.
+      if (liveReturn) $("balance").textContent = money(checkpoint ? balanceBefore : outcome.state.balance - outcome.paidAward);
       if (liveReturn) {
+        await Promise.all([confirming, delay(500)]);
         const balance = outcome.state.balance;
         const beforeAward = balance - outcome.paidAward;
         $("balance").textContent = money(beforeAward);
-        await delay(500);
         await Promise.all([
           leaving,
           entering,
@@ -828,8 +910,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     } else if (tier && !outcome.entry) {
       await showWinSequence(outcome.spinWin, outcome.bet);
     }
-    if (outcome.paidAward > 0 && !outcome.state.feature)
-      lastShareableWin = { amount: outcome.completion?.roundAward ?? outcome.paidAward, bet: outcome.bet };
     await controller.completePresentation();
     const next = controller.nextPresentation();
     if (next) { await present(next, spinTurbo); return; }
@@ -848,6 +928,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     mockBonus?: MockBonusScenario,
   ) {
     if (!recover && controller.phase !== "ready") {
+      if (winSkip) {
+        winSkip();
+        return;
+      }
       if (view.isMoving && !view.allowForceStop) return;
       skipped = true;
       view.skip();
@@ -1105,18 +1189,40 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
     openShop();
   };
+  const fillInfo = (text: string, values: Record<string, string | number>) =>
+    text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
+  /** Reference info page; numbers come from the live game configuration. */
   function rules() {
-    modal(
-      `<span class="eyebrow">TEMPLATE RULES · PROVISIONAL MATH</span><h2>Inside the tavern</h2><p>${game.reels} reels × ${game.rows} rows. ${game.lines.length} illustrative fixed paylines. Matching symbols pay left to right; Wild substitutes for paying symbols. The best Wild substitution pays once per line.</p><p>Demo entry: 3 Bonus symbols start Tavern; 4+ start Drop. Each feature has its own presentation and configurable spin count. These entry rules are unverified.</p><p>During free spins, each distinct winning row fills one position on that reel’s chest. Repeated positions do not add progress. ${game.rows} rows unlock a chest. At completion, unlocked chest multipliers multiply together and apply to accumulated feature wins. A server-side cap limits the full paid round.</p><div class="paytable">${game.symbols
-        .filter((s) => s.kind !== "bonus")
-        .map(
-          (s) =>
-            `<div>${paytableIcon(s.id)}<b style="color:${s.color}">${s.label}</b><span>3: ${(s.pays[3] || 0) / 100}×</span><span>4: ${(s.pays[4] || 0) / 100}×</span><span>5: ${(s.pays[5] || 0) / 100}×</span></div>`,
-        )
-        .join(
-          "",
-        )}</div><p class="muted">The demo uses provisional awards, prices, probabilities and line patterns. Sessions reset when the server restarts.</p>`,
-    );
+    const rtp = info.rtp as string | null;
+    const multipliers = [...new Set([...game.demo.chestMultipliers.tavern, ...game.demo.chestMultipliers.drop])]
+      .sort((a, b) => a - b);
+    const values = {
+      reels: game.reels, rows: game.rows, rtp: rtp ?? "",
+      maxWin: game.demo.capMultiplier.toLocaleString("en-US"),
+      extraPrice: game.demo.chancePrices.extra, superPrice: game.demo.chancePrices.super,
+      multipliers: multipliers.join(", "), retriggerSpins: game.demo.retriggerSpins,
+      dropSpins: game.demo.featureSpins.drop, dropMinMultiplier: Math.min(...game.demo.chestMultipliers.drop),
+    };
+    void openInfoScreen({
+      headings: info.headings,
+      rules: fillInfo(info.rules, { ...values, rtpLine: rtp ? fillInfo(info.rtpLine, values) : "" }),
+      paytable: info.paytable.map((group) => group.flatMap((id) => {
+        const symbol = game.symbols.find((item) => item.id === id);
+        if (!symbol) return [];
+        const pays = Object.entries(symbol.pays)
+          .map(([count, pay]) => ({ count: Number(count), multiplier: Number(pay) / 100 }))
+          .filter((pay) => pay.multiplier > 0)
+          .sort((a, b) => a.count - b.count);
+        return [{ image: "./assets/" + staticSymbolImage(id), pays }];
+      })),
+      waysToWin: info.waysToWin,
+      paylines: { reels: game.reels, rows: game.rows, lines: game.lines },
+      features: fillInfo(info.features, values),
+      general: fillInfo(info.general, { copyrightLine: info.copyright ? " " + info.copyright : "" }),
+      version: info.version,
+      closeIcon: hudIcon("close"),
+      imageUrl: (path) => asset(path.replace(/^\.\/assets\//, "")),
+    });
   }
   $("rules").onclick = rules;
   if (gameMenuEnabled) {
@@ -1127,42 +1233,33 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       $("menu").innerHTML = hudIcon(open ? "close" : "menu");
       $("menu").setAttribute("aria-expanded", String(open));
     });
+    const syncVolumeIcons = () => {
+      for (const name of ["effects", "music"] as const)
+        $(name + "-icon").innerHTML = hudIcon(audio.level(name) > 0 ? name : `${name}-muted`);
+    };
+    // As in the reference menu, the icon mutes its channel or restores the last level.
+    const lastLevel = { effects: audio.level("effects") || 1, music: audio.level("music") || 1 };
     for (const channel of ["effects", "music"] as const) {
       const slider = $<HTMLInputElement>(channel + "-volume");
-      slider.value = String(Math.round(audio.level(channel) * 100));
-      slider.oninput = () => {
+      const apply = (level: number) => {
         audio.unlock();
         audio.muted = false;
-        audio.setLevel(channel, Number(slider.value) / 100);
-        for (const name of ["effects", "music"] as const)
-          $(name + "-icon").innerHTML = hudIcon(audio.level(name) > 0 ? name : `${name}-muted`);
+        audio.setLevel(channel, level);
+        if (level > 0) lastLevel[channel] = level;
+        slider.value = String(Math.round(level * 100));
+        syncVolumeIcons();
         syncMusic(!!controller.state?.feature);
       };
+      slider.value = String(Math.round(audio.level(channel) * 100));
+      slider.oninput = () => apply(Number(slider.value) / 100);
+      $(channel + "-icon").onclick = () => apply(audio.level(channel) > 0 ? 0 : lastLevel[channel]);
     }
-    $("menu-share").onclick = () => {
-      menu.hidePopover();
-      const win = lastShareableWin;
-      modal(`<h2>Share</h2><p class="share-game">Tavern Drop</p>
-        <div class="share-card">${win
-          ? `<strong>Win ${money(win.amount)}</strong><p>Bet ${money(win.bet)}</p><button id="copy-win" type="button">Copy result</button>`
-          : "<strong>Nothing to share yet</strong><p>Play a round and your cards show up here.</p>"}</div>`,
-        true, "share",
-      );
-      if (win) $("copy-win").onclick = async () => {
-        const button = $("copy-win");
-        try {
-          await navigator.clipboard.writeText(`Tavern Drop · Win ${money(win.amount)} · Bet ${money(win.bet)}`);
-          button.textContent = "Copied";
-        } catch {
-          button.textContent = "Clipboard unavailable";
-        }
-      };
-    };
+    syncVolumeIcons();
   }
   window.addEventListener("keydown", (event) => {
     if (
       event.code === "Space" &&
-      !dialog.open &&
+      !document.querySelector("dialog[open]") &&
       !$("spin").closest("[inert]") &&
       !(event.target instanceof HTMLButtonElement)
     ) {

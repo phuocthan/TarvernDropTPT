@@ -133,5 +133,14 @@ export class WebAudioBus<Cue extends string> {
     for (const play of active) play.source?.stop();
     active.clear();
   }
+  /** The Web Audio fallback has no per-cue gain; it stops after the requested time. */
+  fade(name: Cue, durationMs: number) {
+    const active = this.playing.get(name);
+    this.playing.delete(name);
+    if (!active) return;
+    const stopAt = (this.context?.currentTime ?? 0) + Math.max(0, durationMs) / 1000;
+    for (const play of active) play.source?.stop(stopAt);
+    active.clear();
+  }
 }
 export { AudioBus } from "../audio/howler-bus.ts";
