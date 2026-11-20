@@ -49,7 +49,10 @@ html:has(.tavern-shell) {
   position: relative;
   max-width: none;
   height: 100svh;
-  /* Reference v13 fills any viewport (no minimum, no page scroll). */
+  /* Reference v13 fills the visible viewport with no page scroll. Override the shared
+     .game-shell min-height: 100vh, which on mobile is the toolbar-hidden height and pushed
+     the HUD below the screen once scrolling was locked. */
+  min-height: 0;
   overflow: clip;
   isolation: isolate;
   color: white;
