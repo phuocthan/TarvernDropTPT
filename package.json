@@ -12,7 +12,9 @@
     "game:start": "node --experimental-strip-types tools/game.mjs start",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:browser": "playwright test",
-    "test:compare": "node --experimental-strip-types scripts/compare-games.mjs"
+    "test:compare": "node --experimental-strip-types scripts/compare-games.mjs",
+    "qa:behavior": "playwright test --config playwright.qa.config.ts",
+    "qa:trello": "node scripts/publish-qa-to-trello.mjs"
   },
   "dependencies": {
     "@esotericsoftware/spine-pixi-v8": "4.2.120",

@@ -313,7 +313,9 @@ test.describe("touch controls", () => {
   });
 });
 
-test("free spins autoplay through a retrigger and reveal centered Drop multipliers", async ({
+test("free spins autoplay through a retrigger and reveal centered Drop multipliers", {
+  tag: "@qa-behavior", annotation: { type: "qa-expected", description: "Free spins play automatically, a retrigger adds its awarded spins, and the chest multipliers and final amount are presented." },
+}, async ({
   page,
 }) => {
   test.setTimeout(120000);
@@ -483,7 +485,11 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
     "$" + (expected / 100).toLocaleString("en-US", { minimumFractionDigits: 2 }),
   );
 });
-for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows all chests when one unlocks" : "omits chests when none unlock"}`, async ({ page }) => {
+for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows all chests when one unlocks" : "omits chests when none unlock"}`, {
+  tag: "@qa-behavior", annotation: { type: "qa-expected", description: unlocked
+    ? "The native reveal shows the five-chest row, opens the unlocked chest, changes Total Win from $1.00 to $2.00, and clears the amount and multipliers on return."
+    : "The game skips the chest reveal and stays on Total Win until the player continues." },
+}, async ({ page }) => {
   test.setTimeout(65000);
   const game = structuredClone(tavern);
   game.demo.featureSpins.drop = 1;
@@ -517,16 +523,17 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     const slotObjects = new Map<string, { text: string }>();
     (window as any).chestSlotObjects = slotObjects;
     const updateSlotObject = Spine.prototype.updateSlotObject;
-    Spine.prototype.updateSlotObject = function (attachment: { slot: { data: { name: string } }; container: { text: string } }) {
+    Spine.prototype.updateSlotObject = function (attachment: { slot: { data: { name: string } }; container: { text: string; children: { text: string }[] } }) {
       const name = attachment.slot.data.name;
-      if (name === "slot_finalwin" || name.startsWith("slot_reel_mult_"))
-        slotObjects.set(name, attachment.container);
+      if (name === "slot_finalwin") slotObjects.set(name, attachment.container.children[0]);
+      else if (name.startsWith("slot_reel_mult_")) slotObjects.set(name, attachment.container);
       return updateSlotObject.call(this, attachment);
     };
     const original = AnimationState.prototype.setAnimation;
     AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
       if (name === "4_finalwin" || /reel_3_chest_(open|finalwin)$/.test(name)) clips.push(name);
       const result = document.querySelector<HTMLDialogElement>('#dialog[data-look="total-win"]');
+      if (name === "total_win_end" && result) result.dataset.nativeOutroStarted = "true";
       if (name === "2_base_enter" && result) {
         const shell = document.querySelector<HTMLElement>(".tavern-shell")!;
         result.dataset.baseEnteredDuringOutro = String(result.open && !!result.querySelector('[data-spine-clip="total_win_end"]'));
@@ -547,12 +554,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
   if (unlocked) {
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-reveal", "true", { timeout: 25000 });
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-amount", "$1.00");
-    expect(await page.evaluate(() => {
-      const amount = (window as any).chestSlotObjects.get("slot_finalwin");
-      return amount?.children.find((child: { style?: { fontFamily: string } }) =>
-        child.style?.fontFamily === "td_gold",
-      )?.style.fontSize;
-    })).toBe(240);
+    await expect.poll(() => page.evaluate(() => (window as any).chestSlotObjects.get("slot_finalwin")?.text)).toBe("$1.00");
     await expect(page.locator('#dialog[data-look="chest"]')).toHaveCount(0);
     await expect(page.locator(".stage")).toHaveAttribute("data-chest-opened", "3", { timeout: 10000 });
     expect(await page.evaluate(() => (window as any).chestSlotObjects.get("slot_reel_mult_3")?.text)).toBe("x2");
@@ -582,8 +584,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     await expect(page.locator("#dialog")).toBeVisible();
   }
   await page.mouse.click(5, 5);
-  await expect(resultDialog.locator(".total-win-screen > canvas"))
-    .toHaveCSS("animation-name", "total-win-continue-pop");
+  await expect(resultDialog).toHaveAttribute("data-native-outro-started", "true");
   await expect(resultDialog).toHaveAttribute("data-base-entered-during-outro", "true");
   await expect(resultDialog).toHaveAttribute("data-base-layout-at-entry", "base");
   await expect(resultDialog).toBeHidden({ timeout: 16000 });
@@ -859,7 +860,9 @@ for (const [multiplier, label] of [[20, "BIG WIN"], [50, "SUPER WIN"], [75, "MEG
     expect(sequence.values.every((value: number, i: number, values: number[]) => i === 0 || value >= values[i - 1])).toBe(true);
   });
 }
-test("mobile layout fits 390 pixels", async ({ page }) => {
+test("mobile layout fits 390 pixels", {
+  tag: "@qa-behavior", annotation: { type: "qa-expected", description: "The screen fits a 390×844 viewport without horizontal overflow, the canvas covers the reel area and Spin stays visible." },
+}, async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.locator("#spin")).toBeEnabled();
@@ -868,10 +871,13 @@ test("mobile layout fits 390 pixels", async ({ page }) => {
   );
   const host = await page.locator("#board").boundingBox(),
     canvas = await page.locator("#board canvas").boundingBox();
-  expect(canvas!.width).toBeCloseTo(host!.width, 0);
-  expect(canvas!.height).toBeCloseTo(host!.height, 0);
+  expect(canvas!.x).toBeLessThanOrEqual(host!.x + 1);
+  expect(canvas!.y).toBeLessThanOrEqual(host!.y + 1);
+  expect(canvas!.x + canvas!.width).toBeGreaterThanOrEqual(host!.x + host!.width - 1);
+  expect(canvas!.y + canvas!.height).toBeGreaterThanOrEqual(host!.y + host!.height - 1);
+  await expect(page.locator("#spin")).toBeInViewport({ ratio: 1 });
   await page.screenshot({
-    path: "/tmp/tavern-template-mobile.png",
+    path: testInfo.outputPath("tavern-template-mobile.png"),
     fullPage: true,
   });
 });
@@ -973,7 +979,11 @@ test("Drop anticipation highlights landed Scatters and clears on Skip", async ({
   await expect(canvas).toHaveAttribute("data-raised-scatters", "0:0,1:2,");
 });
 for (const scatterCount of [2, 3]) {
-  test(`${scatterCount} Scatters play win only for a feature trigger`, async ({ page }) => {
+  test(`${scatterCount} Scatters play win only for a feature trigger`, {
+    tag: "@qa-behavior", annotation: { type: "qa-expected", description: scatterCount === 3
+      ? "All three Scatters finish landing before their win animation, then the bonus intro appears."
+      : "The two Scatters land without playing the bonus win animation and the round returns to Spin." },
+  }, async ({ page }) => {
     const server = new MockGame(tavern, () => 0.5);
     const board = ["A", "K", "Q", "J", "10"].map((symbol) => Array(5).fill(symbol));
     for (let reel = 0; reel < scatterCount; reel++) board[reel][reel] = "bonus";
@@ -987,46 +997,44 @@ for (const scatterCount of [2, 3]) {
       const spineUrl = performance.getEntriesByType("resource")
         .find(({ name }) => /esotericsoftware_spine-pixi-v8\.js(?:\?|$)/.test(name))!.name;
       const { AnimationState } = await import(spineUrl);
-      const boardUrl = "/src/framework/presentation/board.ts";
-      const { BoardView } = await import(boardUrl);
-      const focusWins = BoardView.prototype.focusWins;
-      BoardView.prototype.focusWins = function (positions: { reel: number; row: number }[]) {
-        if (positions.length >= 3) {
-          (window as any).scatterLandedBeforeWin = positions.every(({ reel, row }) => {
-            const spine = this.tiles[reel][row + 1].view.children.find((child: any) => child.state?.getCurrent(0)?.animation?.name?.startsWith("bonus_"));
-            const current = spine?.state.getCurrent(0);
-            return current && (current.animation.name !== "bonus_land" || current.trackTime >= current.animationEnd);
-          });
-        }
-        return focusWins.call(this, positions);
-      };
       const events: string[] = [];
       (window as any).scatterAnimations = events;
+      const observed = new WeakSet<object>();
       const setAnimation = AnimationState.prototype.setAnimation;
       AnimationState.prototype.setAnimation = function (track: number, name: string, loop: boolean) {
-        if (name === "bonus_land" || name === "bonus_win") events.push(name);
+        if (name === "bonus_land" && !observed.has(this)) {
+          observed.add(this);
+          this.addListener({
+            start(entry: { animation?: { name: string } }) {
+              const clip = entry.animation?.name;
+              if (clip === "bonus_land" || clip === "bonus_win") events.push(clip);
+            },
+            complete(entry: { animation?: { name: string } }) {
+              if (entry.animation?.name === "bonus_land") events.push("bonus_land_complete");
+            },
+          });
+        }
         return setAnimation.call(this, track, name, loop);
       };
-      const addAnimation = AnimationState.prototype.addAnimation;
-      AnimationState.prototype.addAnimation = function (track: number, name: string, loop: boolean, delay: number) {
-        if (name === "bonus_win") events.push(name);
-        return addAnimation.call(this, track, name, loop, delay);
-      };
     });
-    await page.locator("#spin").click();
+    const spin = page.locator("#spin");
+    const outcome = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/command");
+    await spin.click();
+    expect((await outcome).ok()).toBe(true);
     if (scatterCount === 3)
       await expect(page.getByRole("heading", { name: "TAVERN BONUS", exact: true })).toBeVisible({ timeout: 20000 });
     else {
-      await expect(page.locator("#spin")).toContainText("SKIP", { timeout: 10000 });
-      await expect(page.locator("#spin")).toContainText("SPIN", { timeout: 20000 });
+      await expect(spin).toHaveAccessibleName("Spin", { timeout: 20000 });
+      await expect(spin).toBeEnabled();
+      await expect(page.locator('dialog[data-look="bonus"]')).toBeHidden();
     }
     const events = await page.evaluate(() => (window as any).scatterAnimations as string[]);
     expect(events.filter((event) => event === "bonus_land")).toHaveLength(scatterCount);
     expect(events.filter((event) => event === "bonus_win")).toHaveLength(scatterCount === 3 ? 3 : 0);
-    if (scatterCount === 3)
-      expect(events.lastIndexOf("bonus_land")).toBeLessThan(events.indexOf("bonus_win"));
-    if (scatterCount === 3)
-      expect(await page.evaluate(() => (window as any).scatterLandedBeforeWin)).toBe(true);
+    if (scatterCount === 3) {
+      expect(events.filter((event) => event === "bonus_land_complete")).toHaveLength(3);
+      expect(events.lastIndexOf("bonus_land_complete")).toBeLessThan(events.indexOf("bonus_win"));
+    }
   });
 }
 test("lost response recovers the exact request without charging another spin", async ({

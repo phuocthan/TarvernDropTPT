@@ -2,6 +2,36 @@
 
 **Trạng thái:** Runner P0 đã có trong repo. P1 và P2 là phạm vi mở rộng.
 
+## QA hành vi trên một bản game
+
+Xem [tài liệu bàn giao QA cho Claude](qa-claude-handoff.md) để triển khai các test resume chest, mất phản hồi và HUD.
+
+```powershell
+npm run qa:behavior
+```
+
+Lệnh chạy các test Playwright có tag `@qa-behavior` trên một bản Vite local, cùng mock API riêng. Bộ test hiện kiểm tra mobile 390×844, thứ tự Scatter Land/Win, free spins và retrigger, chest có hoặc không mở, Total Win, và khôi phục intro/free spin. Các test kiểm tra trạng thái DOM, thứ tự animation và request. Ảnh chụp là bằng chứng để đọc lỗi.
+
+Mỗi lượt lưu báo cáo HTML ở `.runtime/qa-behavior/<run-id>/html/index.html`, cùng `run.json`, ảnh khi lỗi và trace của lần chạy lại. Một test được xếp `failed` khi cùng assertion thất bại ở cả lượt đầu lẫn lượt chạy lại. Lỗi chập chờn hoặc lỗi chạy test lặp không đủ căn cứ được xếp `review`, còn test chưa chạy là `notObserved`. Các lỗi của cả suite được ghi ở `suiteErrors`. Dùng `CHROMIUM_PATH` cho Chrome ở vị trí khác, hoặc `npx playwright install chromium` để dùng browser của Playwright. Khi dùng `PLAYWRIGHT_BASE_URL`, trỏ vào Vite dev local vì một số test theo dõi animation qua module nguồn.
+
+```powershell
+npm run qa:trello -- --report .runtime/qa-behavior/<run-id>/run.json
+npm run qa:trello -- --report .runtime/qa-behavior/<run-id>/run.json --publish
+```
+
+Lệnh đầu xem trước card. Lệnh thứ hai gửi lỗi `failed` vào **To-do**. Chọn thủ công `--review <id>` sau khi đã tái hiện một mục `review`. Chỉ ảnh PNG của mục được chọn được gửi kèm. Cả hai lệnh chạy trực tiếp bằng Node/Playwright và không gọi AI.
+
+### Khám phá lỗi với dogfood
+
+Trên Windows, có thể chuẩn bị CLI trong thư mục local của repo.
+
+```powershell
+npm install --prefix .runtime/dogfood-cli agent-browser
+& .runtime/dogfood-cli/node_modules/.bin/agent-browser.cmd skills get dogfood
+```
+
+Chạy game bằng mock local (`npm run dev`) và mở `http://localhost:5173/?game=tarvern`. Dùng workflow `dogfood` của `agent-browser` để agent tự thao tác. Bắt đầu với desktop và portrait, thử Spin/Turbo, Buy Tavern/Drop và reload giữa bonus. Mock mặc định tắt kích hoạt Free Spins tự nhiên từ spin thường, nên dùng Buy Feature để vào bonus khi khám phá. Dùng các test `qa:behavior` cho trường hợp Scatter hoặc chest cần kết quả cố định. Mỗi lỗi cần bước tái hiện, trạng thái mong đợi, trạng thái thực tế và ảnh hoặc clip. Giữ kết quả khám phá trong `.runtime/dogfood/`. Phiên agent tự khám phá có dùng token AI. [Workflow dogfood](https://github.com/vercel-labs/agent-browser/blob/main/skill-data/dogfood/SKILL.md)
+
 ## Mục tiêu
 
 Chạy một lệnh trên Windows để tự mở hai bản game, thực hiện cùng kịch bản và tạo báo cáo HTML cục bộ. Mỗi khác biệt cần truy về được viewport, thao tác, trạng thái game và thời điểm cụ thể. Tavern Drop là cấu hình đầu tiên. Runner dùng lại được cho game 3×3 hoặc game khác bằng cách thay kịch bản và bộ chọn.
@@ -49,6 +79,20 @@ Dùng `--headed` để mở cửa sổ và `--video` để ghi clip Playwright. 
 
 - **Hai bản nội bộ.** Runner cấp session sạch riêng cho mỗi bản và phát cùng kết quả spin từ fixture P0. Chế độ này cho kết quả pass/fail lặp lại được và có thể đưa vào CI sau khi ổn định. Đợt đầu hỗ trợ hai URL đang chạy, sau đó mới xem xét tự khởi động hai build từ commit.
 - **Bản tham chiếu công khai.** Runner mở demo, theo iframe Tavern nếu có và nhận biết Continue, HUD và Bet Menu qua các vùng canvas. Nếu demo không tải, session hết hạn hoặc chưa quan sát được mốc tương ứng, báo `notObserved` kèm lý do. Profile P0 chỉ dùng Buy Bonus trong các bài mở rộng sau này.
+
+## Đưa lỗi lên Trello
+
+Lệnh `qa:trello` đọc `run.json` của một lượt QA. Mặc định lệnh in thử nội dung card cho các mốc `failed`. Dùng `--review <step-id>` để chọn thêm từng mốc `review`; xem ID trong `run.json`. Runner bỏ qua các mốc `passed` và `notObserved`.
+
+```powershell
+npm run qa:trello -- --report .runtime/game-compare/<run-id>/run.json
+npm run qa:trello -- --report .runtime/game-compare/<run-id>/run.json --review <step-id>
+npm run qa:trello -- --report .runtime/game-compare/<run-id>/run.json --publish
+```
+
+`--publish` yêu cầu `TRELLO_API_KEY` và `TRELLO_API_TOKEN` trong môi trường local. Token cần quyền đọc và ghi board. Đích mặc định là board `Tarvern` (`ncXK6YWm`), cột `To-do`. Khi cần đổi đích, đặt `TRELLO_BOARD_ID` và `TRELLO_LIST_NAME`. Tên cột được so khớp bỏ qua khoảng trắng, dấu gạch nối và chữ hoa/thường.
+
+Các viewport gặp lỗi ở cùng một mốc được gộp vào một card. Nếu đã có card đang mở cho cùng profile, chế độ và mốc, lệnh cập nhật phần mô tả do tool quản lý. Ảnh baseline, candidate và diff có sẵn được đính kèm; chạy lại cùng báo cáo sẽ bỏ qua ảnh đã đính kèm. Lệnh in link card sau khi đăng. Các ảnh chụp sẽ hiển thị cho người có quyền xem card.
 
 ## Luồng chạy
 

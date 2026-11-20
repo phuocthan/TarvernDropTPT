@@ -7,7 +7,9 @@ import { tavern } from "../../src/games/tavern/definition.ts";
 
 for (const step of ["intro", "freespin"] as const) {
   for (const mode of ["tavern", "drop"] as const) {
-    test(`landing resumes ${mode} ${step} in its correct scene without another game-info`, async ({ page }) => {
+    test(`landing resumes ${mode} ${step} in its correct scene without another game-info`, {
+      tag: "@qa-behavior", annotation: { type: "qa-expected", description: "Restore the saved scene and free-spin count without a new paid spin or buy request." },
+    }, async ({ page }) => {
       test.setTimeout(90000);
       const dir = mkdtempSync(join(tmpdir(), "tavern-startup-"));
       const backend = new ProposalBackend([tavern], join(dir, "state.json"), { rng: () => 0.5 });
@@ -18,7 +20,16 @@ for (const step of ["intro", "freespin"] as const) {
       auth.playToken = info.playToken as string;
       let issued: any = backend.handle("POST", "/buy-feature", { betMinor: 1000, featureMode: mode }, auth);
       if (step === "freespin") issued = backend.handle("POST", "/spin", { isFreespin: 1, curStep: "intro", stepId: issued.stepId }, auth);
-      await page.addInitScript(({ key, userId }) => { localStorage.setItem(key, userId); }, { key: tavern.id + ".proposal-v1.user", userId });
+      await page.addInitScript(({ key, userId, step }) => {
+        localStorage.setItem(key, userId);
+        if (step !== "intro") return;
+        const attribute = "data-foreground-win-focus";
+        new MutationObserver((records) => {
+          if (document.querySelector(`canvas[${attribute}]`) || records.some((record) =>
+            record.target instanceof HTMLCanvasElement && record.oldValue !== null))
+            document.documentElement.dataset.qaSawScatterWin = "true";
+        }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: [attribute], attributeOldValue: true });
+      }, { key: tavern.id + ".proposal-v1.user", userId, step });
       const requests: { path: string; body: Record<string, unknown> }[] = [];
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
@@ -40,7 +51,7 @@ for (const step of ["intro", "freespin"] as const) {
         await expect(page.locator(".game-shell")).toHaveAttribute("data-opening", "true");
         await page.locator(".opening-continue").click();
         if (step === "intro") {
-          await expect(page.locator("canvas[data-foreground-win-focus]")).toHaveCount(1, { timeout: 15000 });
+          await expect(page.locator("html")).toHaveAttribute("data-qa-saw-scatter-win", "true", { timeout: 15000 });
           await expect(page.locator("#recover")).toHaveCount(0);
         } else await expect(page.locator("#recover")).toBeVisible();
         await expect(page.locator(".game-shell")).not.toHaveAttribute("data-opening", "true");

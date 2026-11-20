@@ -75,7 +75,9 @@ test("v1 HTTP endpoints require POST bodies and reject route query parameters", 
   expect((await request.post("/api/v1/login", { data: {} })).status()).toBe(400);
 });
 
-test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Continue", async ({ page }) => {
+test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Continue", {
+  tag: "@qa-behavior", annotation: { type: "qa-expected", description: "Reload resumes the same bonus intro. Chest steps advance in order, and Continue confirms Total Win once before unlocking Spin." },
+}, async ({ page }) => {
   test.setTimeout(180000);
   const dir = mkdtempSync(join(tmpdir(), "tavern-ui-v1-"));
   const config = structuredClone(tavern);

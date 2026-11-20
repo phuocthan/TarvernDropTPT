@@ -68,7 +68,10 @@ function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
 
 export default defineConfig({
   base: "./",
-  server: { proxy: { "/api": process.env.LOCAL_API_ORIGIN || "http://127.0.0.1:4000" } },
+  server: {
+    proxy: { "/api": process.env.LOCAL_API_ORIGIN || "http://127.0.0.1:4000" },
+    watch: { ignored: ["**/.runtime/**"] },
+  },
   ...(target && paths ? {
     plugins: [standalone(target, paths)],
     build: { outDir: paths.dist, copyPublicDir: false, emptyOutDir: true },
