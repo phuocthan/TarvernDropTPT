@@ -116,6 +116,30 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   updateClock();
   const scene = game.presentation.scene;
   const stage = root.querySelector<HTMLElement>(".stage")!;
+  // Reference v13: the scene slowly pushes in (1 -> 1.05, 4 s linear) while a scatter reel is
+  // anticipated, then eases back after 100 ms (300 ms power4.out).
+  let anticipationPush: Animation | undefined;
+  const anticipationZoom = (active: boolean) => {
+    if (active) {
+      anticipationPush?.cancel();
+      anticipationPush = stage.animate(
+        [{ transform: "scale(1)", transformOrigin: "50% 50%" }, { transform: "scale(1.05)", transformOrigin: "50% 50%" }],
+        { duration: 4000, easing: "linear", fill: "forwards", composite: "add" },
+      );
+      return;
+    }
+    const push = anticipationPush;
+    if (!push) return;
+    anticipationPush = undefined;
+
+    push.pause();
+    const scale = Number(push.effect?.getComputedTiming().progress ?? 1) * 0.05 + 1;
+    push.cancel();
+    stage.animate(
+      [{ transform: `scale(${scale})`, transformOrigin: "50% 50%" }, { transform: "scale(1)", transformOrigin: "50% 50%" }],
+      { delay: 100, duration: 300, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "backwards", composite: "add" },
+    );
+  };
   if (scene) applySceneLayers(stage, scene.layers);
   // Reference v13 picks desktop / landscape / portrait from the game viewport size. The CSS
   // reads data-layout from <html> (dialogs and overlays included) and the scene follows it.
@@ -652,7 +676,11 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
             if (id === game.presentation.drop.anticipation?.symbolId)
               audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
           },
-          anticipation: (active) => active ? audio.cue("anticipation", true) : audio.stop("anticipation"),
+          anticipation: (active) => {
+            if (active) audio.cue("anticipation", true);
+            else audio.stop("anticipation");
+            anticipationZoom(active);
+          },
         });
         const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
           !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;

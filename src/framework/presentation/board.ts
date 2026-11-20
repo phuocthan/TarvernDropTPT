@@ -2,6 +2,8 @@ import { Application, Container, Graphics, RenderLayer, UPDATE_PRIORITY, type Ti
 import { keepWithinVerticalViewport, reelCellCenter, type VerticalBounds } from "./grid.ts";
 import { planDropColumns } from "./drop-schedule.ts";
 import { landingDuration, landingOffset, landingScale } from "./landing-motion.ts";
+import { dropEnterStartUnits, dropExitUnits, planDropEnter, planDropExit } from "./drop-timeline.ts";
+import { resolveEase } from "./custom-ease.ts";
 import type {
   Board,
   GameDefinition,
@@ -250,7 +252,8 @@ export class BoardView {
         if (tile.view.visible) tile.effect?.("idle");
       }
       this.dropRound = {
-        exit: this.strip.visible ? this.animateDrop(false) : Promise.resolve(),
+        exit: !this.strip.visible ? Promise.resolve()
+          : this.game.presentation.drop.timeline ? this.animateTimeline(false) : this.animateDrop(false),
         skipped: false,
       };
       return;
@@ -290,12 +293,22 @@ export class BoardView {
     };
     const drop = this.dropRound;
     if (drop) {
+      const resultAt = performance.now();
       await drop.exit;
       if (this.dropRound !== drop) return;
+      const timeline = this.game.presentation.drop.timeline;
+      if (timeline && !drop.skipped) {
+        // Reference: the first reel drops in a fixed time after the result arrives.
+        const wait = (this.fast ? timeline.enter.turboWaitMs : timeline.enter.waitMs) - (performance.now() - resultAt);
+        if (wait > 0) await delay(wait);
+        if (this.dropRound !== drop) return;
+      }
       if (!drop.skipped) {
         board.forEach((symbols, reel) => this.setReel(reel, symbols, "spin"));
         this.strip.visible = true;
-        await this.animateDrop(true, { board, onLand, events });
+        await (timeline
+          ? this.animateTimeline(true, { board, onLand, events })
+          : this.animateDrop(true, { board, onLand, events }));
       }
       if (this.dropRound === drop) {
         this.dropRound = null;
@@ -335,6 +348,138 @@ export class BoardView {
     }
     await lastBounce;
     this.strip.visible = true;
+  }
+  /**
+   * Drop driven by `presentation.drop.timeline` (reference v13 reels): per-symbol eases,
+   * staggers and turbo values, a fixed start height above the board and the authored
+   * overshoot of the enter ease. Anticipated reels drop slowly and are followed by a pause.
+   */
+  private animateTimeline(entering: boolean, landing?: {
+    board: Board;
+    onLand: (reel: number, row: number) => void;
+    events?: ReelStopEvents;
+  }) {
+    const timeline = this.game.presentation.drop.timeline!;
+    const scatterId = this.game.presentation.drop.anticipation?.symbolId;
+    for (const [tile, edge] of this.edgeTiles) {
+      edge.settled = false;
+      if (entering) tile.view.pivot.y = edge.pivotY;
+    }
+    const pitch = this.cell + this.gap;
+    const unit = pitch / timeline.unitsPerRow;
+    const rows = this.game.rows;
+    const deformation = this.game.presentation.landing;
+    const fast = this.fast;
+    const ease = resolveEase(entering ? timeline.enter.ease : timeline.exit.ease);
+    const plan = entering && landing
+      ? planDropEnter(landing.board, rows, timeline, fast, scatterId)
+      : planDropExit(this.game.reels, rows, timeline, fast);
+    const enterPlan = entering && landing ? (plan as ReturnType<typeof planDropEnter>) : undefined;
+    const settleMs = entering ? Math.max(0, landingDuration(deformation) - (deformation?.leadMs ?? 0)) : 0;
+    const duration = plan.endMs + settleMs;
+    const moves = plan.tiles.map((motion) => {
+      const tile = this.tiles[motion.reel][motion.row + 1];
+      const rest = motion.row * pitch;
+      if (entering) tile.view.visible = false;
+      return {
+        ...motion,
+        tile,
+        rest,
+        from: entering ? rest + dropEnterStartUnits(motion.row, timeline.unitsPerRow, timeline) * unit : rest,
+        landed: false,
+      };
+    });
+    const landLead = Math.min(timeline.enter.landLeadMs, entering ? moves[0]?.durationMs ?? 0 : 0);
+    const canvas = this.app.canvas;
+    const audited = landing && canvas.hasAttribute("data-motion-audit");
+    const publish = (phase: string, move: typeof moves[number]) => {
+      canvas.dispatchEvent(new CustomEvent("fw-pixi:drop", {
+        detail: {
+          phase, reel: move.reel, row: move.row, symbol: landing?.board[move.reel][move.row],
+          visible: move.tile.view.visible, y: move.tile.view.y, time: performance.now(),
+        },
+      }));
+    };
+    const stoppedReels = new Set<number>();
+    const landedScatters: SymbolView[] = [];
+    let anticipating = false;
+    let anticipationEnded = false;
+    const paint = (time: number) => {
+      for (const move of moves) {
+        const elapsed = time - move.startMs;
+        if (entering) {
+          const progress = Math.max(0, Math.min(1, elapsed / move.durationMs));
+          move.tile.view.y = move.from + (move.rest - move.from) * (elapsed <= 0 ? 0 : ease(progress));
+          this.applyLanding(move.tile, elapsed - move.durationMs + (deformation?.leadMs ?? 0));
+          // Spine effects outside the cell must not reveal a queued symbol.
+          if (!move.tile.view.visible && elapsed > 0 && move.tile.view.y + this.cell > 0) {
+            move.tile.view.visible = true;
+            if (audited) publish("entered", move);
+          }
+          if (!move.landed && elapsed >= move.durationMs - landLead && this.dropRound && !this.dropRound.skipped) {
+            move.landed = true;
+            if (audited) publish("landed", move);
+            const edge = this.edgeTiles.get(move.tile);
+            if (edge) edge.settled = true;
+            const animation = move.tile.effect?.("land");
+            if (animation) this.landingAnimations.set(`${move.reel}:${move.row}`, animation);
+            landing!.onLand(move.reel, move.row);
+            if (scatterId !== undefined && landing!.board[move.reel][move.row] === scatterId) {
+              landedScatters.push(move.tile);
+              if (anticipating) this.raiseAnticipationSymbol(move.tile);
+            }
+          }
+        } else {
+          move.tile.view.y = move.rest + dropExitUnits(elapsed, timeline, fast, ease) * unit;
+          this.applyLanding(move.tile, Infinity);
+        }
+      }
+      if (!enterPlan || !this.dropRound || this.dropRound.skipped) return;
+      enterPlan.reelStops.forEach((at, reel) => {
+        if (time < at || stoppedReels.has(reel)) return;
+        stoppedReels.add(reel);
+        landing?.events?.reel?.(reel);
+      });
+      const first = enterPlan.anticipation[0];
+      if (!anticipating && first && time >= first.atMs) {
+        anticipating = true;
+        for (const tile of this.tiles.flat()) tile.view.tint = this.unfocusedTint;
+        this.app.canvas.setAttribute("data-anticipation-focus", "");
+        for (const tile of landedScatters) this.raiseAnticipationSymbol(tile);
+        landing?.events?.anticipation?.(true);
+      }
+      if (anticipating && !anticipationEnded && enterPlan.anticipationEndMs !== undefined &&
+          time >= enterPlan.anticipationEndMs) {
+        anticipationEnded = true;
+        landing?.events?.anticipation?.(false);
+      }
+    };
+    paint(0);
+    return new Promise<void>((resolve) => {
+      const start = performance.now();
+      let frame = 0;
+      const finish = () => {
+        cancelAnimationFrame(frame);
+        this.finishDrop = null;
+        paint(duration);
+        this.resetLanding();
+        if (anticipating) {
+          this.clearHighlight();
+          if (!anticipationEnded) landing?.events?.anticipation?.(false);
+        }
+        resolve();
+      };
+      const tick = (now: number) => {
+        const elapsed = now - start;
+        if (elapsed >= duration) finish();
+        else {
+          paint(elapsed);
+          frame = requestAnimationFrame(tick);
+        }
+      };
+      this.finishDrop = finish;
+      frame = requestAnimationFrame(tick);
+    });
   }
   private animateDrop(entering: boolean, landing?: {
     board: Board;

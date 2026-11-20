@@ -182,6 +182,12 @@ export interface ReelPresentation {
     bouncePx: number;
     turboMultiplier: number;
     anticipation?: DropAnticipation;
+    /**
+     * Opt-in reference timeline (eases, staggers and turbo values per phase). When present it
+     * replaces exit/enter/bounce/turboMultiplier timing; `anticipation.symbolId` still names
+     * the scatter. See presentation/drop-timeline.ts.
+     */
+    timeline?: import("../presentation/drop-timeline.ts").DropTimelineConfig;
   };
 }
 export interface GameDefinition {

@@ -482,6 +482,64 @@
                 "reelPauseMs": { "type": "integer", "minimum": 0 }
               },
               "additionalProperties": false
+            },
+            "timeline": {
+              "description": "Opt-in reference drop timeline. Distances are reference units scaled by row pitch / unitsPerRow; eases are GSAP names or CustomEase paths.",
+              "type": "object",
+              "required": ["unitsPerRow", "exit", "enter"],
+              "properties": {
+                "unitsPerRow": { "type": "integer", "minimum": 1 },
+                "exit": {
+                  "type": "object",
+                  "required": ["durationMs", "turboDurationMs", "distance", "ease", "rowStaggerMs", "turboRowStaggerMs", "reelStaggerMs", "turboReelStaggerMs"],
+                  "properties": {
+                    "durationMs": { "type": "integer", "minimum": 1 },
+                    "turboDurationMs": { "type": "integer", "minimum": 1 },
+                    "distance": { "type": "number" },
+                    "ease": { "type": "string" },
+                    "rowStaggerMs": { "type": "integer", "minimum": 0 },
+                    "turboRowStaggerMs": { "type": "integer", "minimum": 0 },
+                    "reelStaggerMs": { "type": "integer", "minimum": 0 },
+                    "turboReelStaggerMs": { "type": "integer", "minimum": 0 },
+                    "cutoffMs": { "type": "integer", "minimum": 0 },
+                    "cutoffDurationMs": { "type": "integer", "minimum": 1 }
+                  },
+                  "additionalProperties": false
+                },
+                "enter": {
+                  "type": "object",
+                  "required": ["durationMs", "turboDurationMs", "startY", "rowStartStep", "ease", "rowStaggerMs", "turboRowStaggerMs", "reelStaggerMs", "turboReelStaggerMs", "waitMs", "turboWaitMs", "landLeadMs"],
+                  "properties": {
+                    "durationMs": { "type": "integer", "minimum": 1 },
+                    "turboDurationMs": { "type": "integer", "minimum": 1 },
+                    "startY": { "type": "number" },
+                    "rowStartStep": { "type": "number" },
+                    "ease": { "type": "string" },
+                    "rowStaggerMs": { "type": "integer", "minimum": 0 },
+                    "turboRowStaggerMs": { "type": "integer", "minimum": 0 },
+                    "reelStaggerMs": { "type": "integer", "minimum": 0 },
+                    "turboReelStaggerMs": { "type": "integer", "minimum": 0 },
+                    "waitMs": { "type": "integer", "minimum": 0 },
+                    "turboWaitMs": { "type": "integer", "minimum": 0 },
+                    "landLeadMs": { "type": "integer", "minimum": 0 },
+                    "reelStopRow": { "type": "integer", "minimum": 0 }
+                  },
+                  "additionalProperties": false
+                },
+                "anticipation": {
+                  "type": "object",
+                  "required": ["minCount", "maxCount", "rowStaggerMs", "pauseMs"],
+                  "properties": {
+                    "minCount": { "type": "integer", "minimum": 1 },
+                    "maxCount": { "type": "integer", "minimum": 1 },
+                    "rowStaggerMs": { "type": "integer", "minimum": 1 },
+                    "pauseMs": { "type": "integer", "minimum": 0 },
+                    "includeLastReel": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

@@ -1,3 +1,4 @@
+import { isEaseSpec } from "./presentation/custom-ease.ts";
 import type { GameDefinition } from "./domain/contracts.ts";
 import { validateDefinition } from "./domain/rules.ts";
 import { validateResourceManifest } from "./resources/validate-manifest.ts";
@@ -113,6 +114,25 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     (!anticipation || !ids.has(anticipation.symbolId) ||
       !positiveInt(anticipation.count) || !nonNegativeInt(anticipation.reelPauseMs)))
     invalid("presentation.drop.anticipation");
+  const timeline = drop?.timeline;
+  if (timeline !== undefined) {
+    const ms = (value: unknown) => typeof value === "number" && nonNegativeInt(value);
+    const { exit, enter, anticipation: slow } = timeline ?? ({} as never);
+    if (!timeline || !positiveInt(timeline.unitsPerRow) || !exit || !enter ||
+        ![exit.durationMs, exit.turboDurationMs, enter.durationMs, enter.turboDurationMs].every(positiveInt) ||
+        ![exit.rowStaggerMs, exit.turboRowStaggerMs, exit.reelStaggerMs, exit.turboReelStaggerMs,
+          enter.rowStaggerMs, enter.turboRowStaggerMs, enter.reelStaggerMs, enter.turboReelStaggerMs,
+          enter.waitMs, enter.turboWaitMs, enter.landLeadMs].every(ms) ||
+        !Number.isFinite(exit.distance) || !Number.isFinite(enter.startY) || !Number.isFinite(enter.rowStartStep) ||
+        !isEaseSpec(exit.ease) || !isEaseSpec(enter.ease) ||
+        (exit.cutoffMs === undefined) !== (exit.cutoffDurationMs === undefined) ||
+        (exit.cutoffMs !== undefined && (!ms(exit.cutoffMs) || !positiveInt(exit.cutoffDurationMs!))) ||
+        (enter.reelStopRow !== undefined && (!nonNegativeInt(enter.reelStopRow) || enter.reelStopRow >= game.rows)) ||
+        (slow !== undefined && (!slow || !positiveInt(slow.minCount) || !positiveInt(slow.maxCount) ||
+          slow.maxCount < slow.minCount || !positiveInt(slow.rowStaggerMs) || !ms(slow.pauseMs))) ||
+        !drop.anticipation)
+      invalid("presentation.drop.timeline");
+  }
   const loading = display.loadingScreen;
   if (loading !== undefined &&
     (!loading || ![loading.background, loading.brandLogo, loading.brandName, loading.gameLogo].every(nonEmpty)))
