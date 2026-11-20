@@ -260,6 +260,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     loadTavernBitmapFonts(resources),
   ]);
   let presentingFeature: FeatureState | null = null;
+  /** A winning result is being presented: Spin (and its Skip role) waits until it ends. */
+  let winPresentation = false;
   let presentingBet = game.bets[betIndex];
   const dialog = $<HTMLDialogElement>("dialog");
   const closeModal = dialog.querySelector<HTMLButtonElement>(".close-modal")!;
@@ -384,6 +386,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $<HTMLButtonElement>("bet-up").disabled = betLocked || betIndex === game.bets.length - 1;
     $<HTMLButtonElement>("spin").disabled =
       nextFreeSpin ||
+      (winPresentation && !autoRunning) ||
       (busy && view.isMoving && !view.allowForceStop && !autoRunning) ||
       controller.phase === "loading" ||
       controller.phase === "recovery";
@@ -654,6 +657,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
           !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
         noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
+        winPresentation = !plainNoWin;
         if (!plainNoWin) await waitAfterReels(spinTurbo);
         const scatter =
           outcome.entry || outcome.retrigger
@@ -944,6 +948,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     mockBonus?: MockBonusScenario,
   ) {
     if (!recover && controller.phase !== "ready") {
+      // A win (including its free spins) plays out in full before the next spin.
+      if (winPresentation) return;
       if (winSkip) {
         winSkip();
         return;
@@ -987,7 +993,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         } else if (!outcome.entry) view.hideSymbols();
         shell.querySelector<HTMLElement>(".tavern-hud")!.inert = false;
       }
-      await present(outcome, spinTurbo);
+      try {
+        await present(outcome, spinTurbo);
+      } finally {
+        if (winPresentation) {
+          winPresentation = false;
+          sync();
+        }
+      }
     } catch (error) {
       stopAuto();
       if (controller.state) {
