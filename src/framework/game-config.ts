@@ -127,6 +127,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
         !isEaseSpec(exit.ease) || !isEaseSpec(enter.ease) ||
         (exit.cutoffMs === undefined) !== (exit.cutoffDurationMs === undefined) ||
         (exit.cutoffMs !== undefined && (!ms(exit.cutoffMs) || !positiveInt(exit.cutoffDurationMs!))) ||
+        [enter.settleWaitMs, enter.turboSettleWaitMs].some((value) => value !== undefined && !ms(value)) ||
         (enter.reelStopRow !== undefined && (!nonNegativeInt(enter.reelStopRow) || enter.reelStopRow >= game.rows)) ||
         (slow !== undefined && (!slow || !positiveInt(slow.minCount) || !positiveInt(slow.maxCount) ||
           slow.maxCount < slow.minCount || !positiveInt(slow.rowStaggerMs) || !ms(slow.pauseMs))) ||

@@ -29,6 +29,7 @@ import type {
   GameDefinition,
   MockBonusScenario,
   Outcome,
+  Position,
   ReelMotion,
 } from "../../framework/domain/contracts.ts";
 
@@ -636,9 +637,11 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       !(feature?.remaining || autoRunning)
     )
       return;
-    const delay = noWinReelsStoppedAt === undefined
-      ? nextSpinDelay(turbo ? 357 : feature?.played === 0 ? 1400 : 900)
-      : Math.max(0, 500 - (performance.now() - noWinReelsStoppedAt));
+    // Reference v13: autoplay starts the next base round as soon as the previous one ends
+    // (autobetTimeoutDuration 0); each free spin waits 500 ms (turbo 300) before dropping,
+    // and the first one also waits for the bonus-enter tail (feature.startDelayMs).
+    void noWinReelsStoppedAt;
+    const delay = feature?.remaining ? nextSpinDelay(turbo ? 300 : 500) : 0;
     autoTimer = setTimeout(() => {
       autoTimer = null;
       if (!dialog.open && controller.phase === "ready") void run("spin");
@@ -702,20 +705,21 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         sync();
         if (outcome.wins.length) audio.cue("win");
         const animateWins = async () => {
-          const lineDuration = turbo
-            ? 304
-            : Math.max(250, Math.min(670, 2500 / Math.max(1, outcome.wins.length)));
-          for (const win of outcome.wins) {
-            if (skipped) break;
-            view.focusWins(win.positions);
-            await payline.play(
-              win,
-              game.lines[win.line],
-              money(win.amount),
-              win.amount >= outcome.bet * 20,
-              lineDuration,
-              () => skipped,
-            );
+          // Reference v13 animateBoardWins: lines accumulate (earlier lines stay lit); each
+          // symbol of a line starts its win 40 ms after the previous (turbo/skip 5 ms), a line
+          // ends with 150 ms (normal only) and the last line holds 500 ms.
+          const lit: Position[] = [];
+          for (const [index, win] of outcome.wins.entries()) {
+            const fast = () => turbo || skipped;
+            payline.show(win, game.lines[win.line], money(win.amount), win.amount >= outcome.bet * 20, fast());
+            for (const position of win.positions)
+              if (!lit.some((p) => p.reel === position.reel && p.row === position.row)) lit.push(position);
+            for (const position of win.positions) {
+              void view.focusWins(lit, [position]);
+              await delay(fast() ? 5 : 40);
+            }
+            if (!fast()) await delay(150);
+            if (index === outcome.wins.length - 1) await delay(500);
           }
           if (scatter.length && (outcome.entry || !skipped)) {
             await view.waitForLandings(scatter);
@@ -994,6 +998,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     const spinTurbo = turbo;
     audio.unlock();
     skipped = false;
+    payline?.clear();
     if (!recover) {
       view.start(turbo, reelMotion);
       effects?.spin();

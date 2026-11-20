@@ -347,7 +347,7 @@
     "cellSizePx": 102,
     "gapPx": 8,
     "reelMaskPaddingPx": 6,
-    "checkWinDelayMs": { "normal": 1000, "turbo": 500 },
+    "checkWinDelayMs": { "normal": 500, "turbo": 300 },
     "controls": {
       "menu": true,
       "autoRounds": [10, 25, 50, 100, 250, 500, 1000],
@@ -409,7 +409,7 @@
       }
     },
     "feature": {
-      "startDelayMs": 2000,
+      "startDelayMs": 500,
       "endDelayMs": 2000,
       "hideSymbolsUntilFirstSpin": true
     },
@@ -454,7 +454,8 @@
           "durationMs": 290, "turboDurationMs": 120, "startY": -2200, "rowStartStep": 100,
           "ease": "M0,0 C0.566,0.382 0.689,1.015 0.689,1.015 0.689,1.015 0.749,0.989 0.855,0.989 0.945,0.989 0.931,0.989 1,1",
           "rowStaggerMs": 40, "turboRowStaggerMs": 15, "reelStaggerMs": 70, "turboReelStaggerMs": 15,
-          "waitMs": 350, "turboWaitMs": 50, "landLeadMs": 250
+          "waitMs": 350, "turboWaitMs": 50, "landLeadMs": 250,
+          "settleWaitMs": 380, "turboSettleWaitMs": 150
         },
         "anticipation": { "minCount": 2, "maxCount": 3, "rowStaggerMs": 100, "pauseMs": 800 }
       }

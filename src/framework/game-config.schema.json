@@ -522,7 +522,9 @@
                     "waitMs": { "type": "integer", "minimum": 0 },
                     "turboWaitMs": { "type": "integer", "minimum": 0 },
                     "landLeadMs": { "type": "integer", "minimum": 0 },
-                    "reelStopRow": { "type": "integer", "minimum": 0 }
+                    "reelStopRow": { "type": "integer", "minimum": 0 },
+                    "settleWaitMs": { "type": "integer", "minimum": 0 },
+                    "turboSettleWaitMs": { "type": "integer", "minimum": 0 }
                   },
                   "additionalProperties": false
                 },

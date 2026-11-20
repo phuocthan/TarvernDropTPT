@@ -241,6 +241,8 @@ export class BoardView {
     }
   }
   start(turbo: boolean, motion: ReelMotion = this.game.presentation.spinType) {
+    // A timeline reveal may still be settling after its round was released.
+    this.finishDrop?.();
     this.motionGeneration++;
     this.skipLanding = false;
     this.resetLanding();
@@ -400,6 +402,8 @@ export class BoardView {
         },
       }));
     };
+    const round = this.dropRound;
+    const live = () => !!round && !round.skipped;
     const stoppedReels = new Set<number>();
     const landedScatters: SymbolView[] = [];
     let anticipating = false;
@@ -416,7 +420,7 @@ export class BoardView {
             move.tile.view.visible = true;
             if (audited) publish("entered", move);
           }
-          if (!move.landed && elapsed >= move.durationMs - landLead && this.dropRound && !this.dropRound.skipped) {
+          if (!move.landed && elapsed >= move.durationMs - landLead && live()) {
             move.landed = true;
             if (audited) publish("landed", move);
             const edge = this.edgeTiles.get(move.tile);
@@ -434,7 +438,7 @@ export class BoardView {
           this.applyLanding(move.tile, Infinity);
         }
       }
-      if (!enterPlan || !this.dropRound || this.dropRound.skipped) return;
+      if (!enterPlan || !live()) return;
       enterPlan.reelStops.forEach((at, reel) => {
         if (time < at || stoppedReels.has(reel)) return;
         stoppedReels.add(reel);
@@ -455,22 +459,37 @@ export class BoardView {
       }
     };
     paint(0);
+    // The round continues at the reference reveal end; landing squash may still be settling.
+    const releaseAt = enterPlan ? enterPlan.revealEndMs : duration;
     return new Promise<void>((resolve) => {
       const start = performance.now();
       let frame = 0;
+      let done = false;
+      let released = false;
       const finish = () => {
+        if (done) return;
+        done = true;
         cancelAnimationFrame(frame);
-        this.finishDrop = null;
+        if (this.finishDrop === finish) this.finishDrop = null;
         paint(duration);
         this.resetLanding();
         if (anticipating) {
           this.clearHighlight();
           if (!anticipationEnded) landing?.events?.anticipation?.(false);
         }
-        resolve();
+        const remaining = releaseAt - (performance.now() - start);
+        if (remaining > 0 && live() && this.dropRound === round) {
+          const timer = setTimeout(() => {
+            if (this.finishDrop === settle) this.finishDrop = null;
+            resolve();
+          }, remaining);
+          const settle = () => { clearTimeout(timer); this.finishDrop = null; resolve(); };
+          this.finishDrop = settle;
+        } else resolve();
       };
       const tick = (now: number) => {
         const elapsed = now - start;
+        if (elapsed >= releaseAt && !released) { released = true; resolve(); }
         if (elapsed >= duration) finish();
         else {
           paint(elapsed);
@@ -669,10 +688,16 @@ export class BoardView {
     for (const { reel, row } of scatter) seen.add(reel + ":" + row);
     return this.playWinners(seen, dimUnmatched);
   }
-  focusWins(positions: Position[]) {
+  /**
+   * Light `positions` and dim the rest. `animate` limits which focused symbols (re)start
+   * their win animation; the others keep playing (cumulative line presentation).
+   */
+  focusWins(positions: Position[], animate?: Position[]) {
+    const key = ({ reel, row }: Position) => reel + ":" + row;
     return this.playWinners(
-      new Set(positions.map(({ reel, row }) => reel + ":" + row)),
+      new Set(positions.map(key)),
       true,
+      animate && new Set(animate.map(key)),
     );
   }
   async waitForLandings(positions: Position[]) {
@@ -682,7 +707,7 @@ export class BoardView {
     tile.view.tint = 0xffffff;
     this.winningSymbols.attach(tile.view);
   }
-  private playWinners(seen: Set<string>, dimUnmatched: boolean) {
+  private playWinners(seen: Set<string>, dimUnmatched: boolean, animate?: Set<string>) {
     const animations: Promise<void>[] = [];
     for (const [reel, tiles] of this.tiles.entries()) {
       for (const [slot, tile] of tiles.entries()) {
@@ -700,6 +725,7 @@ export class BoardView {
           }
         }
         if (!matched && this.animatedWinners.delete(tile)) tile.effect?.("idle");
+        if (matched && animate && !animate.has(reel + ":" + (slot - 1))) continue;
         if (matched) {
           this.animatedWinners.add(tile);
           const animation = tile.effect?.("win");

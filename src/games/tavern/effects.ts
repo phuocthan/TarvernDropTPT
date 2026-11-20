@@ -555,16 +555,24 @@ export async function mountTavernEffects(
     }
     const sceneRect = scene.getBoundingClientRect();
     const frameRect = frame.getBoundingClientRect();
-    const bottom = (portrait ? camera?.portraitBottom : camera?.landscapeBottom) ?? 1940;
-    const backgroundScale = Math.max(
-      width / (camera?.width ?? 6000),
-      height / ((camera?.top ?? 2060) + bottom),
-    );
-    background.scale.set(backgroundScale);
-    background.position.set(
-      width / 2 + (camera?.centerOffsetX ?? 80) * backgroundScale,
-      height - bottom * backgroundScale,
-    );
+    if (portrait) {
+      const bottom = camera?.portraitBottom ?? 1940;
+      const backgroundScale = Math.max(
+        width / (camera?.width ?? 6000),
+        height / ((camera?.top ?? 2060) + bottom),
+      );
+      background.scale.set(backgroundScale);
+      background.position.set(
+        width / 2 + (camera?.centerOffsetX ?? 80) * backgroundScale,
+        height - bottom * backgroundScale,
+      );
+    } else {
+      // Reference v13 (QL + JL): the background covers a 5800x3800 box centred on the
+      // viewport, so very wide or short screens crop top and bottom evenly.
+      const backgroundScale = width / height > 5800 / 3800 ? width / 5800 : height / 3800;
+      background.scale.set(backgroundScale);
+      background.position.set(width / 2, height / 2);
+    }
     const sceneScale = sceneRect.width / scene.clientWidth || 1;
     const reelScale = frameRect.width / sceneScale / 3976;
     reelhouse.scale.set(reelScale);

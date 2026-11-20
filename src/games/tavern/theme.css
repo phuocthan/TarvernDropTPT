@@ -35,6 +35,11 @@
   font-weight: 800 900;
   font-display: swap;
 }
+/* Reference v13 global.css: html { overflow: hidden; height: 100% } - the game never scrolls. */
+html:has(.tavern-shell) {
+  overflow: hidden;
+  height: 100%;
+}
 .tavern-shell,
 .tavern-dialog {
   font-family: Outfit, sans-serif;
@@ -44,7 +49,7 @@
   position: relative;
   max-width: none;
   height: 100svh;
-  min-height: 350px;
+  /* Reference v13 fills any viewport (no minimum, no page scroll). */
   overflow: clip;
   isolation: isolate;
   color: white;

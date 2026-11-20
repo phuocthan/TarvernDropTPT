@@ -42,6 +42,12 @@ export interface DropTimelineConfig {
     landLeadMs: number;
     /** Index of the row whose drop marks the reel stop (reference: the second from the bottom). */
     reelStopRow?: number;
+    /**
+     * Reference: the reveal ends one fixed reel offset (reelStaggerMs) after the last reel's
+     * own offset, then waits this long before the round may continue (normal / turbo).
+     */
+    settleWaitMs?: number;
+    turboSettleWaitMs?: number;
   };
   anticipation?: {
     /** Anticipate a reel while the scatter count up to and including it is within [min, max]. */
@@ -71,6 +77,8 @@ export interface EnterPlan {
   anticipationEndMs?: number;
   /** Time at which every symbol has reached rest. */
   endMs: number;
+  /** Time at which the reference reveal (and its settle wait) completes. */
+  revealEndMs: number;
 }
 
 /** Exit (spin out) schedule: every reel together (turbo: 15 ms apart), bottom row first. */
@@ -145,6 +153,7 @@ export function planDropEnter(
     anticipation: anticipated,
     anticipationEndMs,
     endMs: Math.max(...tiles.map((t) => t.startMs + t.durationMs)),
+    revealEndMs: time + enter.reelStaggerMs + ((turbo ? enter.turboSettleWaitMs : enter.settleWaitMs) ?? 0),
   };
 }
 

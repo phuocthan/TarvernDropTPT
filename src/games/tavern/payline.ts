@@ -32,28 +32,26 @@ export function createTavernPayline(
   bitmapFont = false,
 ) {
   const layer = new Container();
-  const label = bitmapFont
-    ? new BitmapAmount("td_green", 54, 0xadff35)
-    : new Text({
-        style: {
-          fontFamily: "Outfit",
-          fontSize: 44,
-          fontWeight: "800",
-          fill: 0xadff35,
-          stroke: { color: 0x172315, width: 4, join: "round" },
-        },
-      });
-  label.anchor.set(0.5);
-  const highLabel = bitmapFont
-    ? new BitmapAmount("td_red", 54, 0xff6354)
-    : null;
-  highLabel?.anchor.set(0.5);
-  layer.visible = false;
+  const labels = new Container();
+  const makeLabel = (high: boolean) => {
+    if (bitmapFont)
+      return high ? new BitmapAmount("td_red", 54, 0xff6354) : new BitmapAmount("td_green", 54, 0xadff35);
+    return new Text({
+      style: {
+        fontFamily: "Outfit",
+        fontSize: 44,
+        fontWeight: "800",
+        fill: high ? 0xff6354 : 0xadff35,
+        stroke: { color: 0x172315, width: 4, join: "round" },
+      },
+    });
+  };
   const source = game.presentation.animationGrid;
   const origin = source && native?.skeleton.findSlot(source.originSlot)?.bone;
   if (native && source && origin) {
     native.autoUpdate = false;
     native.update(0);
+    native.visible = false;
     const aligned = alignReelGrid(game.presentation, {
       x: origin.worldX, y: origin.worldY,
       reelPitch: source.reelPitch, rowPitch: source.rowPitch,
@@ -67,65 +65,106 @@ export function createTavernPayline(
     };
     layer.addChild(native);
   }
-  layer.addChild(label);
-  if (highLabel) layer.addChild(highLabel);
+  layer.addChild(labels);
   stage.addChild(layer);
 
-  return {
-    async play(
-      win: LineWin,
-      rows: number[],
-      amount: string,
-      highAmount: boolean,
-      duration: number,
-      skipped: () => boolean,
-    ) {
-      const index = originalRows.indexOf(rows.join(""));
-      const clip =
-        index >= 0 && origin
-          ? native?.skeleton.data.findAnimation(`payline_${index}`)
-          : null;
-      if (native) {
-        native.visible = !!clip;
-        if (clip) {
-          native.state.clearTracks();
-          native.skeleton.setToSetupPose();
-          native.state.setAnimation(0, clip.name, false);
-          native.update(0);
-        }
+  /** Reference units (reelhouse space: 564 per row) to board pixels. */
+  const rowPitch = reelCellCenter({ reel: 0, row: 1 }, game.presentation).y -
+    reelCellCenter({ reel: 0, row: 0 }, game.presentation).y;
+  const unit = rowPitch / 564;
+  const power2Out = (t: number) => 1 - (1 - t) ** 3;
+  const power3In = (t: number) => t ** 4;
+  const sineInOut = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2;
+  let textPositions: string[] = [];
+  let nativeFrame = 0;
+  const active = new Set<{ stop: () => void }>();
+  const pumpNative = () => {
+    if (!native || nativeFrame) return;
+    let last = performance.now();
+    const frame = (now: number) => {
+      native.update((now - last) / 1000);
+      last = now;
+      const busy = native.state.tracks.some((track) =>
+        !!track?.animation && track.animation.duration > 0 && track.trackTime < track.animationEnd);
+      if (busy) nativeFrame = requestAnimationFrame(frame);
+      else {
+        nativeFrame = 0;
+        native.visible = false;
       }
-      const amountLabel = highAmount && highLabel ? highLabel : label;
-      label.visible = amountLabel === label;
-      if (highLabel) highLabel.visible = amountLabel === highLabel;
-      const anchor = {
-        reel: (win.positions.length - 1) / 2,
-        row: (Math.min(...rows) + Math.max(...rows)) / 2,
-      };
-      const amountAt = reelCellCenter(anchor, game.presentation);
-      amountLabel.text = amount;
-      amountLabel.position.set(amountAt.x, amountAt.y);
-      layer.visible = true;
+    };
+    nativeFrame = requestAnimationFrame(frame);
+  };
 
-      const clipSeconds = clip?.duration ?? 0;
-      let trackTime = 0;
+  return {
+    /** Start a fresh round of line wins (reference oh.clearPositions on bet start). */
+    clear() {
+      textPositions = [];
+      for (const item of [...active]) item.stop();
+      if (native) {
+        native.state.clearTracks();
+        native.skeleton.setToSetupPose();
+        native.visible = false;
+        if (nativeFrame) cancelAnimationFrame(nativeFrame);
+        nativeFrame = 0;
+      }
+    },
+    /**
+     * Reference v13 line win: the payline clip plays at its own speed on its own track (lines
+     * overlap), and the amount pops in above its anchor, wobbles and falls out of the board.
+     * Not awaited by the caller; the line cadence comes from the symbol stagger.
+     */
+    show(win: LineWin, rows: number[], amount: string, highAmount: boolean, fast: boolean) {
+      const index = originalRows.indexOf(rows.join(""));
+      const clip = index >= 0 && origin ? native?.skeleton.data.findAnimation(`payline_${index}`) : null;
+      if (native && clip) {
+        native.visible = true;
+        native.state.setAnimation(1 + index, clip.name, false);
+        native.state.addEmptyAnimation(1 + index, 0, 0);
+        pumpNative();
+      }
+      const reel = (win.positions.length - 1) / 2;
+      let row = (Math.min(...rows) + Math.max(...rows)) / 2;
+      if (textPositions.includes(`${reel}:${row}`)) row += 0.25;
+      textPositions.push(`${reel}:${row}`);
+      const label = makeLabel(highAmount);
+      label.anchor.set(0.5);
+      label.text = amount;
+      const at = reelCellCenter({ reel, row }, game.presentation);
+      const bottom = reelCellCenter({ reel, row: 3200 / 564 }, game.presentation).y;
+      label.position.set(at.x, at.y);
+      label.alpha = 0;
+      labels.addChild(label);
+      const s = fast ? 0.5 : 1;
+      const rise = 600 * s, fade = 200 * s, wobble = 400 * s, fall = 600 * s, fadeOut = 200 * s;
+      const direction = Math.random() > 0.5 ? 1 : -1;
+      const riseTo = at.y - 200 * unit;
       const start = performance.now();
-      await new Promise<void>((resolve) => {
-        const frame = (now: number) => {
-          const elapsed = now - start;
-          if (skipped() || elapsed >= duration) {
-            resolve();
-            return;
-          }
-          if (native && clip) {
-            const time = (elapsed / duration) * clipSeconds;
-            native.update(time - trackTime);
-            trackTime = time;
-          }
-          requestAnimationFrame(frame);
-        };
-        frame(start);
-      });
-      layer.visible = false;
+      let fallFrom: number | undefined;
+      let frame = 0;
+      const item = {
+        stop: () => {
+          cancelAnimationFrame(frame);
+          active.delete(item);
+          label.destroy();
+        },
+      };
+      active.add(item);
+      const tick = (now: number) => {
+        const t = now - start;
+        if (t < fade) label.position.y = at.y + (riseTo - at.y) * power2Out(Math.min(1, t / rise));
+        else {
+          // The fall starts when the fade-in completes and overrides the rise.
+          fallFrom ??= at.y + (riseTo - at.y) * power2Out(Math.min(1, fade / rise));
+          label.position.y = fallFrom + (bottom - fallFrom) * power3In(Math.min(1, (t - fade) / fall));
+          const swing = ((t - fade) / wobble) % 2;
+          label.rotation = 0.08 * direction * sineInOut(swing <= 1 ? swing : 2 - swing);
+        }
+        const outAt = fade + fade * 2;
+        label.alpha = t < fade ? t / fade : t < outAt ? 1 : Math.max(0, 1 - (t - outAt) / fadeOut);
+        if (t >= outAt + fadeOut) item.stop();
+        else frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
     },
   };
 }
