@@ -903,11 +903,16 @@ export async function mountTavernEffects(
     async enterBonus() {
       // The authored entry animates the same chests that the HUD layers above the reels during play.
       stage.setAttribute("data-bonus-entry", "");
+      // 2_bonus_enter brings slot_symbols back 0 -> 1.
+      app.ticker.add(followSymbolAlpha, undefined, -10);
       try {
         reelhouse.visible = true;
         const entry = setMode("bonus");
+        followSymbolAlpha();
         if (entry) await waitForClip(entry);
       } finally {
+        app.ticker.remove(followSymbolAlpha);
+        reelHost.style.removeProperty("opacity");
         stage.removeAttribute("data-bonus-entry");
         updateReelhouse(0);
         app.render();
@@ -945,10 +950,13 @@ export async function mountTavernEffects(
           const y = (symbolAnchor.worldY - firstY) * reelhouse.scale.y;
           reelHost.style.translate = `0 ${y}px`;
         }
+        // 2_base_exit fades slot_symbols 1 -> 0; the reference symbols live in that slot.
+        followSymbolAlpha();
       };
       app.ticker.add(followReels, undefined, -10);
       try {
         await playClip(reelhouse, 2, "2_base_exit");
+        followSymbolAlpha();
         reelhouse.visible = false;
       } finally {
         app.ticker.remove(followReels);

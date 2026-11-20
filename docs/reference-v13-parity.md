@@ -95,7 +95,39 @@ From the bundle (`boardWin`, `animateBoardWins`, `playLineWinText`):
 - **Landscape/desktop background:** the reference covers a 5800×3800 box centred on the viewport (`QL` plus `JL`). Tavern now does the same, so very wide or short windows no longer push the table over the board.
 - ⚠️ Portrait still uses the earlier bottom-anchored camera (`presentation.camera.portraitBottom`).
 
-### HUD position — ✅ (structure ❌)
+### Free-spin HUD — ✅
+
+The reference feature HUD has **no Spin or Autoplay button**, because free spins run on their own. Tavern now follows the bundle templates `iU` (desktop/landscape) and `lU` (portrait):
+
+- **Desktop/landscape:** `[menu, balance, bet, win]`, then the bonus info `Wf`, then a column of Skip bonus above Turbo.
+  - `Wf` is a white box with TOTAL WIN (cyan, 1.3em) over the amount (1.8em), and below it a FREE SPINS | value row with a 0.2em × 2.8em divider. Boxes have a 0.25em black border and 0.75em radius, with a minimum width of 13em.
+  - In landscape `Wf` is scaled to 0.8, as in the reference `transform: scale(0.8)`.
+- **Portrait:** top row `[menu] [TOTAL WIN] [FREE SPINS] [skip / turbo]`, then `[balance] [bet] [win]` on three equal columns.
+- **Skip bonus (`i2`):** `#skip-bonus` is shown disabled (opacity 0.7), because the mock backend cannot skip a feature.
+- Checked at 1280×720, 844×390 and 390×844.
+
+### Symbols during the bonus transition — ✅
+
+The reference symbols live in the reelhouse `slot_symbols` slot, so they fade with it. The skeleton keys this slot as follows:
+
+- `2_base_exit` fades it 1 → 0 between 0.2 and 0.67 s.
+- `2_bonus_enter` brings it back 0 → 1 by 0.42 s.
+- `2_bonus_exit` and `2_base_enter` fade it the same way.
+
+Tavern's symbol canvas now follows the slot alpha during `prepareBonusIntro` and `enterBonus`, in addition to the game entry and Total Win paths. Before this change, the frame faded while the symbols stayed bright.
+
+### Buy screen bottom panel — ✅
+
+The reference `.bottom-panel.svelte-1vd6a7q` uses the buy-screen font: `min(16px, w/58, h/22.5)`, or `min(16px, w/20)` when `h > w && w < 768`.
+
+- **Panel:** 0.75em from the bottom, padding 0.45em 0.9em 0.45em 1.2em, background `rgba(9,13,14,.7)`, 0.75em radius, 1.1em gap.
+- **Text:** label 0.8em, value 1.15em.
+- **Bet button:** 2.6em tall, at least 6em wide.
+- **Portrait:** full width in a column, with padding 0.35em 0.5em.
+
+Tavern used fixed sizes of 7, 11 and 18 px. It now uses `--buy-unit`; at 1280×720 the label is 12.8 px and the value 18.4 px.
+
+### HUD position — ✅ (base structure ❌)
 
 - The reference `.game-wrap` uses flex `justify-content: center` around `.desktop-panel-wrap`, which holds the Buy button and the main panel. Tavern now centres the HUD on the viewport.
   - Previously it was anchored to the reel frame's right edge, and shifted to `left: 48%` below 670 px.
@@ -120,20 +152,20 @@ These notes come from the bundle and are prepared for tasks 10–12. The generat
 | autoplay | `s2` | `s-autoplay` |
 | turbo | `_u` | `s-turbo` |
 | buy | `t2` | `s-buy` |
-| bonus info | `Wf` | `s-bonus-info` |
+| bonus info (TOTAL WIN + FREE SPINS) | `Wf` | `s-bonus-info` |
 | skip bonus | `i2` | `s-skip-bonus` |
-| free-spin total | `zf` | — |
+| static bet (feature) | `zf` | `s-bet-static` |
 
 Panels use `s-panel-desktop` and `s-panel-portrait`. The game wrap uses `s-game-wrap`.
 
 ### Structure
 
 - **Desktop/landscape base:** `[buy] main-panel[ texts[menu, balance, win] + bet-controls[ bet-indicator[indicator, up/down], bet-button[spin, (autoplay, turbo)] ] ]`. The panel has `min-width: 60em`, height `6.5em`, and gap `1em` to the Buy button.
-- **Desktop bonus:** `texts[menu, balance, fs-total, win] + info-panel[bonus info, (skip bonus, turbo)]`.
+- **Desktop bonus:** `texts[menu, balance, bet, win] + info-panel[bonus info, (skip bonus, turbo)]`. There is no Spin or Autoplay button in the feature.
 - **Portrait base:**
   - Top row: `panel-container-portrait[menu, (autoplay, spin, turbo), buy]`.
   - Below it: `info-bar[balance, bet(down, indicator, up), win]`.
-- **Portrait bonus:** `bonus-panel[menu, bonus info, (skip bonus, turbo)]` plus `info-bar.bonus[balance, fs-total, win]`.
+- **Portrait bonus:** `bonus-panel[menu, bonus info, (skip bonus, turbo)]` plus `info-bar.bonus[balance, bet, win]`.
 
 ### States
 
@@ -164,7 +196,7 @@ Panels use `s-panel-desktop` and `s-panel-portrait`. The game wrap uses `s-game-
 
 ## Remaining gaps and next steps
 
-1. **HUD rebuild (tasks 10–12):** rebuild the normal, free-spin, buy and confirm screens from the structure and `hud.reference.css` above. Keep the existing ids (`#spin`, `#bet-picker`, `#bet-up`, `#bet-down`, `#buy`, `#auto`, `#speed`, `#balance`, `#win-value`, `#feature-total`, `#free-spins`, `#menu`, `#auto-add`) and the game logic. On 1380×172 the HUD still looks different from the reference.
+1. **HUD rebuild (tasks 10, 12):** the free-spin HUD and the buy-screen bottom panel are done. Still to rebuild: the normal HUD, the buy cards and the confirm popup, from the structure and `hud.reference.css` above. Keep the existing ids (`#spin`, `#bet-picker`, `#bet-up`, `#bet-down`, `#buy`, `#auto`, `#speed`, `#balance`, `#win-value`, `#feature-total`, `#free-spins`, `#menu`, `#auto-add`) and the game logic. On 1380×172 the HUD still looks different from the reference.
 2. **Space during a round:** the reference skips the presentation (`ge.skip`) and plays a flash. Turbo values are then used and the result wait drops to 20 + 90 ms. Tavern does not do this yet.
 3. **Free-spin timing:**
    - The reference waits 300 + 150 ms (turbo 50 ms) between exit and reveal, and 450 / 200 ms after the reveal. Tavern uses the base values.

@@ -89,7 +89,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
      <button id="spin" class="spin-button" popovertarget="auto-panel" popovertargetaction="hide" disabled aria-label="Spin">${hudIcon("spin")}</button>
      <button id="auto-add" type="button" class="auto-add" aria-label="Add ${controls?.autoTopUp ?? 0} autoplay spins" hidden>+${controls?.autoTopUp ?? 0}</button>
     </div>
-    <div class="hud-quick"><button id="auto" aria-label="Autoplay">${hudIcon("autoplay")}</button><button id="speed" aria-label="Turbo" aria-pressed="false">${hudIcon("turbo")}</button></div>
+    <div class="hud-quick"><button id="auto" aria-label="Autoplay">${hudIcon("autoplay")}</button><button id="skip-bonus" class="skip-bonus" type="button" aria-label="Skip bonus" disabled>${hudIcon("skip")}</button><button id="speed" aria-label="Turbo" aria-pressed="false">${hudIcon("turbo")}</button></div>
    </div>
    <div class="hud-aux"><button id="rules" aria-label="Rules and paytable">ⓘ</button><button id="sound" aria-label="Toggle sound" aria-pressed="false">♫</button></div>
    <div id="auto-panel" class="tavern-hud-panel"></div>
