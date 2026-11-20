@@ -8,7 +8,7 @@
     "concurrency": 4,
     "retries": 1,
     "assets": {
-      "atlas": { "src": "hd/td_master.atlas" },
+      "atlas": { "src": "{quality}/td_master.atlas" },
       "symbols.low": { "src": "td_symbols_low.skel" },
       "symbols.high": { "src": "td_symbols_high.skel" },
       "symbols.wild": { "src": "td_symbols_wild.skel" },
@@ -358,8 +358,8 @@
       "gameLogo": "tavern-assets/assets/td_loader.webp",
       "brandIntro": {
         "src": "tavern-assets/assets/paperclip-rMFDawAD.gif",
-        "durationMs": 1600,
-        "holdUntilReady": true
+        "durationMs": 2700,
+        "holdUntilReady": false
       }
     },
     "winDimmerOpacity": 0.5,

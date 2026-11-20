@@ -51,7 +51,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const controls = game.presentation.controls;
   const gameMenuEnabled = controls?.menu ?? false;
   root.innerHTML = `
- <main class="game-shell tavern-shell" data-mode="base">
+ <main class="game-shell tavern-shell" data-mode="base"${matchMedia("(prefers-reduced-motion: reduce)").matches ? "" : " data-native-scene"}>
   <header class="tavern-top">
     <time id="game-clock"></time> | <span id="game-title"></span>
   </header>
@@ -278,6 +278,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     layoutMode,
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
+    // Fall back to the DOM art (it fetches the hd atlas pages only now).
+    root.querySelector(".tavern-shell")?.removeAttribute("data-native-scene");
     return undefined;
   });
   const paylineAssets = Promise.allSettled([

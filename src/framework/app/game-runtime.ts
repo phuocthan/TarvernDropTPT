@@ -3,6 +3,7 @@ import type { BrandLoader } from "../presentation/brand-loading.ts";
 import { resolveResourceUrl } from "../remote/asset-resolver.ts";
 import { ResourceManager, ResourceStore } from "../resources/resource-manager.ts";
 import { browserResourceDriver } from "../resources/browser-driver.ts";
+import { detectAssetQuality } from "../resources/asset-quality.ts";
 import { Disposables } from "../shared/disposables.ts";
 
 const store = new ResourceStore(browserResourceDriver);
@@ -23,7 +24,8 @@ export class GameRuntime {
     }
     this.resources = new ResourceManager(manifest, store,
       (src, base) => resolveResourceUrl(src, base, { baseUrl,
-        locale: game.currency?.locale, brand: game.resources?.brand, version: game.resources?.version }));
+        locale: game.currency?.locale, brand: game.resources?.brand, version: game.resources?.version,
+        quality: detectAssetQuality(navigator as Navigator & { deviceMemory?: number }, location.search) }));
   }
   async prepare(loader?: Pick<BrandLoader, "update">) {
     const unsubscribe = this.resources.onProgress(({ completed, total }) => {

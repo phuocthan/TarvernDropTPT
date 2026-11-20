@@ -127,6 +127,47 @@ The reference `.bottom-panel.svelte-1vd6a7q` uses the buy-screen font: `min(16px
 
 Tavern used fixed sizes of 7, 11 and 18 px. It now uses `--buy-unit`; at 1280×720 the label is 12.8 px and the value 18.4 px.
 
+### Loading and texture quality — ✅
+
+**Brand intro.** The reference intro (`c8`) waits for the GIF and the Outfit fonts, then shows the GIF on black (up to 550 px wide) for 2.7 s.
+
+- During the GIF the reference only downloads assets. Pixi Assets decodes images in a worker, and `.skel` files stay binary until a Spine is created.
+- After the GIF comes a static loader (`mV`):
+  - background `td_loader_bg`;
+  - studio logo 500 px wide, moved down 100 px;
+  - game logo at most 720 px wide, scaled 0.8 and moved down 60 px;
+  - the group sits 11 % above centre, with a 2rem gap;
+  - the whole loader is scaled by `min(h/900, w/700, 1)`;
+  - a 2rem percentage sits 20 px from the bottom.
+- The renderer and the scenes are built behind that static loader.
+
+**Before this change, Tavern** set `holdUntilReady: true`. The GIF therefore stayed up while WebGL and the Spine scenes were built, and it froze: there was a 342 ms main-thread frame on desktop, and longer on phones.
+
+**Now, Tavern:**
+
+- plays the GIF for 2.7 s;
+- then shows the static loader with the percentage;
+- the GIF period has no long frame, and the heaviest frame (about 145 ms) falls on the static loader.
+
+**Texture tier.** The reference `JT()` picks the texture quality by device:
+
+| Device | Atlas |
+| --- | --- |
+| iOS / iPadOS | `sd` |
+| Android with reported `deviceMemory` > 8 | `hd` |
+| Other Android | `sd` |
+| Desktop | `hd` |
+
+- `sd` is a single 4096×3921 page at atlas scale 0.225, about 3 MB.
+- `hd` is five 4096² pages at scale 0.5, about 8.8 MB download and roughly 320 MB GPU memory once uploaded. Uploading those pages causes hitches when a new screen first uses them.
+
+In `fw-pixi`:
+
+- `resources/asset-quality.ts` implements the same rule, with a `?quality=hd|sd` override for testing.
+- Resource sources can use the `{quality}` placeholder.
+- Tavern loads `{quality}/td_master.atlas`.
+- The DOM fallback art inside the stage is not painted while the Spine scene runs (`data-native-scene`), so phones no longer download the hd pages for it. If the scene fails to load, the attribute is removed and the fallback art loads.
+
 ### Bets and prices — ⚠️ (pending client confirmation)
 
 The client sent only the range KRW 200–200,000. A permitted ladder was not sent. On the user's instruction (20 November 2026), Tavern uses the reference USD step pattern ($0.01–$10.00) scaled by 20,000:

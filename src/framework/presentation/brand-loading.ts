@@ -24,7 +24,9 @@ export function mountBrandLoader(
   logos.className = "brand-loading-logos";
   const brandIntro = config.brandIntro;
   const directToLanding = brandIntro?.holdUntilReady === true;
-  if (!brandIntro || (reducedMotion && !directToLanding)) {
+  // Reference v13: after the brand GIF, a static loader (studio logo, game logo, percent)
+  // stays up while the renderer and Spine scenes are built, so the GIF never stalls.
+  if (!directToLanding) {
     const brand = new Image();
     brand.className = "brand-loading-studio";
     brand.src = assetUrl(config.brandLogo);
@@ -50,10 +52,18 @@ export function mountBrandLoader(
   reload.hidden = true;
   reload.onclick = () => location.reload();
   screen.append(logos, progress, reload);
+  // Reference .loader: transform: scale(min(h < 900 ? h / 900 : 1, w < 700 ? w / 700 : 1)).
+  const fitLogos = () => {
+    const scale = Math.min(innerHeight < 900 ? innerHeight / 900 : 1, innerWidth < 700 ? innerWidth / 700 : 1);
+    screen.style.setProperty("--brand-loader-scale", String(scale));
+  };
+  fitLogos();
+  addEventListener("resize", fitLogos);
   const wasInert = root.inert;
   root.inert = true;
   root.setAttribute("aria-busy", "true");
   root.after(screen);
+  if (!brandIntro && !directToLanding) progress.hidden = false;
   let intro: HTMLElement | undefined;
   let introFinished = Promise.resolve();
   const afterPaint = () => new Promise<void>((resolve) => {
@@ -83,6 +93,7 @@ export function mountBrandLoader(
       }
       if (!directToLanding) {
         panel.remove();
+        progress.hidden = !reload.hidden;
         if (reload.hidden) await new Promise<void>((resolve) => setTimeout(resolve, 200));
       }
     })();
@@ -140,6 +151,7 @@ export function mountBrandLoader(
           await fade.finished.catch(() => undefined);
         }
         if (reload.hidden) {
+          removeEventListener("resize", fitLogos);
           screen.remove();
           root.inert = wasInert;
           root.removeAttribute("aria-busy");
