@@ -1898,3 +1898,11 @@ dialog.info-screen p {
     border-radius: calc(.6 * var(--buy-unit));
   }
 }
+
+/* Reference v13 .buy-card.disabled: a card that costs more than the balance fades to 0.6
+   and ignores input (no hover lift, no confirm). */
+.tavern-dialog[data-look="shop"] .shop-card:disabled {
+  opacity: .6;
+  pointer-events: none;
+  transform: none;
+}

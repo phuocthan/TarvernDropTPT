@@ -1167,7 +1167,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         .map(
           (option) => `
         <div class="shop-tile">
-          <button data-${option.kind}="${option.id}" class="shop-card ${option.kind}">
+          <button data-${option.kind}="${option.id}" class="shop-card ${option.kind}"${shopPrice(option) > controller.state!.balance ? " disabled" : ""}>
             ${shopArt(option)}
             <strong>${option.title}</strong>
             <b>${money(shopPrice(option))}</b>
