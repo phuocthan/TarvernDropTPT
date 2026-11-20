@@ -1057,17 +1057,10 @@ html:has(.tavern-shell) {
 :where(html[data-layout="landscape"]) .tavern-shell {
   --frame-width: min(62vw, 101svh);
 }
-:where(html[data-layout="landscape"]) .tavern-hud {
-  width: min(76vw, 670px);
-}
 :where(html[data-layout="landscape"]) .tavern-shell .machine {
   top: 45%;
 }
 @media (max-width: 670px) {
-  :where(html:not([data-layout="portrait"])) .tavern-hud {
-    left: 48%;
-    width: 81vw;
-  }
   :where(html:not([data-layout="portrait"])) .hud-bar { padding-inline: calc(1.25 * var(--hud-unit)); }
 }
 
@@ -1448,11 +1441,8 @@ html:has(.tavern-shell) {
 .share-card button { margin-top: 10px; }
 @media (min-width: 661px) {
   :where(html:not([data-layout="portrait"])) .tavern-hud {
+    /* Reference v13: .game-wrap centres .desktop-panel-wrap (buy + panel) as one unit. */
     bottom: calc(max(7px, env(safe-area-inset-bottom, 0px)) + clamp(10px, 2svh, 18px));
-    left: auto;
-    right: calc((100% - var(--frame-width)) / 2);
-    transform: none;
-    max-width: calc((100% + var(--frame-width)) / 2 - 12px);
   }
   :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-bar > :is(.hud-menu, .hud-balance, .win-value, .hud-bet) {
     position: relative;
