@@ -443,8 +443,7 @@
         "unitsPerRow": 564,
         "exit": {
           "durationMs": 340, "turboDurationMs": 90, "distance": 3400, "ease": "power3.in",
-          "rowStaggerMs": 40, "turboRowStaggerMs": 10, "reelStaggerMs": 0, "turboReelStaggerMs": 15,
-          "cutoffMs": 220, "cutoffDurationMs": 50
+          "rowStaggerMs": 40, "turboRowStaggerMs": 10, "reelStaggerMs": 0, "turboReelStaggerMs": 15
         },
         "enter": {
           "durationMs": 290, "turboDurationMs": 120, "startY": -2200, "rowStartStep": 100,

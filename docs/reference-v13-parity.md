@@ -53,7 +53,7 @@ The opt-in config is `presentation.drop.timeline`, implemented in `presentation/
 
 | Phase | Reference (normal / turbo) | Tavern config |
 | --- | --- | --- |
-| Exit | `y + 3400` over 340 / 90 ms, `power3.in`. At normal speed the tween is cut after 220 ms and finished in 50 ms. Rows start bottom first, 40 / 10 ms apart. Reels start together (turbo 15 ms apart). | `exit` |
+| Exit | `y + 3400` over 340 / 90 ms, `power3.in`, so the symbols visibly fall through the lower board. The 220 ms cut-and-finish-in-50 ms runs only when the player skips (`So()` fires only on `ge.skip`). Rows start bottom first, 40 / 10 ms apart. Reels start together (turbo 15 ms apart). | `exit` (no cutoff) |
 | Wait for result | 350 / 50 ms after the result arrives | `enter.waitMs`, `turboWaitMs` |
 | Enter | Start at `-2200 + row×100`, rest at `row×564`, over 290 / 120 ms. Ease is the CustomEase `M0,0 C0.566,0.382 0.689,1.015 …` (overshoots about 1.5 % and settles). Reels drop left to right, 70 / 15 ms apart; rows bottom first, 40 / 15 ms apart. | `enter` |
 | Land | Land state fires 250 ms before rest. Squash then runs: 1.1/0.88 for 70 ms → 0.94/1.06 for 90 ms → 1 for 120 ms. | `landLeadMs`, `presentation.landing` |

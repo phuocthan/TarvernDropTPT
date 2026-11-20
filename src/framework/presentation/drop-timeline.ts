@@ -18,7 +18,10 @@ export interface DropTimelineConfig {
     turboRowStaggerMs: number;
     reelStaggerMs: number;
     turboReelStaggerMs: number;
-    /** Normal speed only: at this time the fall is restarted from its current point... */
+    /**
+     * Optional, normal speed only: at this time the fall is restarted from its current point...
+     * (Reference v13 does this only when the player skips, so Tavern leaves it unset.)
+     */
     cutoffMs?: number;
     /** ...and finished within this time, with the same ease. */
     cutoffDurationMs?: number;
