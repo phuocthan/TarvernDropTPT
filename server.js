@@ -21,7 +21,8 @@ if (profile) {
 }
 
 const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_ID);
-const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ?? (onRailway ? "1" : "0")) === "1";
+const debugRequested = process.argv.includes("--bonus-debug");
+const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ?? (onRailway || debugRequested ? "1" : "0")) === "1";
 const localMockBonus = enableMockBonus && !onRailway;
 const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE ||
   (localMockBonus ? ".runtime/backend-debug-bonus.json" : ".runtime/backend-v1.json"), { mockGamePolicy, enableMockBonus });
@@ -161,4 +162,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end("Not found");
   }
-}).listen(Number(process.env.PORT) || 4000, localMockBonus ? "127.0.0.1" : "0.0.0.0");
+}).listen(Number(process.env.PORT) || (localMockBonus && debugRequested ? 4001 : 4000), localMockBonus ? "127.0.0.1" : "0.0.0.0");

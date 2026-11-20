@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -k \"node --watch --experimental-strip-types server.js\" \"vite --host 0.0.0.0\"",
     "start": "node --experimental-strip-types server.js",
+    "start:debug": "npm run build && node --experimental-strip-types server.js --bonus-debug",
     "build": "tsc --noEmit && vite build",
     "game:new": "node --experimental-strip-types tools/game.mjs new",
     "game:build": "node --experimental-strip-types tools/game.mjs build",
