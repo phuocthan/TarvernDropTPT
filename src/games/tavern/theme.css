@@ -1445,7 +1445,8 @@ html:has(.tavern-shell) {
 @media (min-width: 661px) {
   :where(html:not([data-layout="portrait"])) .tavern-hud {
     /* Reference v13: .game-wrap centres .desktop-panel-wrap (buy + panel) as one unit. */
-    bottom: calc(max(7px, env(safe-area-inset-bottom, 0px)) + clamp(10px, 2svh, 18px));
+    /* .fade-wrap is bottom: 0; .desktop-panel-wrap has margin-bottom: 1em (the HUD unit). */
+    bottom: calc(var(--hud-unit) + env(safe-area-inset-bottom, 0px));
   }
   :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-bar > :is(.hud-menu, .hud-balance, .win-value, .hud-bet) {
     position: relative;
@@ -1455,14 +1456,15 @@ html:has(.tavern-shell) {
     position: relative;
     top: calc((var(--hud-buy-size) - var(--base-bar-height)) / 2 - var(--base-bar-rise));
   }
-  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-spin-control { top: -10px; }
+  /* Offsets were tuned at the full 12px unit; scale them with the HUD on short screens. */
+  :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-spin-control { top: calc(-10 / 12 * var(--hud-unit)); }
   :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-quick #auto {
     position: relative;
-    top: -15px;
+    top: calc(-15 / 12 * var(--hud-unit));
   }
   :where(html:not([data-layout="portrait"])) .tavern-shell[data-mode="base"] .hud-quick #speed {
     position: relative;
-    top: -5px;
+    top: calc(-5 / 12 * var(--hud-unit));
   }
   :where(html:not([data-layout="portrait"])) .tavern-hud .hud-menu { anchor-name: --tavern-menu; }
   :where(html:not([data-layout="portrait"])) #hud-menu-panel:popover-open {
