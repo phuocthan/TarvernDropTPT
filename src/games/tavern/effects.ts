@@ -76,6 +76,8 @@ export async function mountTavernEffects(
   boardApp: Application,
   layoutMode?: LayoutModeWatcher,
   onMascotEvent?: (name: string) => void,
+  /** Reference reelhouseEvent (key_spawn, chest_spawn) and chestActivate sound hooks. */
+  onSceneEvent?: (type: "reelhouse" | "chestActivate", name?: string) => void,
 ) {
   const atlas = resources.url("atlas");
   const backgroundUrl = resources.url("scene.background");
@@ -108,6 +110,7 @@ export async function mountTavernEffects(
     autoUpdate: false,
   });
   const reelhouse = createReelhouse(app, false, resources);
+  reelhouse.state.addListener({ event: (_entry, event) => onSceneEvent?.("reelhouse", event.data.name) });
   const symbolAnchor = reelhouse.skeleton.findSlot("slot_symbols")?.bone
     ?? reelhouse.skeleton.findBone("slot_symbols");
   // The HTML reel canvas is outside Spine. Mirror the authored slot_symbols fade
@@ -709,6 +712,7 @@ export async function mountTavernEffects(
         const prefix = chestPrefix(reel);
         if (previousFeature) {
           const activating = playClip(reelhouse, 30 + reel, prefix + "activate");
+          onSceneEvent?.("chestActivate");
           chestActivations.set(reel, activating);
           reelhouse.state.addAnimation(30 + reel, prefix + "idle", true, 0);
           void activating.then(() => {

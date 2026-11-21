@@ -1,7 +1,15 @@
 import { Howl, Howler } from "howler";
 import type { AudioChannel, AudioCue } from "../presentation/audio.ts";
 
-interface Playback { howl: Howl; id: number; channel: AudioChannel }
+interface Playback { howl: Howl; id: number; channel: AudioChannel; gain: number }
+export interface CueOptions {
+  /** Volume relative to the channel level (default 1). */
+  gain?: number;
+  /** Playback rate (default 1). */
+  rate?: number;
+  /** Fade in from silence over this many milliseconds. */
+  fadeInMs?: number;
+}
 /** One Howl per source pack; aliases and sprite offsets do not decode the same file twice. */
 export class AudioBus<Cue extends string> {
   private files: Record<Cue, AudioCue>;
@@ -21,7 +29,7 @@ export class AudioBus<Cue extends string> {
     if (!Number.isFinite(value)) return;
     this.volumes[channel] = Math.max(0, Math.min(1, value));
     for (const active of this.playing.values()) for (const play of active)
-      if (play.channel === channel) play.howl.volume(this.volumes[channel], play.id);
+      if (play.channel === channel) play.howl.volume(this.volumes[channel] * play.gain, play.id);
   }
   unlock() {
     if (this.closed) return;
@@ -45,15 +53,23 @@ export class AudioBus<Cue extends string> {
     }
     return howl;
   }
-  cue(name: Cue, loop = false, channel: AudioChannel = "effects") {
+  has(name: Cue) { return !!this.files[name]; }
+  isPlaying(name: Cue) { return !!this.playing.get(name)?.size; }
+  cue(name: Cue, loop = false, channel: AudioChannel = "effects", options: CueOptions = {}) {
     if (this.closed || this.muted || !this.files[name]) return;
     const howl = this.pack(name);
     const id = typeof this.files[name] === "string" ? howl.play() : howl.play(name);
     if (id == null) return;
-    howl.volume(this.volumes[channel], id);
+    const gain = Math.max(0, options.gain ?? 1);
+    const volume = this.volumes[channel] * gain;
+    if (options.fadeInMs) {
+      howl.volume(0, id);
+      howl.fade(0, volume, options.fadeInMs, id);
+    } else howl.volume(volume, id);
+    if (options.rate && options.rate !== 1) howl.rate(options.rate, id);
     howl.loop(loop || (typeof this.files[name] !== "string" && !!this.files[name].loop), id);
     const active = this.playing.get(name) ?? new Set<Playback>();
-    const play = { howl, id, channel };
+    const play = { howl, id, channel, gain };
     active.add(play); this.playing.set(name, active);
     const remove = () => {
       active.delete(play);
@@ -68,6 +84,23 @@ export class AudioBus<Cue extends string> {
     };
     howl.on("end", ended, id); howl.once("stop", remove, id); howl.once("playerror", remove, id); howl.once("loaderror", failed);
     if (howl.state() === "unloaded") howl.load();
+  }
+  /** Fades every playing instance of a cue to a new gain and keeps it playing (music layers). */
+  setGain(name: Cue, gain: number, durationMs = 500) {
+    for (const play of this.playing.get(name) ?? []) {
+      play.gain = Math.max(0, gain);
+      const target = this.volumes[play.channel] * play.gain;
+      if (durationMs > 0) play.howl.fade(Number(play.howl.volume(play.id)), target, durationMs, play.id);
+      else play.howl.volume(target, play.id);
+    }
+  }
+  gain(name: Cue) {
+    const [play] = this.playing.get(name) ?? [];
+    return play?.gain ?? 0;
+  }
+  /** Restarts every playing instance of a cue from its beginning. */
+  restart(name: Cue) {
+    for (const { howl, id } of this.playing.get(name) ?? []) howl.seek(0, id);
   }
   stop(name: Cue) {
     const active = this.playing.get(name); this.playing.delete(name);

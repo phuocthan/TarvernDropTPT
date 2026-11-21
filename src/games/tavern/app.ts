@@ -21,6 +21,7 @@ import type { BrandLoader } from "../../framework/presentation/brand-loading.ts"
 import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framework/ui/index.ts";
 import { countPayout } from "../../framework/presentation/payout.ts";
 import { loadTavernAudio } from "./audio.ts";
+import { createTavernSoundscape } from "./soundscape.ts";
 import { mountMascot } from "./mascot.ts";
 import { observeLayoutMode } from "../../framework/presentation/layout-mode.ts";
 import type {
@@ -173,13 +174,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   const audio = await audioReady;
   runtime.lifetime.add(() => audio.dispose());
   loader?.update(80, 100);
-  let music = "";
+  // Reference sound director: ambience + three music layers per mode and the cue rules.
+  const sound = createTavernSoundscape(audio);
+  // Reference defaults: sound and music at 0.5, both on; they start with Press to continue.
+  audio.setLevel("effects", 0.5);
+  audio.setLevel("music", 0.5);
   function syncMusic(bonus: boolean) {
-    const cue = bonus ? "musicBonus" : "musicBase";
-    if (audio.muted || music === cue) return;
-    if (music) audio.stop(music);
-    music = cue;
-    audio.cue(music, true, "music");
+    sound.mode(bonus);
   }
   const {
     controller,
@@ -284,6 +285,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     view.app,
     layoutMode,
     onMascotEvent,
+    (type, name) => {
+      if (type === "chestActivate") sound.chestActivate();
+      else if (name) sound.reelhouseEvent(name);
+    },
   ).catch((error) => {
     console.warn("Tavern scene animations unavailable", error);
     // Fall back to the DOM art (it fetches the hd atlas pages only now).
@@ -321,7 +326,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   );
   function setBet(index: number) {
     if (controller.phase !== "ready" || controller.state?.feature) return;
-    audio.cue("bet");
+    sound.betLevel(index, game.bets.length);
     betIndex = index;
     sync();
   }
@@ -744,17 +749,18 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         }
         view.clearHighlight();
       } else {
-        let scatterLanded = 0;
+        let anticipating = false;
+        sound.reveal();
         if (checkpoint?.staticResult) view.setBoard(outcome.state.board);
         else await view.stop(outcome.state.board, effects?.playSceneEffects, {
-          reel: (reel) => audio.cue(`reel${reel}`),
+          reel: (reel) => sound.reelStop(reel, turbo),
           symbol: (id) => {
-            if (id === game.presentation.drop.anticipation?.symbolId)
-              audio.cue(`scatter${Math.min(scatterLanded++, 3)}`);
+            if (anticipating && !turbo && !skipped) sound.anticipationSymbolReveal();
+            if (id === game.presentation.drop.anticipation?.symbolId) sound.scatterLand(turbo || skipped);
           },
           anticipation: (active) => {
-            if (active) audio.cue("anticipation", true);
-            else audio.stop("anticipation");
+            anticipating = active;
+            sound.anticipation(active);
             anticipationZoom(active);
           },
         });
@@ -776,7 +782,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           ? Math.max(0, presentingFeature.accumulated - outcome.spinWin)
           : undefined;
         sync();
-        if (outcome.wins.length) audio.cue("win");
         const animateWins = async () => {
           // Reference v13 animateBoardWins: lines accumulate (earlier lines stay lit); each
           // symbol of a line starts its win 40 ms after the previous (turbo/skip 5 ms), a line
@@ -784,6 +789,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           const lit: Position[] = [];
           for (const [index, win] of outcome.wins.entries()) {
             const fast = () => turbo || skipped;
+            sound.lineWin(win.amount / outcome.bet, turbo);
             payline.show(win, game.lines[win.line], money(win.amount), win.amount >= outcome.bet * 20, fast());
             for (const position of win.positions)
               if (!lit.some((p) => p.reel === position.reel && p.row === position.row)) lit.push(position);
@@ -801,6 +807,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
             if (outcome.entry || outcome.retrigger) {
               await delay(outcome.entry ? 380 : turbo || skipped ? 300 : 500);
               celebrate();
+              sound.scatterWin();
             }
             await view.focusWins(scatter);
           }
@@ -823,13 +830,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         countingFeatureBase = undefined;
         syncWin(presentingFeature);
         if (outcome.retrigger) {
-          audio.cue("retrigger");
           effects?.shake();
           await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
         }
       }
       if (outcome.entry) {
         stopAuto();
+        sound.bonusIntro();
         audio.cue("entry");
         await effects?.prepareBonusIntro();
         stage.dataset.bonusIntro = "true";
@@ -866,6 +873,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         sync();
         delete stage.dataset.bonusIntro;
         audio.cue("entryEnd");
+        sound.bonusEnter();
         syncMusic(true);
         await Promise.all([bonusEntry, reveal]);
       }
@@ -874,9 +882,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       sync();
       if (checkpoint.curStep === "show-chest") {
         await waitBeforeFeatureResult();
-        if (music) audio.stop(music);
-        music = "";
-        audio.cue("chestIntro");
+        sound.chestFinalWinIntro();
         await effects?.revealChests(money(checkpoint.displayWinMinor));
         await delay(2000);
       } else {
@@ -887,7 +893,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           for (const [index, chest] of (presentingFeature?.chests ?? []).entries())
             if (index !== reel && chest.multiplier != null) effects?.restoreChest(index, chest.multiplier);
         }
-        audio.cue(`chest${Math.min(reel, 3)}`);
+        sound.chestOpen();
         if (effects) await effects.openChest(reel, checkpoint.multiplier!);
         else $("chests").children[reel].outerHTML = chestMarkup(presentingFeature!.chests[reel], reel, true);
         const finishing = effects?.finishChest(reel);
@@ -904,9 +910,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const unlocked = chests.map((chest, reel) => ({ chest, reel }))
         .filter(({ chest }) => chest.unlocked && chest.multiplier != null);
       if (unlocked.length) {
-        if (music) audio.stop(music);
-        music = "";
-        audio.cue("chestIntro");
+        sound.chestFinalWinIntro();
         const fallback = effects ? undefined : document.createElement("strong");
         if (fallback) {
           fallback.className = "chest-result-fallback";
@@ -924,14 +928,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         if (!effects) stage.dataset.chestReveal = "true";
         await delay(2000);
         for (const [index, { chest, reel }] of unlocked.entries()) {
-          audio.cue(`chest${Math.min(index, 3)}`);
+          sound.chestOpen();
           if (effects) await effects.openChest(reel, chest.multiplier!);
           else $("chests").children[reel].outerHTML = chestMarkup(chest, reel, true);
         }
         let runningAmount = c.accumulated;
         for (const [index, { chest, reel }] of unlocked.entries()) {
           const nextAmount = Math.min(runningAmount * chest.multiplier!, c.featureAward);
-          audio.cue(`multiplier${index}`);
+          sound.multiplierAdd();
           const animation = effects?.finishChest(reel);
           if (effects) await delay(650);
           if (runningAmount !== nextAmount) audio.cue("count");
@@ -969,7 +973,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       );
       const amount = money(c.featureAward);
       renderAmount(dialog.querySelector<HTMLElement>(".result-total")!, amount, "td_gold");
-      audio.cue("totalIntro");
+      sound.totalWinIntro();
       const resultArt = dialog.querySelector<HTMLElement>(".tavern-screen-art")!;
       const enter = effects?.showScreen(resultArt, "total_win_start", {
         amount, idle: "total_win_idle", outro: "total_win_end",
@@ -1052,6 +1056,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       autoRemaining--;
       autoRunning = autoRemaining > 0;
     }
+    // Reference finalWin: the whole round's award in bets, once the round has ended.
+    if (!controller.state?.feature)
+      sound.finalWin((outcome.completion?.roundAward ?? outcome.spinWin) / outcome.bet);
     sync();
     syncMusic(!!controller.state?.feature);
     scheduleNextSpin(noWinReelsStoppedAt);
@@ -1097,6 +1104,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     if (!recover) {
       view.start(turbo, reelMotion);
       effects?.spin();
+      if (!controller.state?.feature) sound.betStart();
       audio.cue("start");
     }
     const work = recover
@@ -1175,8 +1183,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   $("sound").onclick = () => {
     audio.unlock();
     audio.muted = !audio.muted;
-    if (audio.muted) music = "";
-    else syncMusic(!!controller.state?.feature);
+    if (!audio.muted) syncMusic(!!controller.state?.feature);
     sync();
   };
   $("auto").onclick = () => {
@@ -1381,6 +1388,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     };
   }
   $("buy").onclick = () => {
+    sound.buttonClick(true);
     if (controller.phase !== "ready" || controller.state?.feature) return;
     stopAuto();
     if (chance !== "standard") {
@@ -1547,6 +1555,13 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       hud.inert = true;
       if (controller.state) $("balance").textContent = money(controller.state.balance);
       shell.append(opening);
+      // Reference startGame: the Continue press starts the entry sting, ambience and music.
+      opening.addEventListener("click", () => {
+        audio.unlock();
+        audio.muted = false;
+        syncMusic(!!controller.state?.feature);
+        sync();
+      }, { once: true });
       const landing = effects?.showOpening();
       await landing;
       loader?.update(95, 100);
