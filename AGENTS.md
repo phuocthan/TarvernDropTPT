@@ -19,6 +19,8 @@ Use `fw-pixi` as the framework name in current source, documentation and filenam
 
 # Next-session context
 
+To resume the latest work, read `.runtime/resume-2026-11-21.md` first (local only, gitignored). It records the current state after M2 re-review 2, open items and how to publish when asked.
+
 For the next game comparison work, start with `docs/handoff-2026-11-19.md` and `docs/game-comparison-test-plan.md`.
 
 For reference v13 parity work (scene, drop, round pacing, wins, HUD), read `docs/reference-v13-parity.md` first. It records the bundle evidence, what matches and the remaining gaps.
