@@ -10,6 +10,7 @@
 # korRelease exports
 
 - Exclude AI-related documentation from exports to `phuocthan/DropTarvernRelease/korRelease`, including prompts, AI handoff notes, and assistant transcripts.
+- Anything published to `DropTarvernRelease` (root or `korRelease/`) or to the client GitLab must contain no trace of AI: no AI-related files, wording or mentions in docs, code comments, commit messages, tag messages or MR text, and no AI attribution trailers (`Co-Authored-By`, session links). Release and GitLab commits use the user identity only.
 - Export all documentation in English. Translate included documents and verify the English copy before publishing.
 
 # Framework naming
