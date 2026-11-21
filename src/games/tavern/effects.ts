@@ -727,6 +727,7 @@ export async function mountTavernEffects(
     clearScreenDim();
     observer.unobserve(host);
     host.removeAttribute("data-spine-ready");
+    host.removeAttribute("data-spine-pending");
     host.removeAttribute("data-spine-amount");
     host.removeAttribute("data-spine-count");
     host = scene;

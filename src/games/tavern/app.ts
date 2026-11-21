@@ -547,6 +547,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     renderAmount(value, count ? money(count.from) : text, "td_gold");
     const art = document.createElement("div");
     art.className = "tavern-screen-art";
+    // The Spine screen replaces the DOM text; hide it before the renderer is ready (no flash).
+    if (effects) art.dataset.spinePending = "";
     overlay.append(title, art, value);
     root.append(overlay);
     const update = (amount: number) => {
@@ -585,6 +587,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     title.textContent = stages[0].label;
     const art = document.createElement("div");
     art.className = "tavern-screen-art";
+    // The Spine screen replaces the DOM text; hide it before the renderer is ready (no flash).
+    if (effects) art.dataset.spinePending = "";
     const value = document.createElement("span");
     value.className = "win-celebration-value";
     renderAmount(value, money(0), "td_gold");
@@ -830,7 +834,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         await effects?.prepareBonusIntro();
         stage.dataset.bonusIntro = "true";
         modal(
-          `<div class="tavern-screen-art bonus-intro-art"></div>
+          `<div class="tavern-screen-art bonus-intro-art"${effects ? " data-spine-pending" : ""}></div>
           <h2>${outcome.entry.toUpperCase()} BONUS</h2>
           <img class="bonus-preview" src="${asset(outcome.entry === "drop" ? "td_super.webp" : "td_bonus.webp")}" alt="">
           <strong class="free-spin-title">${outcome.state.feature!.remaining} Free Spins</strong>
@@ -956,7 +960,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const shell = stage.parentElement!;
       shell.dataset.totalWin = "shown";
       modal(
-        `<div class="tavern-screen-art total-win-screen"></div>
+        `<div class="tavern-screen-art total-win-screen"${effects ? " data-spine-pending" : ""}></div>
         <h2>${artRegion("totalWin", "total-win-art")}<span class="visually-hidden">Total Win</span></h2>
         <strong class="result-total bonus-paid" aria-live="polite">${money(c.featureAward)}</strong>
         <button id="continue" class="scene-continue">Press to continue</button>`,

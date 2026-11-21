@@ -1161,8 +1161,8 @@ html:has(.tavern-shell) {
 .tavern-screen-art:empty {
   display: none;
 }
-.win-celebration:has([data-spine-ready]) strong,
-#modal-content:has(> .tavern-screen-art[data-spine-ready]) > h2 {
+.win-celebration:has(:is([data-spine-ready], [data-spine-pending])) strong,
+#modal-content:has(> .tavern-screen-art:is([data-spine-ready], [data-spine-pending])) > h2 {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1176,10 +1176,10 @@ html:has(.tavern-shell) {
   overflow: hidden;
   clip-path: inset(50%);
 }
-#modal-content:has(> .tavern-screen-art[data-spine-ready]) > :is(.bonus-preview, .bonus-instructions) {
+#modal-content:has(> .tavern-screen-art:is([data-spine-ready], [data-spine-pending])) > :is(.bonus-preview, .bonus-instructions) {
   display: none;
 }
-#modal-content:has(> .tavern-screen-art[data-spine-ready]) > .free-spin-title {
+#modal-content:has(> .tavern-screen-art:is([data-spine-ready], [data-spine-pending])) > .free-spin-title {
   font-size: clamp(20px, 3.5vw, 36px);
   margin-block: 4px;
 }
@@ -1235,7 +1235,7 @@ html:has(.tavern-shell) {
   opacity: 1;
   cursor: default;
 }
-#modal-content:has(> .tavern-screen-art[data-spine-ready]) > .scene-continue {
+#modal-content:has(> .tavern-screen-art:is([data-spine-ready], [data-spine-pending])) > .scene-continue {
   position: fixed;
   inset: auto 0 7svh;
   margin: auto;
