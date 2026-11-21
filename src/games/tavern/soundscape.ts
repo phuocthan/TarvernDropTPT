@@ -19,6 +19,8 @@ const baseLayers: Layer[] = ["ambBase", "baseL0", "baseL1", "baseL2"];
 const bonusLayers: Layer[] = ["ambBonus", "bonusL0", "bonusL1", "bonusL2"];
 /** Reference `G()`: every audible layer drops to this level while a big screen plays. */
 const duckLevel = 0.05;
+/** Round-start cues under a still-playing coin cue. */
+const coinMaskGain = 0.35;
 
 export function createTavernSoundscape(audio: AudioBus<string>) {
   const target: Record<Layer, number> = {
@@ -83,10 +85,17 @@ export function createTavernSoundscape(audio: AudioBus<string>) {
       for (const layer of Object.keys(layers) as Layer[])
         if (target[layer] > duckLevel) set(layer, duckLevel);
     },
+    /**
+     * Gain for cues that start a new round. While the previous credit's coin cue still plays
+     * (an immediate next spin or held Space), they step back so the coins stay audible.
+     */
+    roundStartGain() {
+      return audio.isPlaying("shared_totalwin_coins") ? coinMaskGain : 1;
+    },
     betStart() {
       lineCount = 0;
       scatterCount = 0;
-      audio.cue("shared_click");
+      audio.cue("shared_click", false, "effects", { gain: this.roundStartGain() });
     },
     reveal() {
       lineCount = 0;
@@ -153,15 +162,20 @@ export function createTavernSoundscape(audio: AudioBus<string>) {
       if (name === "key_spawn") audio.cue("td_fs_start_keys");
       else if (name === "chest_spawn") audio.cue("td_fs_start_chests");
     },
-    /** Reference finalWin: the round's total in bets. */
+    /**
+     * The balance credit: one coin cue for every positive round total (the reference only
+     * plays it above 1×). Small credits get a quieter cue; zero stays silent. Callers must not
+     * use it for an already settled round shown after a reload.
+     */
     finalWin(multiplier: number) {
+      if (!(multiplier > 0)) return;
       if (multiplier > 50) {
         audio.cue("shared_totalwin_big");
         audio.cue("shared_totalwin_coins");
       } else if (multiplier > 1) {
         audio.cue("shared_totalwin");
         audio.cue("shared_totalwin_coins");
-      }
+      } else audio.cue("shared_totalwin_coins", false, "effects", { gain: 0.6 });
     },
     totalWinIntro() {
       this.duck();

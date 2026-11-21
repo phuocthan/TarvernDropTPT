@@ -1,9 +1,12 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { ProposalBackend, ProposalError } from "../../server/proposal-backend.ts";
-import { tavern } from "../../src/games/tavern/definition.ts";
+import { tavern as tavernDefinition } from "../../src/games/tavern/definition.ts";
 import type { Board } from "../../src/framework/domain/contracts.ts";
 import { beginReviewCapture } from "./fixtures/review-capture.ts";
 import { win79k, zeroWin } from "./fixtures/m2-rounds.ts";
+
+// The review fixtures were recorded at a ₩20,000 base bet (a first visit selects ₩1,000).
+const tavern = { ...tavernDefinition, defaultBet: 20000 };
 
 test.describe.configure({ timeout: process.env.M2_CAPTURE === "1" ? 180000 : 120000 });
 test.use({ reducedMotion: process.env.M2_REDUCED_MOTION === "1" ? "reduce" : "no-preference" });
@@ -75,14 +78,16 @@ test("portrait shows Chance base and costs, then restores the recorded KRW 79,00
     await page.locator("#buy").click();
     await page.locator("dialog[open]").getByRole("button", { name: new RegExp(mode + " chance", "i") }).click();
     await page.locator("#confirm-buy").click();
-    await expect(page.locator("#bet")).toHaveText("₩20,000");
-    await expect(page.locator("#chance-cost")).toContainText(cost);
-    await expect(page.locator("#chance-cost")).toBeVisible();
+    // BET shows the price of one spin as a single amount; there is no separate Cost line.
+    await expect(page.locator("#bet")).toHaveText(cost);
+    await expect(page.locator("#bet-label")).toHaveText(new RegExp(`^${mode} chance$`, "i"));
+    await expect(page.locator("#chance-cost")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
     if (process.env.M2_SCREENS === "1") await page.screenshot({ path: testInfo.outputPath(mode + "-chance.png"), timeout: 25000 });
     if (process.env.M2_CAPTURE === "1") await page.waitForTimeout(650);
     await page.locator("#buy").click();
-    await expect(page.locator("#chance-cost")).toBeHidden();
+    await expect(page.locator("#bet")).toHaveText("₩20,000");
+    await expect(page.locator("#bet-label")).toHaveText(/^bet$/i);
   }
   await page.locator("#spin").click();
   await expect.poll(() => calls.filter(({ body }) => body.isFreespin === 0).length).toBe(1);
@@ -307,7 +312,7 @@ test("portrait HUD keeps the full balance beside the bet arrows at ₩200,000 Su
   await page.locator("#buy").click();
   await page.locator("dialog[open]").getByRole("button", { name: /super chance/i }).click();
   await page.locator("#confirm-buy").click();
-  await expect(page.locator("#chance-cost")).toContainText("₩1,200,000");
+  await expect(page.locator("#bet")).toHaveText("₩1,200,000");
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: width === 320 ? 700 : 844 });
     await page.waitForTimeout(400);

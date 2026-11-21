@@ -38,6 +38,22 @@ export class AudioBus<Cue extends string> {
     if (first) this.pack(first);
     if (Howler.ctx?.state === "suspended") void Howler.ctx.resume().catch(() => undefined);
   }
+  /**
+   * Tries to start audio without a gesture. Resolves true only when the browser allows audible
+   * playback now; otherwise the context stays suspended until the next unlock() in a gesture.
+   */
+  async tryAutoplay(timeoutMs = 300): Promise<boolean> {
+    if (this.closed) return false;
+    this.unlock();
+    const context = Howler.ctx;
+    if (!context) return false;
+    if (context.state === "running") return true;
+    await Promise.race([
+      context.resume().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+    return (context.state as string) === "running";
+  }
   private pack(name: Cue) {
     const cue = this.files[name];
     const sources = typeof cue === "string" ? [cue] : [...cue.sources];

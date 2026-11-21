@@ -24,6 +24,7 @@ import { mountBetPicker, mountRoundPicker, updateBetTrack } from "../../framewor
 import { countPayout } from "../../framework/presentation/payout.ts";
 import { loadTavernAudio } from "./audio.ts";
 import { createTavernSoundscape } from "./soundscape.ts";
+import { browserStorage, createAudioPreferences } from "../../framework/audio/preferences.ts";
 import { mountMascot } from "./mascot.ts";
 import { observeLayoutMode } from "../../framework/presentation/layout-mode.ts";
 import type {
@@ -87,7 +88,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     <div class="hud-money" id="feature-total" hidden><span>Total win</span><strong id="feature-total-amount">0.00</strong></div>
     <div id="free-spins" hidden><span>Free spins</span> <strong id="feature-progress">0</strong></div>
     <div class="hud-bet">
-     <button id="bet-picker" type="button" class="hud-money hud-bet-amount" aria-label="Bet menu" aria-controls="bet-panel" aria-expanded="false" popovertarget="bet-panel" disabled><span id="bet-label">Bet</span><strong id="bet">1.00</strong><span id="chance-cost" hidden></span><span id="bet-track" role="meter" aria-label="Bet level" aria-valuemin="0"></span></button>
+     <button id="bet-picker" type="button" class="hud-money hud-bet-amount" aria-label="Bet menu" aria-controls="bet-panel" aria-expanded="false" popovertarget="bet-panel" disabled><span id="bet-label">Bet</span><strong id="bet">1.00</strong><span id="bet-track" role="meter" aria-label="Bet level" aria-valuemin="0"></span></button>
      <div class="bet-arrows"><button id="bet-up" aria-label="Increase bet">${hudIcon("bet-up")}</button><button id="bet-down" aria-label="Decrease bet">${hudIcon("bet-down")}</button></div>
     </div>
     <div class="hud-spin-control">
@@ -179,9 +180,21 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   loader?.update(80, 100);
   // Reference sound director: ambience + three music layers per mode and the cue rules.
   const sound = createTavernSoundscape(audio);
-  // Reference defaults: sound and music at 0.5, both on; they start with Press to continue.
-  audio.setLevel("effects", 0.5);
-  audio.setLevel("music", 0.5);
+  // Reference defaults: sound and music at 0.5, both on. A returning player's saved choice
+  // (speaker off, or a channel at 0) is restored before any sound can play.
+  const audioPrefs = createAudioPreferences(game.id,
+    { muted: false, levels: { effects: 0.5, music: 0.5 } }, browserStorage());
+  audio.setLevel("effects", audioPrefs.level("effects"));
+  audio.setLevel("music", audioPrefs.level("music"));
+  /** Starts sound unless the player turned it off; returns whether it is now audible. */
+  let audioStarted = false;
+  const startAudio = () => {
+    audioStarted = true;
+    audio.unlock();
+    audio.muted = audioPrefs.muted;
+    if (!audio.muted) syncMusic(!!controller.state?.feature);
+    return !audio.muted;
+  };
   function syncMusic(bonus: boolean) {
     sound.mode(bonus);
   }
@@ -397,18 +410,18 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     const bet = game.bets[betIndex];
     updateBetTrack($("bet-track"), betIndex, game.bets.length);
     const chanceActive = !feature && chance !== "standard";
-    const shownBet = money(feature ? (state?.round?.bet ?? presentingBet) : bet);
+    // BET shows the price of one spin: base bet × the Chance price (Normal 1×, Extra 3×,
+    // Super 6×). Free spins show the round's recorded base bet. The base bet, mode and charge
+    // stay separate in the round data; payouts and the cap still use the base bet.
+    const shownBet = money(feature
+      ? (state?.round?.bet ?? presentingBet)
+      : spinPrice(bet, chanceActive ? chance : "standard"));
     const chanceName = chance === "extra" ? "Extra Chance" : "Super Chance";
-    const cost = money(bet * game.demo.chancePrices[chance]);
-    $("bet-label").textContent = "Bet";
+    // Reference HUD: with a Chance mode active the label reads its name instead of "Bet".
+    $("bet-label").textContent = chanceActive ? chanceName : "Bet";
     $("bet").textContent = shownBet;
-    $("chance-cost").hidden = !chanceActive;
-    // Two parts so narrow portrait HUDs can stack them instead of widening the bet field.
-    $("chance-cost").innerHTML = chanceActive
-      ? `<span class="chance-mode">${chanceName}</span><span class="chance-sep"> · </span><span class="chance-price">Cost ${cost}</span>`
-      : "";
     $("bet-picker").setAttribute("aria-label", chanceActive
-      ? `Bet menu, current bet ${shownBet}, ${chanceName}, cost ${cost} per spin`
+      ? `Bet menu, ${chanceName}, current bet ${shownBet} per spin, base bet ${money(bet)}`
       : `Bet menu, current bet ${shownBet}`);
     const mode = feature?.mode || "base";
     const shell = stage.parentElement!;
@@ -483,10 +496,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     if (dialog.open && dialog.dataset.notice && (!kind || dialog.dataset.notice === kind)) dialog.close();
   };
   dialog.addEventListener("close", () => { delete dialog.dataset.notice; });
+  /** The charge for one base spin in a Chance mode; the base bet itself is unchanged. */
+  function spinPrice(base: number, mode: typeof chance) {
+    return base * game.demo.chancePrices[mode];
+  }
   const spinCost = (action: "spin" | "buy-tavern" | "buy-drop") =>
-    game.bets[betIndex] * (action === "spin"
-      ? game.demo.chancePrices[chance]
-      : game.demo.buyPrices[action === "buy-drop" ? "drop" : "tavern"]);
+    action === "spin"
+      ? spinPrice(game.bets[betIndex], chance)
+      : game.bets[betIndex] * game.demo.buyPrices[action === "buy-drop" ? "drop" : "tavern"];
   function showInsufficientBalance() {
     stopAuto();
     notice("balance", "Insufficient Balance",
@@ -797,7 +814,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     const delay = feature?.remaining ? nextSpinDelay(turbo ? 300 : 500) : 0;
     autoTimer = setTimeout(() => {
       autoTimer = null;
-      if (!dialog.open && controller.phase === "ready") void run("spin");
+      if (!dialog.open && controller.phase === "ready") {
+        finishWinCount?.();
+        void run("spin");
+      }
     }, delay);
   }
   async function present(outcome: Outcome, spinTurbo: boolean) {
@@ -858,6 +878,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
           !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
         noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
+        if (plainNoWin && displayWin) {
+          displayWin = 0;
+          syncWin(presentingFeature);
+        }
         basePresentationSkippable = ordinary && !plainNoWin;
         sync();
         if (!plainNoWin) {
@@ -1191,9 +1215,18 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       return;
     }
     if (!recover && controller.phase !== "ready") {
+      // The count can start while the completion is still being confirmed.
+      finishWinCount?.();
       skipRound();
       return;
     }
+    if (!recover && finishWinCount && action === "spin") {
+      // An early press while the HUD win still counts completes that total; the next press
+      // places the wager, so a new round cannot hide the amount just credited.
+      finishWinCount();
+      return;
+    }
+    finishWinCount?.();
     clearSpinTimer();
     if (!recover && !controller.state?.feature && controller.state &&
         spinCost(action) > controller.state.balance) {
@@ -1211,7 +1244,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     finishWinCount = undefined;
     setPhase(null);
     lineSkip = false;
-    displayWin = 0;
+    // A base spin keeps the previous total readable while the reels drop; it clears when the
+    // new result lands. Feature spins and buys start from zero as before.
+    if (recover || action !== "spin" || controller.state?.feature) displayWin = 0;
     syncWin(controller.state?.feature);
     const spinTurbo = turbo;
     audio.unlock();
@@ -1221,7 +1256,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       view.start(turbo, reelMotion);
       effects?.spin();
       if (!controller.state?.feature) sound.betStart();
-      audio.cue("start");
+      audio.cue("start", false, "effects", { gain: sound.roundStartGain() });
     }
     const work = recover
       ? controller.recover(!startupResume)
@@ -1355,6 +1390,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   $("sound").onclick = () => {
     audio.unlock();
     audio.muted = !audio.muted;
+    audioPrefs.save({ muted: audio.muted });
     if (!audio.muted) syncMusic(!!controller.state?.feature);
     sync();
   };
@@ -1614,22 +1650,25 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       for (const name of ["effects", "music"] as const)
         $(name + "-icon").innerHTML = hudIcon(audio.level(name) > 0 ? name : `${name}-muted`);
     };
-    // As in the reference menu, the icon mutes its channel or restores the last level.
-    const lastLevel = { effects: audio.level("effects") || 1, music: audio.level("music") || 1 };
+    // As in the reference menu, the icon mutes its channel or restores the last level. That
+    // level is saved, so unmuting returns to it after a reload as well.
     for (const channel of ["effects", "music"] as const) {
       const slider = $<HTMLInputElement>(channel + "-volume");
-      const apply = (level: number) => {
+      const apply = (level: number, remember = true) => {
         audio.unlock();
         audio.muted = false;
         audio.setLevel(channel, level);
-        if (level > 0) lastLevel[channel] = level;
+        audioPrefs.save({ muted: false, levels: { [channel]: level }, remember });
         slider.value = String(Math.round(level * 100));
         syncVolumeIcons();
         syncMusic(!!controller.state?.feature);
       };
       slider.value = String(Math.round(audio.level(channel) * 100));
-      slider.oninput = () => apply(Number(slider.value) / 100);
-      $(channel + "-icon").onclick = () => apply(audio.level(channel) > 0 ? 0 : lastLevel[channel]);
+      // While dragging, the level applies live; the level to return to is taken on release, so
+      // a drag down to 0 keeps the level from before the drag.
+      slider.oninput = () => apply(Number(slider.value) / 100, false);
+      slider.onchange = () => apply(Number(slider.value) / 100);
+      $(channel + "-icon").onclick = () => apply(audio.level(channel) > 0 ? 0 : audioPrefs.restoreLevel(channel));
     }
     syncVolumeIcons();
   }
@@ -1675,6 +1714,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const spin = $<HTMLButtonElement>("spin");
       if (!spaceHeld || autoRunning || dialog.open || controller.phase !== "ready" ||
           controller.state?.feature || transport.readyForWager === false || spin.disabled) return;
+      finishWinCount?.();
       void run("spin");
     }, 0);
   };
@@ -1722,6 +1762,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       initialState,
     });
     const entry = resolveSessionEntry(controller.state!);
+    // A resumed round keeps its recorded base bet (its mode travels with the round itself).
+    const recordedBet = controller.state?.round?.bet;
+    if (recordedBet !== undefined && game.bets.includes(recordedBet)) betIndex = game.bets.indexOf(recordedBet);
     view.app.ticker.maxFPS = 60;
     loader?.update(85, 100);
     const [reelhouse, fonts] = await paylineAssets;
@@ -1746,15 +1789,22 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       shell.append(opening);
       // Reference startGame: the Continue press starts the entry sting, ambience and music.
       opening.addEventListener("click", () => {
-        audio.unlock();
-        audio.muted = false;
-        syncMusic(!!controller.state?.feature);
+        if (!audioStarted) startAudio();
         sync();
       }, { once: true });
       const landing = effects?.showOpening();
       await landing;
       loader?.update(95, 100);
       await loader?.ready();
+      // Sound on by default: start at entry when the browser allows audible autoplay, else on
+      // the first Continue press. A saved "off" never starts it.
+      if (!audioPrefs.muted)
+        void audio.tryAutoplay().then((allowed) => {
+          if (allowed && !audioStarted) {
+            startAudio();
+            sync();
+          }
+        });
       const mascotReady = (async () => {
         // Paint the interactive landing before warming an invisible extra renderer.
         await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));

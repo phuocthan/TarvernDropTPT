@@ -43,7 +43,7 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 - A 5×5 board with 15 fixed paylines paying left to right, 3 or more of a kind. Wild substitutes for all symbols except Bonus.
 - The original drop motion: outgoing symbols fall out over 340 ms, new symbols drop in reel by reel, land with a squash and settle. Turbo uses the original shorter values.
 - Anticipation from two Bonus symbols: remaining reels slow, the camera zooms slightly and an anticipation sound plays.
-- Win presentation (original timing): a 500 ms pause after the reels (300 ms in Turbo or after a skip), then the lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). After the last line and any win screen, the **Win** amount counts up over 500 ms while Spin is already available. In Turbo, after a skip or while Space is held, the amount appears at once without counting, so a quick next spin cannot hide it.
+- Win presentation (original timing): a 500 ms pause after the reels (300 ms in Turbo or after a skip), then the lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). After the last line and any win screen, the **Win** amount counts up over 500 ms while Spin is already available. In Turbo, after a skip or while Space is held, the amount appears at once without counting. An early Spin or Space press while the amount still counts completes the total first; the next press places the wager. The total of a base spin stays in **Win** while the next reels drop and clears when the new result lands.
 - **Skip**: pressing Spin, a second Space tap or a tap on the play area during a round shortens it. During the drop the symbols still fall and land visibly, just faster. During the lines every line is still shown, with shorter gaps. A skip never places a wager. The [timing reference](milestone-2-evidence/rereview-2-reference-timing.md) lists the original values.
 
 **How to test**
@@ -60,7 +60,7 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 **Delivered**
 
 - HUD layouts for desktop, landscape phones and portrait phones, centered like the original and inside the safe area.
-- **Bet ladder (KRW).** The review baseline contains 22 steps, with a default of ₩20,000. The [25 approved base stakes](milestone-2-evidence/re-review-plan.md#approved-base-stakes) will replace that ladder in the re-review build.
+- **Bet ladder (KRW).** The review baseline contains 22 steps, with a first-visit default of ₩1,000 in Normal mode. A resumed round keeps its recorded bet and mode. The [25 approved base stakes](milestone-2-evidence/re-review-plan.md#approved-base-stakes) will replace that ladder in the re-review build.
 - **Turbo** can be toggled in the HUD. Holding Space for 0.4 s turns Turbo on until release; release restores the player's own setting.
 - **Autoplay**: 10, 25, 50, 100, 250, 500, 1,000 or unlimited rounds. The Spin button shows the remaining count; pressing it stops autoplay. **+10** adds rounds while autoplay runs. Autoplay stops on a bonus trigger, a Max Win, insufficient balance or any error.
 - **Space**: a press acts like Spin (spin when idle, skip during a round). **Holding Space** keeps playing, as in the original: a new wager starts each time the previous round has been presented and the server allows the next one, one wager at a time, until the key is released or the window loses focus. Keyboard auto-repeat never adds a wager.
@@ -79,7 +79,7 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 
 - **Menu** with Game Rules and separate **sound effects** and **music** volume sliders, each with a mute icon.
 - **Game Rules** with the paytable (live values from the game configuration), the 15 paylines, features, Extra/Super Chance prices, the max win (10,000× bet) and general rules.
-- Sound starts at volume 0.5 for effects and music, as in the original.
+- Sound is on by default at volume 0.5 for effects and music, as in the original. It starts at entry when the browser allows audible autoplay, otherwise on the first **Press to continue**. The speaker state and both volume levels are saved in the browser: a player who turned sound off (or a channel to 0) stays muted after a reload, in a new tab and on later visits, including after **Press to continue**. Turning sound back on is saved as well. Each channel also remembers the last audible level the player set: muting a channel and unmuting it returns to that level, also after a reload.
 
 **How to test**
 
@@ -95,14 +95,14 @@ The RTP line stays hidden until the client supplies the approved RTP figure. The
 
 - **Feature buy** opens a panel with four cards: **Extra Chance** (3× bet per spin), **Super Chance** (6× bet per spin, a triggered bonus is always the Drop Bonus), **Tavern Bonus** (125× bet) and **Drop Bonus** (300× bet). Prices are shown in KRW at the current bet and change with the panel's own bet −/+.
 - Each card opens a confirmation with its description and price. **Confirm** applies it; closing the confirmation (×) returns to the panel without changes.
-- With a Chance mode active, the HUD keeps the base bet prominent and shows the mode and the cost per spin below it (for example **Bet ₩20,000 · Super Chance · Cost ₩120,000**). On portrait phones the mode and cost stack on two lines so the balance and bet arrows keep their space.
+- **BET** shows the price of one spin as a single amount: at a ₩20,000 base it reads ₩20,000 in Normal, ₩60,000 in Extra Chance and ₩120,000 in Super Chance. As in the original, the label above the amount reads **Extra Chance** or **Super Chance** instead of **Bet** while that mode is active. There is no separate Cost line. Turning Chance off returns to ₩20,000. The mode, base bet and charge stay separate in the round data; payouts and the 10,000× cap use the base bet.
 - Cards that cost more than the balance are disabled (dimmed, as in the original).
 - **Tavern/Drop Bonus Buy** shows a confirmation with the price. In M2, **Confirm** shows **Bonus not available**: "Bonus Buy is currently unavailable. Your balance has not changed."
 
 **How to test**
 
 1. Open **Feature buy** at ₩20,000. Expected: ₩60,000, ₩120,000, ₩2,500,000 and ₩6,000,000 on the four cards.
-2. Choose **Extra Chance → Activate → Confirm** and spin. Expected: the bet label shows the chance mode and the balance goes down by ₩60,000. Press **Feature buy** again. Expected: the chance mode switches off and spins cost ₩20,000 again.
+2. Choose **Extra Chance → Activate → Confirm** and spin. Expected: the bet field reads **Extra Chance ₩60,000** and the balance goes down by ₩60,000. Press **Feature buy** again. Expected: the chance mode switches off and **BET** shows ₩20,000 again.
 3. Open Tavern Bonus and close the confirmation with ×. Expected: back in the panel, nothing changes. Open it again and press **Confirm**. Expected: the **Bonus not available** message; the balance is unchanged.
 4. Set the bet to ₩200,000 with a balance below ₩60,000,000. Expected: Drop Bonus is disabled.
 
@@ -117,7 +117,8 @@ The RTP line stays hidden until the client supplies the approved RTP figure. The
 **How to test**
 
 1. Play until a 10× or larger win, or use the cases in **Bonus debug** if enabled. Expected: the win screen with the correct tier name and sound, then the HUD win.
-2. Count the reel stop sounds on a normal spin. Expected: five stops, quieter in Turbo.
+2. Count the reel stop sounds on a normal spin. Expected: five stops heard one after another (about 0.4 s from first to last in Normal, about 0.13 s in Turbo or after a skip), quieter in Turbo.
+   - Balance credit: every positive round total plays one coin cue as the balance goes up (quieter up to 1× bet, with the total-win sting above 1× and the big sting above 50×). A zero win and a reload of an already settled round stay silent. When the next spin starts at once, its click and start cues step back while the coin cue is still playing.
 3. Watch for a 50× win. Expected: the mascot cheers once.
 4. Win on several lines. Expected: each line plays a win sound slightly higher than the one before, and background music gains a layer that fades out about 8 s after the last win.
 

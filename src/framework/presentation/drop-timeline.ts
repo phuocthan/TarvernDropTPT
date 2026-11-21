@@ -55,6 +55,8 @@ export interface DropTimelineConfig {
     skipWaitMs?: number;
     /** Skip while symbols move: the rest of the drop finishes within this time (keeps it visible). */
     skipRemainderMs?: number;
+    /** Shortest real time between two reel-stop cues, so stops are heard one after another. */
+    reelStopMinGapMs?: number;
   };
   anticipation?: {
     /** Anticipate a reel while the scatter count up to and including it is within [min, max]. */

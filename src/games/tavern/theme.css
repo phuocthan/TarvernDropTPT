@@ -1942,24 +1942,3 @@ dialog.info-screen p {
   background-image: none;
 }
 
-.tavern-hud #chance-cost {
-  display: block;
-  margin: 2px auto;
-  color: var(--hud-cyan, #40d9ef);
-  font-size: clamp(10px, calc(var(--hud-unit) * 1.1), 14px);
-  line-height: 1.18;
-  text-transform: none;
-  letter-spacing: normal;
-  white-space: nowrap;
-}
-.tavern-hud #chance-cost[hidden] { display: none; }
-/* Portrait: mode and cost stack on two lines, so the bet field keeps its width and the bet
-   arrows and balance keep their places at long KRW amounts (320 px phones). */
-:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-mode,
-:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-price { display: block; }
-:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-sep { display: none; }
-:where(html[data-layout="portrait"]) .tavern-hud .hud-bet-amount:has(#chance-cost:not([hidden])) {
-  height: auto;
-  min-width: 0;
-  padding: 3px 4px;
-}

@@ -424,6 +424,7 @@ export class BoardView {
     const visibleSkip = timeline.enter.skipRemainderMs !== undefined;
     const live = () => !!round && this.dropRound === round && (visibleSkip || !round.skipped);
     const stoppedReels = new Set<number>();
+    let lastReelStopAt = -Infinity;
     const landedScatters: SymbolView[] = [];
     let anticipating = false;
     let anticipationEnded = false;
@@ -461,7 +462,13 @@ export class BoardView {
       enterPlan.reelStops.forEach((at, reel) => {
         if (time < at || stoppedReels.has(reel)) return;
         stoppedReels.add(reel);
-        landing?.events?.reel?.(reel);
+        // Stops due in the same frame (a skip, or a stagger below one frame) still play as a
+        // short rolling sequence: each cue starts at least reelStopMinGapMs after the previous.
+        const now = performance.now();
+        const due = Math.max(now, lastReelStopAt + (timeline.enter.reelStopMinGapMs ?? 0));
+        lastReelStopAt = due;
+        if (due <= now) landing?.events?.reel?.(reel);
+        else setTimeout(() => { if (this.dropRound === round) landing?.events?.reel?.(reel); }, due - now);
       });
       const first = enterPlan.anticipation[0];
       if (!anticipating && first && time >= first.atMs) {
