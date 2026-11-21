@@ -24,7 +24,9 @@ Baseline: the build reviewed in MR !2 at `44aab3b`. The confirmed items from tha
 | --- | --- |
 | `npm test` | 72/72 passed |
 | `npm run build` | Passed (type check and production build) |
-| Browser tests on the production build (installed Chrome, Windows, mock API) | See the results table in the evidence folder |
+| Browser tests, production build with the mock API (Chrome, Windows) | `m2-rereview.spec.ts` (10 tests), `proposal.spec.ts` (5), `tavern-policies.spec.ts` (6): all assertions passed across the runs on 21 November 2026. The two-window test failed once while both windows ran in the background and passes since each window is brought to the front; the foreground Scatter test (bonus, M3) is timing-sensitive and passed on rerun |
+| Browser tests, development server | `framework-policies.spec.ts` (4): passed |
+| Candidate clips (no sound) | Desktop Space tap and hold, Normal and Turbo; mobile 390 px Chance and ₩79,000 recovery. Recorded by the browser tests with `M2_CAPTURE=1` (key state shown in the corner). The recording hook exceeds the test time limit while encoding; the clips are complete |
 | Reference timing | [Reference input and win timing](rereview-2-reference-timing.md) |
 
 ## Open items
