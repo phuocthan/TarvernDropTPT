@@ -177,17 +177,7 @@
             },
             "autoUnlimited": { "type": "boolean" },
             "autoTopUp": { "type": "integer", "minimum": 1 },
-            "betMenuCloseDelayMs": { "type": "integer", "minimum": 0 },
-            "bonusBuyNotice": {
-              "description": "Milestone gating: confirming a Bonus Buy shows this notice instead of buying.",
-              "type": "object",
-              "required": ["title", "body"],
-              "properties": {
-                "title": { "type": "string", "minLength": 1 },
-                "body": { "type": "string" }
-              },
-              "additionalProperties": false
-            }
+            "betMenuCloseDelayMs": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": false
         },

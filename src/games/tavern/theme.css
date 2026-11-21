@@ -1937,8 +1937,7 @@ dialog.info-screen p {
   transform: none;
 }
 
-/* The Spine scene draws the stage art from the quality-tier atlas (sd on phones). The DOM
-   fallback art inside the stage stays unpainted so it never downloads the hd pages. */
-.tavern-shell[data-native-scene] .stage .atlas-art {
+/* The projected table uses the active Spine atlas. Suppress the other DOM fallback art. */
+.tavern-shell[data-native-scene] .stage .atlas-art:not([data-spine-table]) {
   background-image: none;
 }

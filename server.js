@@ -23,13 +23,12 @@ if (profile) {
 
 const onRailway = Boolean(process.env.RAILWAY_ENVIRONMENT_ID);
 const debugRequested = process.argv.includes("--bonus-debug");
-// Optional developer override in the ignored .runtime folder: { "bonusDebug": true }.
-// Precedence: MOCK_DEBUG_BONUS env > --bonus-debug / Railway > local file > off.
+// Preserve the existing separate wallet file for explicit local debug runs.
 const localOverridePath = ".runtime/mock-server.local.json";
 const localOverride = existsSync(localOverridePath) ? JSON.parse(readFileSync(localOverridePath, "utf8")) : {};
-const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ??
-  (onRailway || debugRequested || localOverride.bonusDebug === true ? "1" : "0")) === "1";
-const localMockBonus = enableMockBonus && !onRailway;
+const enableMockBonus = (process.env.MOCK_DEBUG_BONUS ?? "1") === "1";
+const localMockBonus = enableMockBonus && !onRailway &&
+  (process.env.MOCK_DEBUG_BONUS === "1" || debugRequested || localOverride.bonusDebug === true);
 const proposal = new ProposalBackend(catalog, process.env.MOCK_API_DATA_FILE ||
   (localMockBonus ? ".runtime/backend-debug-bonus.json" : ".runtime/backend-v1.json"), { mockGamePolicy, enableMockBonus });
 proposal.sweepExpired();

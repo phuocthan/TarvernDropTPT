@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { ProposalBackend, ProposalError } from "../../server/proposal-backend.ts";
 import { tavern } from "../../src/games/tavern/definition.ts";
 
-async function enter(page: import("@playwright/test").Page) {
-  await page.goto("/?game=tarvern");
+async function enter(page: import("@playwright/test").Page, params = "") {
+  await page.goto("/?game=tarvern" + params);
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 45000 });
   await expect(page.locator(".brand-loading")).toHaveCount(0, { timeout: 45000 });
   await page.locator(".opening-continue").click();
@@ -98,7 +98,7 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     } catch (error) { await route.fulfill({ status: error instanceof ProposalError ? error.status : 500, json: { error: String(error) } }); }
   });
   try {
-    await enter(page);
+    await enter(page, "&cheat=1");
     await page.locator("#buy").click();
     const shopClose = await page.locator(".close-modal").boundingBox();
     expect(shopClose?.width).toBeCloseTo(61.2, 1);

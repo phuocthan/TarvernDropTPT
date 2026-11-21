@@ -130,7 +130,6 @@ export interface ReelPresentation {
      * Milestone gating: when set, confirming a Bonus Buy shows this notice instead of buying
      * (no charge, no bonus). The buy screen, prices and confirmation stay available.
      */
-    bonusBuyNotice?: { title: string; body: string };
   };
   checkWinDelayMs?: { normal: number; turbo: number };
   animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };

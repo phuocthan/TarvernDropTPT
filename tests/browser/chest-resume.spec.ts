@@ -119,7 +119,7 @@ for (const variant of variants) test(`v1 reload between chest reveals resumes th
   });
 
   try {
-    await page.goto("/?game=tarvern");
+    await page.goto("/?game=tarvern&cheat=1");
     await waitForOpening(page);
     await watchChests(page);
     await page.locator(".opening-continue").click();

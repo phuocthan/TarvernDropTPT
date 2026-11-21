@@ -48,10 +48,19 @@ export function artRegion(name: keyof typeof regions, className: string) {
 export function textureRegion(
   file: string,
   className: string,
+  pageSize: readonly [number, number],
+  bounds: readonly [number, number, number, number],
+) {
+  const { size, position } = atlasCrop(pageSize, bounds);
+  const [, , width, height] = bounds;
+  return `<span aria-hidden="true" class="atlas-art ${className}" style="--art-image:url(${tavernAsset(file)});--art-size:${size};--art-position:${position};--art-ratio:${width}/${height}"></span>`;
+}
+
+export function atlasCrop(
   [pageWidth, pageHeight]: readonly [number, number],
   [x, y, width, height]: readonly [number, number, number, number],
 ) {
   const size = `${(pageWidth / width) * 100}% ${(pageHeight / height) * 100}%`;
-  const position = `${(x / (pageWidth - width)) * 100}% ${(y / (pageHeight - height)) * 100}%`;
-  return `<span aria-hidden="true" class="atlas-art ${className}" style="--art-image:url(${tavernAsset(file)});--art-size:${size};--art-position:${position};--art-ratio:${width}/${height}"></span>`;
+  const position = `${(pageWidth === width ? 0 : x / (pageWidth - width)) * 100}% ${(pageHeight === height ? 0 : y / (pageHeight - height)) * 100}%`;
+  return { size, position };
 }

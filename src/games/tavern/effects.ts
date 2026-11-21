@@ -4,6 +4,7 @@ import {
   AttachmentTimeline,
   EventTimeline,
   Spine,
+  TextureAtlasRegion,
   type Skeleton,
   type Slot,
   type TrackEntry,
@@ -18,6 +19,7 @@ import { animationBounds } from "./spine-bounds.ts";
 import { slotContentScale } from "../../framework/presentation/slot-content-fit.ts";
 import { BitmapAmount } from "../../framework/presentation/bitmap-amount.ts";
 import type { ResourceManager } from "../../framework/resources/resource-manager.ts";
+import { atlasCrop } from "./art.ts";
 
 const cameraEffects = new Set(["fade", "fx_light"]);
 const introArtSlots = new Set(["bonus_title", "bonus_img", "bonus_desc", "fs"]);
@@ -217,6 +219,7 @@ export async function mountTavernEffects(
     [background.skeleton.findSlot(slots.bonusTable ?? ""), foreground.querySelector<HTMLElement>(".bonus-art")],
   ] as const;
   const foregroundAlpha = new Map<Slot, number>();
+  const tableRegions = new Map<HTMLElement, TextureAtlasRegion>();
   const vertices = new Float32Array(8);
   background.afterUpdateWorldTransforms = () => {
     const opening = stage.parentElement?.hasAttribute("data-opening");
@@ -227,20 +230,33 @@ export async function mountTavernEffects(
         continue;
       }
       const attachment = slot.getAttachment();
-      table.style.opacity = attachment ? String(slot.color.a) : "0";
-      if (attachment instanceof RegionAttachment) {
-        foreground.dataset.anchored = "true";
-        attachment.computeWorldVertices(slot, vertices, 0, 2);
-        const [blX, blY, tlX, tlY, trX, trY] = vertices;
-        const scale = background.scale.x;
-        const ux = (trX - tlX) * scale, uy = (trY - tlY) * scale;
-        const vx = (blX - tlX) * scale, vy = (blY - tlY) * scale;
-        const width = Math.hypot(ux, uy), height = Math.hypot(vx, vy);
-        if (width > 0 && height > 0) {
-          table.style.width = `${width}px`;
-          table.style.height = `${height}px`;
-          table.style.transform = `matrix(${ux / width},${uy / width},${vx / height},${vy / height},${background.x + tlX * scale},${background.y + tlY * scale})`;
-        }
+      const region = attachment instanceof RegionAttachment ? attachment.region : null;
+      if (!(attachment instanceof RegionAttachment) || !(region instanceof TextureAtlasRegion) || region.degrees !== 0) {
+        table.style.opacity = "0";
+        continue;
+      }
+      if (tableRegions.get(table) !== region) {
+        const { page, x, y, width, height } = region;
+        const { size, position } = atlasCrop([page.width, page.height], [x, y, width, height]);
+        const textureUrl = new URL(page.name, new URL(atlas, document.baseURI));
+        table.style.setProperty("--art-image", `url("${textureUrl.href}")`);
+        table.style.setProperty("--art-size", size);
+        table.style.setProperty("--art-position", position);
+        table.dataset.spineTable = "";
+        tableRegions.set(table, region);
+      }
+      table.style.opacity = String(slot.color.a);
+      foreground.dataset.anchored = "true";
+      attachment.computeWorldVertices(slot, vertices, 0, 2);
+      const [blX, blY, tlX, tlY, trX, trY] = vertices;
+      const scale = background.scale.x;
+      const ux = (trX - tlX) * scale, uy = (trY - tlY) * scale;
+      const vx = (blX - tlX) * scale, vy = (blY - tlY) * scale;
+      const width = Math.hypot(ux, uy), height = Math.hypot(vx, vy);
+      if (width > 0 && height > 0) {
+        table.style.width = `${width}px`;
+        table.style.height = `${height}px`;
+        table.style.transform = `matrix(${ux / width},${uy / width},${vx / height},${vy / height},${background.x + tlX * scale},${background.y + tlY * scale})`;
       }
       foregroundAlpha.set(slot, slot.color.a);
       slot.color.a = 0;

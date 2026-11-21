@@ -20,7 +20,7 @@ This guide explains what changed between Milestone 1 and Milestone 2, how to mov
 | Assets | Original Tavern Drop v13 runtime files under `public/tavern-assets/`. The build copies them to `dist/`. | Confirm the client's right to ship them (see the asset checklist) |
 | Game config | Bets are the KRW ladder ₩200–₩200,000 (default ₩20,000). Demo balance ₩10,000,000. Chance prices 1×/3×/6×, Bonus Buy 125×/300×, max win 10,000×. | Review against the approved math |
 | Mock API | Same `/api/v1` body-only contract as M1. Additions only: `settings.mockBonusEnabled` on the session, an optional `mockBonus` buy field and `POST /api/v1/debug/balance`, all available only when the review switch is on. Bets now come from the game config. | Backend team: no breaking change |
-| Server | `MOCK_DEBUG_BONUS` turns the review tools on or off. It defaults to on when the server runs on Railway and off elsewhere. | Set it explicitly per environment |
+| Server | `MOCK_DEBUG_BONUS` controls whether the mock server accepts review requests | Set it explicitly per environment |
 | Node | Node.js 22.18 or newer, unchanged. | None |
 | Docs | New: this guide, the features and test guide, the asset and sound checklist (Markdown and PDF), and error-state evidence. | None |
 
@@ -87,14 +87,13 @@ PORT=8080 MOCK_DEBUG_BONUS=0 npm start
 | Setting | Where | Notes |
 | --- | --- | --- |
 | `PORT` | Environment | HTTP port, default 4000 |
-| `MOCK_DEBUG_BONUS` | Environment | `1` shows **Feature buy → Bonus debug**; `0` hides it |
+| `MOCK_DEBUG_BONUS` | Environment | `1` allows mock review requests; `0` rejects them |
 | `MOCK_API_DATA_FILE` | Environment | Path of the mock wallet/session store |
 | `GAME_TARGET` | Environment | Set by `game:build`/`game:start` for single-game deployments |
 | `?game=` | URL | `tavern` (default), `reuse` (3×3 example), `viewer` (asset viewer) |
 | `?quality=` | URL | `hd` or `sd` to override the automatic texture tier |
 | Bets, prices, timings, texts | `src/games/tavern/game.config.json` | Validated at build time against `src/framework/game-config.schema.json` |
 | Rules text, RTP | `src/games/tavern/info.json` | `rtp` is `null` until the approved figure is supplied; the RTP line is then shown |
-| Bonus Buy notice | `presentation.controls.bonusBuyNotice` in the game config | Remove it in M3 to enable the bonus buy |
 
 ## 5. Smoke test after each deployment
 
@@ -104,7 +103,7 @@ PORT=8080 MOCK_DEBUG_BONUS=0 npm start
 4. **Menu → Game Rules** opens; the volume sliders work.
 5. **Feature buy** shows four cards with KRW prices. Tavern Bonus → Confirm shows **Coming Soon in M3**.
 6. Reload during a spin; **Resume Active Game?** finishes the round.
-7. With `MOCK_DEBUG_BONUS=1`, run the error states in section 9 of the features and test guide.
+7. Run the error states in section 9 of the features and test guide with a designated review session.
 8. Repeat steps 1–3 on a phone in portrait and landscape.
 
 ## 6. Bring M2 into the client project (GitLab `slot-client`)

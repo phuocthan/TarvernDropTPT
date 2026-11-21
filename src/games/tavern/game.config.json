@@ -349,11 +349,7 @@
       "autoRounds": [10, 25, 50, 100, 250, 500, 1000],
       "autoUnlimited": true,
       "autoTopUp": 10,
-      "betMenuCloseDelayMs": 100,
-      "bonusBuyNotice": {
-        "title": "Coming Soon in M3",
-        "body": "The Tavern and Drop bonus games arrive in Milestone 3. You have not been charged."
-      }
+      "betMenuCloseDelayMs": 100
     },
     "loadingScreen": {
       "background": "tavern-assets/assets/td_loader_bg.webp",

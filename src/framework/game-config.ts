@@ -150,10 +150,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
       new Set(controls.autoRounds).size !== controls.autoRounds.length ||
       (controls.autoUnlimited !== undefined && typeof controls.autoUnlimited !== "boolean") ||
       (controls.autoTopUp !== undefined && !positiveInt(controls.autoTopUp)) ||
-      (controls.betMenuCloseDelayMs !== undefined && !nonNegativeInt(controls.betMenuCloseDelayMs)) ||
-      (controls.bonusBuyNotice !== undefined && (!controls.bonusBuyNotice ||
-        typeof controls.bonusBuyNotice.title !== "string" || !controls.bonusBuyNotice.title ||
-        typeof controls.bonusBuyNotice.body !== "string"))))
+      (controls.betMenuCloseDelayMs !== undefined && !nonNegativeInt(controls.betMenuCloseDelayMs))))
     invalid("presentation.controls");
   if (
     display.symbolEdgeInsetPx !== undefined &&

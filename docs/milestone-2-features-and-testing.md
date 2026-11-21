@@ -14,7 +14,7 @@ This guide lists what each M2 item contains and how to test it. Results come fro
 | Asset viewer | `/?game=viewer` plays each Spine clip, image and sound cue |
 | Demo wallet | ₩10,000,000 per new session (synthetic KRW) |
 | Asset quality | Automatic. Add `?quality=hd` or `?quality=sd` to force a tier |
-| Review tools | **Feature buy → Bonus debug** appears only when the server runs with `MOCK_DEBUG_BONUS=1` (on by default on Railway). It holds the error-state switches used in section 9 |
+| Review tools | Designated mock review sessions can open **Feature buy → Bonus debug** for the error-state switches in section 9 |
 
 Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Android phone and one iPhone, in portrait and landscape. A new browser profile or private window starts a new demo session.
 

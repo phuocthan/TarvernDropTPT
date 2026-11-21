@@ -32,9 +32,9 @@ npm start
 
 The Node server serves `dist` and `/api` on `$PORT` (default 4000). Railway configuration is included. This version requires a Node host; static GitHub Pages alone is insufficient.
 
-To build and start the local **Buy → Bonus debug** demo, run `npm run start:debug` and open `http://127.0.0.1:4001/?game=tarvern`. The debug server uses a separate mock wallet and binds to loopback. `PORT` and `MOCK_API_DATA_FILE` can override the defaults. Regular local startup leaves Bonus Debug off by default.
+To build and start an isolated mock review server, run `npm run start:debug`. It uses a separate mock wallet and binds to loopback. `PORT` and `MOCK_API_DATA_FILE` can override the defaults.
 
-The Railway mock demo enables Bonus Debug by default. Set `MOCK_DEBUG_BONUS=0` in the Railway service variables to hide the button and reject debug round requests, or use `MOCK_DEBUG_BONUS=1` to enable them again. Deploy the variable change and reload the game.
+The mock server supports Bonus Debug in designated review sessions. Set `MOCK_DEBUG_BONUS=0` to reject debug requests at the server.
 
 ```sh
 npm test

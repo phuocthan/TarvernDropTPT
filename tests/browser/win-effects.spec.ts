@@ -115,7 +115,7 @@ test("v1 Epic Win announces each tier once and Total Win returns to base on one 
     } catch (error) { await route.fulfill({ status: error instanceof ProposalError ? error.status : 500, json: { error: String(error) } }); }
   });
   try {
-    await page.goto("/?game=tarvern");
+    await page.goto("/?game=tarvern&cheat=1");
     await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 45000 });
     await expect(page.locator(".brand-loading")).toHaveCount(0, { timeout: 45000 });
     await page.locator(".opening-continue").click();

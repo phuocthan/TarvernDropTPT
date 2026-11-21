@@ -213,7 +213,7 @@ for (const action of ["spin", "buy-drop"] as const) {
       return route.fulfill({ json: server.execute(command, board) });
     });
     await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.goto("/");
+    await page.goto("/?cheat=1");
     await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
     await page.evaluate(async (count) => {
       const boardModule = performance.getEntriesByType("resource")
@@ -345,7 +345,7 @@ test("free spins autoplay through a retrigger and reveal centered Drop multiplie
       spinAmounts.push({ win: outcome.spinWin, total: feature.accumulated });
     return route.fulfill({ json: outcome });
   });
-  await page.goto("/");
+  await page.goto("/?cheat=1");
   await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
   await page.locator("#buy").click();
   await page.locator('[data-buy="drop"]').click();
@@ -526,7 +526,7 @@ for (const unlocked of [false, true]) test(`feature result ${unlocked ? "shows a
     }
     return route.fulfill({ json: outcome });
   });
-  await page.goto("/");
+  await page.goto("/?cheat=1");
   await expect(page.locator("#spin")).toBeEnabled({ timeout: 20000 });
   await page.evaluate(async () => {
     const spineUrl = performance.getEntriesByType("resource")

@@ -37,6 +37,7 @@ import type {
 
 
 export async function mountTavern(root: HTMLElement, game: GameDefinition, loader?: BrandLoader) {
+  const bonusPreview = new URLSearchParams(location.search).get("cheat") === "1";
   const runtime = gameRuntime(game);
   const resources = runtime.resources;
   const transport = createGameTransport(game, localStorage);
@@ -1069,6 +1070,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     startupResume = false,
     mockBonus?: MockBonusScenario,
   ) {
+    if (!recover && action !== "spin" && !bonusPreview) {
+      notice("coming-soon", "Coming Soon in M3",
+        "The Tavern and Drop bonus games arrive in Milestone 3. You have not been charged.",
+        [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
+      return;
+    }
     if (!recover && controller.phase !== "ready") {
       // A win (including its free spins) plays out in full before the next spin.
       if (winPresentation) return;
@@ -1302,9 +1309,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     transport.debugFault = fault as "fail-request" | "drop-response";
   }
   function openShop() {
+    const showBonusDebug = bonusPreview && transport.mockBonusEnabled;
     modal(
       `<h2 class="visually-hidden">Feature buy</h2>
-      ${transport.mockBonusEnabled ? '<button id="open-bonus-debug" class="shop-debug-entry" type="button">Bonus debug</button>' : ""}
+      ${showBonusDebug ? '<button id="open-bonus-debug" class="shop-debug-entry" type="button">Bonus debug</button>' : ""}
       <div class="shop-grid">${shopOptions
         .map(
           (option) => `
@@ -1329,7 +1337,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       true,
       "shop",
     );
-    if (transport.mockBonusEnabled) $("open-bonus-debug").onclick = openDebugBonus;
+    if (showBonusDebug) $("open-bonus-debug").onclick = openDebugBonus;
     $("shop-bet-down").onclick = () => {
       updateShopBet(betIndex - 1, "shop-bet-down");
     };
@@ -1378,10 +1386,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (option.kind === "chance") {
         chance = option.id;
         sync();
-      } else if (controls?.bonusBuyNotice) {
-        // Milestone gating (M2): the buy flow ends at confirmation; nothing is charged.
-        notice("coming-soon", controls.bonusBuyNotice.title, controls.bonusBuyNotice.body,
-          [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
       } else {
         void run(option.id === "tavern" ? "buy-tavern" : "buy-drop");
       }

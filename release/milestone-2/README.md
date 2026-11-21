@@ -26,7 +26,7 @@ Open `http://localhost:4000/`, press **Press to continue** and spin.
 
 Development server with hot reload: `npm run dev` (game on port 5173, API on 4000). Browser tests: `npm run test:browser` (set `CHROMIUM_PATH` if Chromium is not at `/usr/bin/chromium`).
 
-Set `MOCK_DEBUG_BONUS=1` to show **Feature buy → Bonus debug**, which holds the error-state switches used in testing. It is on by default on Railway and off elsewhere.
+Designated mock review sessions can open **Feature buy → Bonus debug** for error-state testing. Set `MOCK_DEBUG_BONUS=0` to reject debug requests at the server.
 
 ## Documents
 
