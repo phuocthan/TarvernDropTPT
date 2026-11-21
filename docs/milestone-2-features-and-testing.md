@@ -1,6 +1,6 @@
 # Tavern Drop — Milestone 2 features and test guide
 
-> Current review status: [second re-review revision](milestone-2-evidence/rereview-2-delivery.md) and [reference input and win timing](milestone-2-evidence/rereview-2-reference-timing.md).
+> Current review status: [third re-review revision](milestone-2-evidence/rereview-3-delivery.md), [second re-review revision](milestone-2-evidence/rereview-2-delivery.md) and [reference input and win timing](milestone-2-evidence/rereview-2-reference-timing.md).
 
 Milestone 2 covers the Tavern Drop **base game** on the reusable `fw-pixi` TypeScript/PixiJS framework. The baseline uses Tavern Drop v13 art, Spine animations, fonts and sounds. The Tavern and Drop bonus games are Milestone 3. In M2 the Bonus Buy is locked: confirming it shows **Bonus not available** and no bet is placed.
 
