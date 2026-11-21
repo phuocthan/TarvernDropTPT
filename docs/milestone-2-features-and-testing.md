@@ -43,7 +43,7 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 - A 5×5 board with 15 fixed paylines paying left to right, 3 or more of a kind. Wild substitutes for all symbols except Bonus.
 - The original drop motion: outgoing symbols fall out over 340 ms, new symbols drop in reel by reel, land with a squash and settle. Turbo uses the original shorter values.
 - Anticipation from two Bonus symbols: remaining reels slow, the camera zooms slightly and an anticipation sound plays.
-- Win presentation (original timing): a 500 ms pause after the reels (300 ms in Turbo or after a skip), then the lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). After the last line and any win screen, the **Win** amount counts up over 500 ms while Spin is already available.
+- Win presentation (original timing): a 500 ms pause after the reels (300 ms in Turbo or after a skip), then the lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). After the last line and any win screen, the **Win** amount counts up over 500 ms while Spin is already available. In Turbo, after a skip or while Space is held, the amount appears at once without counting, so a quick next spin cannot hide it.
 - **Skip**: pressing Spin, a second Space tap or a tap on the play area during a round shortens it. During the drop the symbols still fall and land visibly, just faster. During the lines every line is still shown, with shorter gaps. A skip never places a wager. The [timing reference](milestone-2-evidence/rereview-2-reference-timing.md) lists the original values.
 
 **How to test**

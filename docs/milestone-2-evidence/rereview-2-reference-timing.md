@@ -41,7 +41,7 @@ A skip while symbols are already falling: the reference reveals the remaining sy
 | Hold after the last line | 500 ms | 500 ms | 500 ms | Bundle `FL = 500` |
 | Line amount text | rises 0.6 s, fades in 0.2 s, then falls 0.6 s and fades out after 0.4 s | halved (0.3 / 0.1 / 0.3 / 0.2 s) | halved | Bundle `playLineWinText` |
 | Win screen | from 10× bet (Big 20×, Super 50×, Mega 75×, Epic 100×, Max 10,000×) | same | jumps to the next tier | Bundle `boardWin`, `Vu` |
-| HUD Win count | after the lines and win screen, 500 ms cubic-out; the round does not wait for it | same | ends at the recorded amount | Bundle `jr.set` (500 ms, `1 - (1 - t)³`) |
+| HUD Win count | after the lines and win screen, 500 ms cubic-out; the round does not wait for it | same in Normal; shown at once in Turbo, after a skip or while Space is held (intentional change: the original can be cut off by a quick next spin) | ends at the recorded amount | Bundle `jr.set` (500 ms, `1 - (1 - t)³`) |
 
 Every line is shown, including after a skip; a skip only shortens the per-symbol and gap timing. The earlier M2 candidate counted the HUD Win during the lines and used 700 ms / 850 ms values that are not in the reference. They now follow the table above.
 

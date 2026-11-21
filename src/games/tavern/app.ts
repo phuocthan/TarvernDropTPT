@@ -555,9 +555,19 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   /** Ends a running HUD win count at its recorded amount. */
   let finishWinCount: (() => void) | undefined;
   /** Reference HUD win: counts up after the lines and win screen, 500 ms cubic-out, without
-   *  holding the round; a play-area tap or the next spin ends it. */
-  function startWinCount(amount: number) {
+   *  holding the round; a play-area tap or the next spin ends it. In Turbo, after a skip or
+   *  while Space is held the amount shows at once, so a quick next spin cannot hide it. */
+  /** Quick play (Turbo, a skip this round or held Space): show the HUD win without counting. */
+  function quickWinAmount() {
+    return turbo || skipped || lineSkip || spaceHeld;
+  }
+  function startWinCount(amount: number, instant = false) {
     finishWinCount?.();
+    if (instant) {
+      displayWin = amount;
+      syncWin(presentingFeature);
+      return;
+    }
     const from = performance.now();
     const ms = basePresentation.countMs[turbo ? "turbo" : "normal"];
     let frame = 0;
@@ -916,7 +926,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
             const countMs = ordinary ? basePresentation.countMs[turbo ? "turbo" : "normal"] : turbo ? 179 : 650;
             countProgress += (now - previousFrame) / countMs;
             previousFrame = now;
-            const t = skipped ? 1 : Math.min(1, countProgress);
+            const t = quickWinAmount() ? 1 : Math.min(1, countProgress);
             displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
             syncWin(presentingFeature);
             if (t < 1) requestAnimationFrame(tick);
@@ -1151,7 +1161,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     basePresentationSkippable = false;
     setPhase(null);
     if (countAfterTier !== null) {
-      startWinCount(countAfterTier);
+      startWinCount(countAfterTier, quickWinAmount());
       countAfterTier = null;
     }
     await controller.completePresentation();
