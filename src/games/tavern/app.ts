@@ -1457,15 +1457,64 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
     syncVolumeIcons();
   }
+  // Long KRW amounts (e.g. ₩2,000,000,000 at the max win cap) must not run under the
+  // neighbouring bet arrows on narrow phones: shrink the amount to the free space.
+  const fitMoney = (el: HTMLElement) => {
+    el.style.fontSize = "";
+    if (!el.getClientRects().length) return;
+    const r = el.getBoundingClientRect();
+    let left = -Infinity;
+    let right = Infinity;
+    for (const button of root.querySelectorAll<HTMLElement>(".tavern-hud button")) {
+      const target = (button.firstElementChild as HTMLElement | null) ?? button;
+      const b = target.getBoundingClientRect();
+      if (!b.width || b.bottom <= r.top || b.top >= r.bottom || button.contains(el)) continue;
+      if (b.left >= r.left + r.width / 2) right = Math.min(right, b.left - 3);
+      else if (b.right <= r.right - r.width / 2) left = Math.max(left, b.right + 3);
+    }
+    const overflow = Math.max(r.right - right, left - r.left, 0);
+    if (overflow <= 0) return;
+    const size = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = `${Math.max(size * 0.6, size * (r.width - overflow) / r.width)}px`;
+  };
+  const moneyFields = ["balance", "spin-win-amount", "bet"].map((id) => $(id));
+  const refitMoney = () => moneyFields.forEach(fitMoney);
+  const moneyObserver = new MutationObserver((records) =>
+    new Set(records.map((record) => moneyFields.find((field) => field.contains(record.target))))
+      .forEach((field) => field && fitMoney(field)));
+  moneyFields.forEach((field) =>
+    moneyObserver.observe(field, { childList: true, characterData: true, subtree: true }));
+  window.addEventListener("resize", () => requestAnimationFrame(refitMoney));
+  // Reference Space key: one press acts like the Spin button (spin, skip, stop autoplay);
+  // holding it for 400 ms turns Turbo on until the key is released. Key repeat is ignored.
+  let spaceTurboTimer = 0;
+  let spaceTurbo = false;
   window.addEventListener("keydown", (event) => {
     if (
-      event.code === "Space" &&
-      !document.querySelector("dialog[open]") &&
-      !$("spin").closest("[inert]") &&
-      !(event.target instanceof HTMLButtonElement)
-    ) {
-      event.preventDefault();
-      $<HTMLButtonElement>("spin").click();
+      event.code !== "Space" ||
+      document.querySelector("dialog[open]") ||
+      $("spin").closest("[inert]") ||
+      event.target instanceof HTMLButtonElement ||
+      event.target instanceof HTMLInputElement
+    ) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    const spin = $<HTMLButtonElement>("spin");
+    if (!spin.disabled && spin.offsetParent) spin.click();
+    else if (controller.phase !== "ready") void run("spin");
+    window.clearTimeout(spaceTurboTimer);
+    spaceTurboTimer = window.setTimeout(() => {
+      if (turbo || $<HTMLButtonElement>("speed").disabled) return;
+      spaceTurbo = turbo = true;
+      sync();
+    }, 400);
+  });
+  window.addEventListener("keyup", (event) => {
+    if (event.code !== "Space") return;
+    window.clearTimeout(spaceTurboTimer);
+    if (spaceTurbo) {
+      spaceTurbo = turbo = false;
+      sync();
     }
   });
   try {

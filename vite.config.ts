@@ -66,6 +66,39 @@ function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
   };
 }
 
+// Dev server only: `?rafTimer` drives animation frames from timers, so automated checks
+// can run the game in a background (hidden) browser tab that pauses requestAnimationFrame.
+const hiddenTabFrames: Plugin = {
+  name: "dev-hidden-tab-frames",
+  apply: "serve",
+  transformIndexHtml: () => [{
+    tag: "script",
+    injectTo: "head-prepend",
+    children: `if (/[?&]rafTimer\\b/.test(location.search)) {
+      window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 16);
+      window.cancelAnimationFrame = (id) => clearTimeout(id);
+      // Web Animations follow the paused document timeline; finish them on a timer instead.
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (keyframes, options) {
+        const animation = animate.call(this, keyframes, options);
+        const timing = typeof options === "number" ? { duration: options } : options ?? {};
+        if (timing.iterations !== Infinity) {
+          const total = (Number(timing.delay) || 0) + (Number(timing.duration) || 0) * (timing.iterations ?? 1);
+          setTimeout(() => { try { if (animation.playState === "running") animation.finish(); } catch {} }, total);
+        }
+        return animation;
+      };
+      // Image decode waits for a visible frame too; resolve it once the bytes are loaded.
+      HTMLImageElement.prototype.decode = function () {
+        return this.complete ? Promise.resolve() : new Promise((resolve, reject) => {
+          this.addEventListener("load", () => resolve(), { once: true });
+          this.addEventListener("error", reject, { once: true });
+        });
+      };
+    }`,
+  }],
+};
+
 export default defineConfig({
   base: "./",
   server: {
@@ -73,7 +106,7 @@ export default defineConfig({
     watch: { ignored: ["**/.runtime/**"] },
   },
   ...(target && paths ? {
-    plugins: [standalone(target, paths)],
+    plugins: [standalone(target, paths), hiddenTabFrames],
     build: { outDir: paths.dist, copyPublicDir: false, emptyOutDir: true },
-  } : {}),
+  } : { plugins: [hiddenTabFrames] }),
 });
