@@ -27,7 +27,8 @@ const git = (...command) => {
 const commit = git("rev-parse", "--verify", `${args.revision ?? "HEAD"}^{commit}`);
 const tracked = new Set(git("ls-tree", "-r", "--name-only", commit).split("\n"));
 
-// Everything the client needs to build, run, test and review M2. AI-related notes, research
+// Everything the client needs to build, run, test and review M2. The delivered M1 documents
+// (docs/milestone-1*, docs/architecture.md) stay as published in the release repository. AI-related notes, research
 // captures, internal communication, non-English drafts and local tooling stay in development.
 const entries = [
   ".gitignore", "index.html", "package.json", "package-lock.json", "tsconfig.json", "vite.config.ts",
@@ -40,8 +41,6 @@ const entries = [
   "docs/milestone-2-features-and-testing.md", "docs/milestone-2-features-and-testing.pdf",
   "docs/milestone-2-asset-checklist.md", "docs/milestone-2-asset-checklist.pdf",
   "docs/milestone-2-evidence",
-  "docs/milestone-1.md", "docs/milestone-1-api.md", "docs/milestone-1-asset-spec.md",
-  "docs/milestone-1-v1-examples.json", "docs/milestone-1-evidence",
   "docs/fw-pixi-architecture.md", "docs/tavern-asset-inventory.md",
   "release/milestone-2/README.md",
 ];
