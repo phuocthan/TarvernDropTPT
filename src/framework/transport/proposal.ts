@@ -53,12 +53,28 @@ export class ProposalTransport implements GameTransport {
     this.game = game; this.storage = storage; this.client = new JsonClient(fetcher);
     this.key = game.id + ".proposal-v1";
   }
+  /**
+   * Mock review only: break the next paid request once. `fail-request` never reaches the server;
+   * `drop-response` lets the server record (and charge) the round, then loses its reply.
+   */
+  debugFault: "fail-request" | "drop-response" | null = null;
   private async request(path: string, body?: unknown, playToken?: string): Promise<Response> {
     const code = this.game.routing.query === "tavern" ? "tavern-drop" : this.game.routing.query;
-    return this.client.request<Response>(`/api/v1${path}`, { ...body as object, gameCode: code }, {
+    const paid = !!playToken;
+    const fault = paid ? this.debugFault : null;
+    if (fault) this.debugFault = null;
+    if (fault === "fail-request") throw new TypeError("Failed to fetch (simulated)");
+    const response = await this.client.request<Response>(`/api/v1${path}`, { ...body as object, gameCode: code }, {
       "Session-Id": this.sessionId, Authorization: `Bearer ${this.token}`,
       ...(playToken ? { "Play-Token": playToken } : {}),
     });
+    if (fault === "drop-response") throw new TypeError("Response lost (simulated)");
+    return response;
+  }
+  /** Mock review only (Bonus debug): set the synthetic wallet. */
+  async debugSetBalance(balanceMinor: number) {
+    if (!this.mockBonusEnabled) throw Error("DEBUG_UNAVAILABLE");
+    await this.request("/debug/balance", { balanceMinor });
   }
   private board(reels: number[]): Board {
     if (reels.length !== this.game.reels * this.game.rows) throw Error("INVALID_BOARD_SIZE");

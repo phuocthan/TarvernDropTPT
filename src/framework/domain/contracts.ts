@@ -221,6 +221,10 @@ export interface GameDefinition {
 export interface GameTransport {
   hasResume?: boolean;
   mockBonusEnabled?: boolean;
+  /** Mock review only: break the next paid request once (see ProposalTransport). */
+  debugFault?: "fail-request" | "drop-response" | null;
+  /** Mock review only: set the synthetic wallet balance. */
+  debugSetBalance?(balanceMinor: number): Promise<void>;
   resume?(refresh?: boolean): Promise<Outcome>;
   completePresentation?(): Promise<Snapshot>;
   nextPresentation?(): Outcome | null;

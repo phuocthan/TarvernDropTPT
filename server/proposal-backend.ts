@@ -416,6 +416,19 @@ export class ProposalBackend {
         requireFields(body, []);
         return this.envelope(account, current);
       }
+      if (path === "/debug/balance") {
+        // Mock review only (Bonus debug): set the wallet to exercise Insufficient Balance.
+        if (!this.canDebugBonus(definition)) throw new ProposalError("NOT_FOUND", 404);
+        requireFields(body, ["balanceMinor"]);
+        const value = body.balanceMinor;
+        if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0 || value > 1e12)
+          throw new ProposalError("INVALID_BALANCE", 400);
+        if (current && (current.presentationStatus === "pending" || current.summaryId))
+          throw new ProposalError("ROUND_IN_PROGRESS", 409);
+        account.balance = value;
+        account.walletVersion++;
+        return this.envelope(account, current);
+      }
       if (method !== "POST" || !["/spin", "/buy-feature"].includes(path)) throw new ProposalError("NOT_FOUND", 404);
       if (path === "/spin" && body.curStep === "final-summary") {
         requireFields(body, ["isFreespin", "curStep", "summaryId"]);

@@ -1235,7 +1235,18 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         </div></fieldset>
         <label>Final win tier <select name="win-tier">${tiers.map(([id, label]) => `<option value="${id}">${label}</option>`).join("")}</select></label>
         <button class="primary" type="submit">Run test bonus</button>
-      </form>`, true, "debug-bonus", () => { openShop(); $("open-bonus-debug").focus(); });
+      </form>
+      <h2>Error states</h2>
+      <div class="debug-faults">
+        <button type="button" data-fault="low-balance">Set balance to ${money(game.bets[0])}</button>
+        <button type="button" data-fault="restore-balance">Restore balance to ${money(game.demo.initialBalance)}</button>
+        <button type="button" data-fault="drop-response">Lose the next spin's reply</button>
+        <button type="button" data-fault="fail-request">Fail the next spin request</button>
+        <button type="button" data-fault="offline">Go offline for 8 seconds</button>
+      </div>
+      <p class="debug-faults-note">After choosing a spin fault, close this menu and press Spin.</p>`, true, "debug-bonus", () => { openShop(); $("open-bonus-debug").focus(); });
+    for (const button of dialog.querySelectorAll<HTMLButtonElement>("[data-fault]"))
+      button.onclick = () => void runDebugFault(button.dataset.fault!);
     const form = $<HTMLFormElement>("debug-bonus-form");
     form.querySelector<HTMLSelectElement>('[name="mode"]')!.value = debugMode;
     form.querySelector<HTMLSelectElement>('[name="win-tier"]')!.value = debugScenario.winTier;
@@ -1252,6 +1263,32 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       dialog.close();
       void run(debugMode === "tavern" ? "buy-tavern" : "buy-drop", false, false, debugScenario);
     };
+  }
+  /** Mock review only: reproduce the base-game error states from the Bonus debug menu. */
+  async function runDebugFault(fault: string) {
+    if (controller.phase !== "ready" || controller.state?.feature) return;
+    if (fault === "low-balance" || fault === "restore-balance") {
+      try {
+        await transport.debugSetBalance?.(fault === "low-balance" ? game.bets[0] : game.demo.initialBalance);
+        location.reload();
+      } catch (error) {
+        console.warn("Debug balance unavailable", error);
+      }
+      return;
+    }
+    dialog.close();
+    if (fault === "offline") {
+      const real = Object.getOwnPropertyDescriptor(Navigator.prototype, "onLine");
+      Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+      dispatchEvent(new Event("offline"));
+      setTimeout(() => {
+        delete (navigator as { onLine?: boolean }).onLine;
+        if (!real) Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+        dispatchEvent(new Event("online"));
+      }, 8000);
+      return;
+    }
+    transport.debugFault = fault as "fail-request" | "drop-response";
   }
   function openShop() {
     modal(

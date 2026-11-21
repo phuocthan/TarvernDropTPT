@@ -696,6 +696,9 @@ html:has(.tavern-shell) {
 .tavern-dialog[data-look="debug-bonus"] { width: min(92vw, 420px); }
 .tavern-dialog[data-look="debug-bonus"] h2 { font-family: inherit; }
 .debug-bonus-form { display: grid; gap: 12px; }
+.debug-faults { display: grid; gap: 8px; }
+.debug-faults button { min-height: 36px; }
+.debug-faults-note { margin: 8px 0 0; opacity: .7; font-size: .85em; }
 .debug-bonus-form > label { display: grid; grid-template-columns: 1fr minmax(0, 1fr); align-items: center; gap: 8px; }
 .debug-bonus-form :is(input[type="number"], select) {
   min-width: 0;
