@@ -1367,6 +1367,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (option.kind === "chance") {
         chance = option.id;
         sync();
+      } else if (controls?.bonusBuyNotice) {
+        // Milestone gating (M2): the buy flow ends at confirmation; nothing is charged.
+        notice("coming-soon", controls.bonusBuyNotice.title, controls.bonusBuyNotice.body,
+          [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
       } else {
         void run(option.id === "tavern" ? "buy-tavern" : "buy-drop");
       }

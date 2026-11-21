@@ -124,7 +124,14 @@ export interface ReelPresentation {
   winDimmerOpacity?: number;
   symbolLandingEffects?: Record<string, SymbolLandingEffects>;
   loadingScreen?: BrandLoadingConfig;
-  controls?: { menu: boolean; autoRounds: number[]; autoUnlimited?: boolean; autoTopUp?: number; betMenuCloseDelayMs?: number };
+  controls?: {
+    menu: boolean; autoRounds: number[]; autoUnlimited?: boolean; autoTopUp?: number; betMenuCloseDelayMs?: number;
+    /**
+     * Milestone gating: when set, confirming a Bonus Buy shows this notice instead of buying
+     * (no charge, no bonus). The buy screen, prices and confirmation stay available.
+     */
+    bonusBuyNotice?: { title: string; body: string };
+  };
   checkWinDelayMs?: { normal: number; turbo: number };
   animationGrid?: { originSlot: string; reelPitch: number; rowPitch: number };
   /** Opt-in layout mode (desktop / landscape / portrait) published as `data-layout`. */
