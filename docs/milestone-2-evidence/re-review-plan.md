@@ -1,5 +1,7 @@
 # Tavern Drop M2 re-review — status and revision plan
 
+> **Superseded by the [second re-review revision](rereview-2-delivery.md)** and its [reference timing](rereview-2-reference-timing.md). This page records the earlier candidate.
+
 **Review baseline:** GitLab MR !2, commit `807f914`. The checks below distinguish the client-observed results from the original revision plan. See the [revision candidate notes](rereview-delivery.md) for the implementation and repeatable checks.
 
 ## Already verified

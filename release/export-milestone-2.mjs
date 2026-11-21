@@ -58,6 +58,16 @@ try {
   rmSync(archive, { force: true });
 }
 renameSync(join(destination, "release/milestone-2/README.md"), join(destination, "README.md"));
+// The Gem Reels starter example is development-only: not part of the client delivery.
+rmSync(join(destination, "src/games/gem"), { recursive: true, force: true });
+rmSync(join(destination, "tests/browser/gem.spec.ts"), { force: true });
+const catalogPath = join(destination, "src/games/catalog.ts");
+const catalog = readFileSync(catalogPath, "utf8");
+const withoutGem = catalog
+  .replace(/^import \{ registration as gem \} from "\.\/gem\/definition\.ts";\r?\n/m, "")
+  .replace(/^[ \t]*gem,\r?\n/m, "");
+if (withoutGem === catalog || /gem/.test(withoutGem)) throw Error("Could not remove Gem Reels from the release catalog.");
+writeFileSync(catalogPath, withoutGem);
 rmSync(join(destination, "release"), { recursive: true });
 writeFileSync(join(destination, "SOURCE_REVISION"), commit + "\n");
 

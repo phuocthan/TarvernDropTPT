@@ -74,7 +74,8 @@ export class GameController {
         // A structured rejection confirms this command was not accepted. Reconcile the snapshot.
         this.pending = null;
         this.storage.removeItem(this.storageKey);
-        this.state = await this.transport.session();
+        // Reconcile wallet and eligibility only: a round opened elsewhere is never presented here.
+        this.state = this.transport.reconcile ? await this.transport.reconcile() : await this.transport.session();
         this.phase = "ready";
       } else this.phase = "recovery";
       throw error;

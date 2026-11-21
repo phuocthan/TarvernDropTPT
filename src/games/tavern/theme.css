@@ -1953,6 +1953,11 @@ dialog.info-screen p {
   white-space: nowrap;
 }
 .tavern-hud #chance-cost[hidden] { display: none; }
+/* Portrait: mode and cost stack on two lines, so the bet field keeps its width and the bet
+   arrows and balance keep their places at long KRW amounts (320 px phones). */
+:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-mode,
+:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-price { display: block; }
+:where(html[data-layout="portrait"]) .tavern-hud #chance-cost .chance-sep { display: none; }
 :where(html[data-layout="portrait"]) .tavern-hud .hud-bet-amount:has(#chance-cost:not([hidden])) {
   height: auto;
   min-width: 0;

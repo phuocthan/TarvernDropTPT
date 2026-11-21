@@ -51,6 +51,10 @@ export interface DropTimelineConfig {
      */
     settleWaitMs?: number;
     turboSettleWaitMs?: number;
+    /** Skip before the drop starts: wait this long, then drop with the turbo values (reference 90). */
+    skipWaitMs?: number;
+    /** Skip while symbols move: the rest of the drop finishes within this time (keeps it visible). */
+    skipRemainderMs?: number;
   };
   anticipation?: {
     /** Anticipate a reel while the scatter count up to and including it is within [min, max]. */

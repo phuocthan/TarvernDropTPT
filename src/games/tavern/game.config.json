@@ -449,7 +449,7 @@
           "ease": "M0,0 C0.566,0.382 0.689,1.015 0.689,1.015 0.689,1.015 0.749,0.989 0.855,0.989 0.945,0.989 0.931,0.989 1,1",
           "rowStaggerMs": 40, "turboRowStaggerMs": 15, "reelStaggerMs": 70, "turboReelStaggerMs": 15,
           "waitMs": 350, "turboWaitMs": 50, "landLeadMs": 250,
-          "settleWaitMs": 380, "turboSettleWaitMs": 150
+          "settleWaitMs": 380, "turboSettleWaitMs": 150, "skipWaitMs": 90, "skipRemainderMs": 150
         },
         "anticipation": { "minCount": 2, "maxCount": 3, "rowStaggerMs": 100, "pauseMs": 800 }
       }

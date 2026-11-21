@@ -1,5 +1,7 @@
 # Tavern Drop M2 revision candidate
 
+> **Superseded by the [second re-review revision](rereview-2-delivery.md)** and its [reference timing](rereview-2-reference-timing.md). This page records the earlier candidate.
+
 Review baseline: MR !2 at `807f914`. The revised client uses synthetic KRW and the local mock API. This note accompanies the evidence bundle. The candidate still needs a commit on the MR branch before it can be reviewed as a GitLab revision.
 
 ## Changes

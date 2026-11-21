@@ -14,8 +14,16 @@ interface Step {
   displayWinMinor: number; displayWinAfterMinor?: number; finalRoundAwardMinor?: number;
   reel?: number; multiplier?: number;
 }
+/** Authoritative state now (same shape as /rounds/status). */
+interface Current {
+  canStartPaidRound?: boolean; playToken?: string; roundId?: string; presentationStatus?: string;
+  wallet: { confirmedBalanceMinor: number; walletVersion: number };
+  stateVersion?: number;
+}
 interface Response {
   sessionId?: string; token?: string; userId?: string;
+  /** A stored receipt returned again: its outcome is history, `current` is the state now. */
+  replayed?: boolean; current?: Current; stateVersion?: number;
   canStartPaidRound?: boolean; playToken?: string; roundId?: string; originalBaseBetMinor?: number; roundCapMinor?: number;
   wallet: { confirmedBalanceMinor: number; walletVersion: number };
   releasedThrough?: number; presentedThrough?: number; presentationStatus?: string;
@@ -35,6 +43,9 @@ interface Response {
 export class ProposalTransport implements GameTransport {
   hasResume = false;
   mockBonusEnabled = false;
+  readyForWager = true;
+  /** Highest server stateVersion applied; older replies never overwrite wallet or eligibility. */
+  private stateVersion = -1;
   private sessionId = "";
   private token = "";
   private playToken = "";
@@ -97,6 +108,28 @@ export class ProposalTransport implements GameTransport {
       }),
     };
   }
+  /**
+   * Apply wallet and eligibility from the newest known server state. A replayed receipt carries
+   * history; its `current` projection (or a newer reply already seen) wins. Returns false when the
+   * view is older than state already applied.
+   */
+  private applyCurrent(view: Current): boolean {
+    const version = view.stateVersion ?? this.stateVersion;
+    if (version < this.stateVersion) return false;
+    this.stateVersion = version;
+    this.readyForWager = view.canStartPaidRound !== false;
+    this.playToken = view.canStartPaidRound === false ? "" : view.playToken ?? this.playToken;
+    if (this.snapshot) this.snapshot.balance = view.wallet.confirmedBalanceMinor;
+    return true;
+  }
+  private currentOf(response: Response): Current {
+    return response.replayed && response.current ? response.current : response;
+  }
+  async reconcile(): Promise<Snapshot> {
+    const status = await this.request("/rounds/status") as Current;
+    this.applyCurrent(status);
+    return structuredClone(this.snapshot);
+  }
   private state(response: Response, step?: Step): Snapshot {
     const active = response.presentationStatus === "pending" || !!response.resume?.summaryId;
     return {
@@ -128,6 +161,8 @@ export class ProposalTransport implements GameTransport {
     this.game.demo.buyPrices = settings.buyPrices;
     this.game.demo.capMultiplier = settings.roundCapMultiplier;
     this.response = response; this.playToken = response.playToken ?? "";
+    this.stateVersion = Math.max(this.stateVersion, response.stateVersion ?? -1);
+    this.readyForWager = response.canStartPaidRound !== false || !!response.resume;
     this.active = response.resume?.step;
     this.staticResult = response.resume?.mode === "show_stored_result";
     this.summaryId = response.resume?.summaryId;
@@ -149,6 +184,8 @@ export class ProposalTransport implements GameTransport {
     this.response = response; this.active = step;
     this.playToken = response.playToken ?? this.playToken;
     this.snapshot = this.state(response, step);
+    // The outcome is this round's record; wallet and eligibility follow the newest server state.
+    this.applyCurrent(this.currentOf(response));
     const wins = (step.winLines ?? []).filter((line) => line.type === "N").map((line) => {
       const positions = line.winSym.map((pos) => ({ reel: (pos - 1) % this.game.reels, row: Math.floor((pos - 1) / this.game.reels) }));
       return { line: line.lineId - 1, positions, amount: line.win_amt, symbol: this.snapshot.board[positions[0].reel][positions[0].row] };
@@ -197,10 +234,11 @@ export class ProposalTransport implements GameTransport {
     const token = pending?.requestId === command.requestId ? pending.token : this.playToken;
     if (!token) throw new ApiError("PLAY_TOKEN_REQUIRED");
     this.storage.setItem(key, JSON.stringify({ requestId: command.requestId, token }));
+    // The request ID tells a retry (same ID, token and payload) from a fresh click on a stale token.
     const response = command.action === "spin"
-      ? await this.request("/spin", { isFreespin: 0, betMinor: command.bet, chanceMode: command.chance === "standard" ? "normal" : command.chance }, token)
+      ? await this.request("/spin", { isFreespin: 0, betMinor: command.bet, chanceMode: command.chance === "standard" ? "normal" : command.chance, requestId: command.requestId }, token)
       : await this.request("/buy-feature", {
-        betMinor: command.bet, featureMode: command.action === "buy-drop" ? "drop" : "tavern",
+        betMinor: command.bet, featureMode: command.action === "buy-drop" ? "drop" : "tavern", requestId: command.requestId,
         ...(command.mockBonus ? { mockBonus: command.mockBonus } : {}),
       }, token);
     this.staticResult = pending?.requestId === command.requestId &&
@@ -220,11 +258,17 @@ export class ProposalTransport implements GameTransport {
       ? await this.request("/spin", { isFreespin: 0, curStep: "final-summary", summaryId: this.summaryId })
       : await this.request("/spin", { isFreespin: 1, curStep: this.active.curStep, stepId: this.active.stepId,
         ...(this.staticResult ? { kind: "shown_as_result" } : {}) });
-    if (base && (response.canStartPaidRound === false || response.presentationStatus === "pending"))
+    // The receipt records this round's settlement; a replayed receipt can be superseded by a newer
+    // round, so readiness and wallet come from its `current` projection.
+    if (base && (response.presentationStatus === "pending" ||
+        (!response.replayed && response.canStartPaidRound === false)))
       throw Error("BASE_SETTLEMENT_UNCONFIRMED");
     if (base) this.storage.removeItem(this.completionKey);
-    this.snapshot.balance = response.wallet.confirmedBalanceMinor;
-    this.playToken = response.playToken ?? "";
+    this.applyCurrent(this.currentOf(response));
+    // A completion reply can arrive late, after another window started a newer round. Confirm
+    // the current wallet and eligibility before Spin unlocks; the newer stateVersion wins.
+    if (response.presentationStatus !== "pending")
+      this.applyCurrent(await this.request("/rounds/status") as Current);
     this.hasResume = false; this.summaryId = undefined;
     if (response.presentationStatus === "pending") this.queued = response;
     else { this.snapshot.feature = null; this.snapshot.round = null; }

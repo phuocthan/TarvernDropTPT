@@ -1,8 +1,10 @@
 export class ApiError extends Error {
   code: string;
   rejected: boolean;
-  constructor(code: string, status = 409) {
-    super(code); this.code = code; this.rejected = status >= 400 && status < 500;
+  /** The rest of a structured error body (e.g. the server's `current` state projection). */
+  details: Record<string, unknown>;
+  constructor(code: string, status = 409, details: Record<string, unknown> = {}) {
+    super(code); this.code = code; this.rejected = status >= 400 && status < 500; this.details = details;
   }
 }
 
@@ -20,7 +22,10 @@ export class JsonClient {
       body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(this.timeoutMs),
     });
     const value = await response.json();
-    if (!response.ok) throw new ApiError(value.error || "SERVER_ERROR", response.status);
+    if (!response.ok) {
+      const { error, ...details } = value ?? {};
+      throw new ApiError(error || "SERVER_ERROR", response.status, details);
+    }
     return value as T;
   }
 }

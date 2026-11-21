@@ -35,8 +35,12 @@ export function bindHoldShortcut(target: Window, options: HoldShortcut) {
   target.addEventListener("keydown", keyDown);
   target.addEventListener("keyup", keyUp);
   target.addEventListener("blur", release);
+  // A hidden page loses key-up events: treat it like losing focus.
+  const hidden = () => { if (target.document?.visibilityState === "hidden") release(); };
+  target.document?.addEventListener("visibilitychange", hidden);
   return () => {
     release();
+    target.document?.removeEventListener("visibilitychange", hidden);
     target.removeEventListener("keydown", keyDown);
     target.removeEventListener("keyup", keyUp);
     target.removeEventListener("blur", release);

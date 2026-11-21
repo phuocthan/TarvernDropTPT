@@ -1,6 +1,8 @@
 # Tavern Drop — Milestone 2 features and test guide
 
-Milestone 2 covers the Tavern Drop **base game** on the reusable `fw-pixi` TypeScript/PixiJS framework. The baseline uses Tavern Drop v13 art, Spine animations, fonts and sounds. The Tavern and Drop bonus games are Milestone 3. In M2, confirming a Bonus Buy shows a **Coming Soon in M3** message and no bet is placed.
+> Current review status: [second re-review revision](milestone-2-evidence/rereview-2-delivery.md) and [reference input and win timing](milestone-2-evidence/rereview-2-reference-timing.md).
+
+Milestone 2 covers the Tavern Drop **base game** on the reusable `fw-pixi` TypeScript/PixiJS framework. The baseline uses Tavern Drop v13 art, Spine animations, fonts and sounds. The Tavern and Drop bonus games are Milestone 3. In M2 the Bonus Buy is locked: confirming it shows **Bonus not available** and no bet is placed.
 
 This guide describes the build reviewed at `807f914`. See the [M2 re-review plan](milestone-2-evidence/re-review-plan.md) for findings, the approved stake list and acceptance cases for the next build. Results use the mock API with demo credits.
 
@@ -41,14 +43,15 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 - A 5×5 board with 15 fixed paylines paying left to right, 3 or more of a kind. Wild substitutes for all symbols except Bonus.
 - The original drop motion: outgoing symbols fall out over 340 ms, new symbols drop in reel by reel, land with a squash and settle. Turbo uses the original shorter values.
 - Anticipation from two Bonus symbols: remaining reels slow, the camera zooms slightly and an anticipation sound plays.
-- Win presentation: lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). The win counter counts up.
-- **Skip and Space** are under re-review. The baseline disables force-stop during reel motion. The re-review will document which win stages accept Skip and which stages lock it.
+- Win presentation (original timing): a 500 ms pause after the reels (300 ms in Turbo or after a skip), then the lines light up one after another and stay lit; each line shows its payline art and amount (green below 20× bet, red from 20×). After the last line and any win screen, the **Win** amount counts up over 500 ms while Spin is already available.
+- **Skip**: pressing Spin, a second Space tap or a tap on the play area during a round shortens it. During the drop the symbols still fall and land visibly, just faster. During the lines every line is still shown, with shorter gaps. A skip never places a wager. The [timing reference](milestone-2-evidence/rereview-2-reference-timing.md) lists the original values.
 
 **How to test**
 
 1. Spin 20 times at the default bet. Expected: no symbol pops or flashes when the old symbols fall out; each reel lands in order.
 2. Find a spin with several winning lines. Expected: lines are shown one by one, earlier lines stay lit, each line amount appears next to its line, and the total counts up in **Win**.
-3. Press Spin or Space again while the reels are dropping and while the win counts up in a separate round. Use the behavior cases in the [re-review plan](milestone-2-evidence/re-review-plan.md#step-by-step-revision-plan) for the revised build.
+3. Tap the reels while they drop. Expected: the symbols finish falling quickly but visibly, then the winning lines and amounts are shown. In another round, tap during the lines. Expected: the remaining lines show faster; the recorded amount is unchanged.
+4. Tap the play area while no round is running. Expected: nothing happens; no wager is placed.
 4. Land two Bonus symbols. Expected: anticipation on the remaining reels.
 5. Open **Menu → Game Rules → Paytable** and compare 3 of the 15 paylines with a winning spin. Expected: the lit symbols follow the drawn line.
 
@@ -58,16 +61,16 @@ Test on at least one desktop browser (Chrome, Edge, Safari or Firefox), one Andr
 
 - HUD layouts for desktop, landscape phones and portrait phones, centered like the original and inside the safe area.
 - **Bet ladder (KRW).** The review baseline contains 22 steps, with a default of ₩20,000. The [25 approved base stakes](milestone-2-evidence/re-review-plan.md#approved-base-stakes) will replace that ladder in the re-review build.
-- **Turbo** can be toggled in the HUD. The current Space hold threshold is 0.4 s; the re-review will measure the reference hold and release behavior.
+- **Turbo** can be toggled in the HUD. Holding Space for 0.4 s turns Turbo on until release; release restores the player's own setting.
 - **Autoplay**: 10, 25, 50, 100, 250, 500, 1,000 or unlimited rounds. The Spin button shows the remaining count; pressing it stops autoplay. **+10** adds rounds while autoplay runs. Autoplay stops on a bonus trigger, a Max Win, insufficient balance or any error.
-- **Space** routes to the shared spin control. The re-review checks the permitted stages for a second tap and verifies that holding the key never places extra wagers through keyboard auto-repeat.
+- **Space**: a press acts like Spin (spin when idle, skip during a round). **Holding Space** keeps playing, as in the original: a new wager starts each time the previous round has been presented and the server allows the next one, one wager at a time, until the key is released or the window loses focus. Keyboard auto-repeat never adds a wager.
 
 **How to test**
 
 1. For the re-review, verify all 25 approved stakes in the Bet Menu and through the bet arrows on the HUD and Feature panel. The first and last steps are ₩200 and ₩200,000.
 2. Turn Turbo on and spin. Expected: faster drops and win lines.
 3. Start Autoplay with 10 rounds. Expected: the counter on Spin goes down by one per round and stops at 0. Start again and press Spin after two rounds. Expected: autoplay stops.
-4. Desktop: check a second Space tap during reels and during the win count. Test Space hold and release with both Turbo settings. Record key-down and key-up as described in the re-review plan.
+4. Desktop: hold Space for a few seconds. Expected: Turbo turns on after 0.4 s and rounds follow one after another, each fully shown. Release. Expected: no further wager, and Turbo returns to its previous setting.
 5. Check the HUD on desktop (1280×720 and 1920×1080), a landscape phone and a portrait phone, including a tall phone such as a Samsung S23 Ultra. Expected: nothing is cut off at the bottom and no page scrollbar appears.
 
 ## 5. Menu, rules, paytable and audio settings
@@ -92,22 +95,22 @@ The RTP line stays hidden until the client supplies the approved RTP figure. The
 
 - **Feature buy** opens a panel with four cards: **Extra Chance** (3× bet per spin), **Super Chance** (6× bet per spin, a triggered bonus is always the Drop Bonus), **Tavern Bonus** (125× bet) and **Drop Bonus** (300× bet). Prices are shown in KRW at the current bet and change with the panel's own bet −/+.
 - Each card opens a confirmation with its description and price. **Confirm** applies it; closing the confirmation (×) returns to the panel without changes.
-- The reviewed HUD shows the active Chance mode and cost per spin. Showing the base stake alongside the cost on desktop and portrait is scheduled for re-review.
+- With a Chance mode active, the HUD keeps the base bet prominent and shows the mode and the cost per spin below it (for example **Bet ₩20,000 · Super Chance · Cost ₩120,000**). On portrait phones the mode and cost stack on two lines so the balance and bet arrows keep their space.
 - Cards that cost more than the balance are disabled (dimmed, as in the original).
-- **Tavern/Drop Bonus Buy** shows a confirmation with the price. In M2, **Confirm** shows **Coming Soon in M3**: "The Tavern and Drop bonus games arrive in Milestone 3. You have not been charged."
+- **Tavern/Drop Bonus Buy** shows a confirmation with the price. In M2, **Confirm** shows **Bonus not available**: "Bonus Buy is currently unavailable. Your balance has not changed."
 
 **How to test**
 
 1. Open **Feature buy** at ₩20,000. Expected: ₩60,000, ₩120,000, ₩2,500,000 and ₩6,000,000 on the four cards.
 2. Choose **Extra Chance → Activate → Confirm** and spin. Expected: the bet label shows the chance mode and the balance goes down by ₩60,000. Press **Feature buy** again. Expected: the chance mode switches off and spins cost ₩20,000 again.
-3. Open Tavern Bonus and close the confirmation with ×. Expected: back in the panel, nothing changes. Open it again and press **Confirm**. Expected: the Coming Soon in M3 message; the balance is unchanged.
+3. Open Tavern Bonus and close the confirmation with ×. Expected: back in the panel, nothing changes. Open it again and press **Confirm**. Expected: the **Bonus not available** message; the balance is unchanged.
 4. Set the bet to ₩200,000 with a balance below ₩60,000,000. Expected: Drop Bonus is disabled.
 
 ## 7. Win animations, sounds, Scatter anticipation and mascot
 
 **Delivered**
 
-- **Win screens** on the original thresholds per spin: from 10× bet the win screen plays, rising through **Big (20×)**, **Super (50×)**, **Mega (75×)** and **Epic (100×)**; **Max Win** at the 10,000× cap. Wins from 5× and below 10× only count up on the HUD. The amount counts continuously across tiers. The re-review will verify where Spin and Space can shorten or end the presentation.
+- **Win screens** on the original thresholds per spin: from 10× bet the win screen plays, rising through **Big (20×)**, **Super (50×)**, **Mega (75×)** and **Epic (100×)**; **Max Win** at the 10,000× cap. Wins from 5× and below 10× only count up on the HUD. The amount counts continuously across tiers. Pressing Spin, Space or the play area jumps to the next tier; on the last tier it completes the amount.
 - **Sounds**: all 66 cues of the original sound sprite are listed in the asset checklist. Button cue parity and real playback verification are part of the re-review. Existing cue groups include reel stops, line wins rising in pitch, round-end coins, win-screen tier stings, Scatter lands, anticipation, ambience and three music layers that build with wins.
 - **Mascot**: the barmaid cheers from a 50× win (below Max Win) and with Bonus triggers. Her giggle and mug sounds come from the animation itself.
 
@@ -141,6 +144,7 @@ All four popups use the same style as **Resume Active Game?**.
 | **Connection Lost** | A spin request failed or its reply was lost | Retry | Retry resends the same round; the bet is charged once |
 | **Reconnecting…** | The browser is offline | Retry is disabled until online | Closes when the browser is back online; never places a new bet by itself |
 | **Please Try Again** | The server declined the request | OK | The balance is unchanged |
+| **Game Updated** | Spin was pressed in a window whose view is out of date (the game was played or a round is open in another window) | OK | Nothing is bet or shown from the other window; the balance is refreshed. While a round is open elsewhere, Spin stays locked ("Round open in another window") until that round ends |
 
 **How to test with Bonus debug** (Feature buy → Bonus debug → Error states)
 
@@ -154,6 +158,8 @@ All four popups use the same style as **Resume Active Game?**.
 - Insufficient balance: raise the bet or a chance mode above the remaining balance.
 - Offline: turn on airplane mode (phone) or set **Offline** in the browser's developer tools Network panel, then press Spin. Turn the network back on. Expected: Reconnecting…, then the popup closes; no spin is placed.
 - Lost reply: start a spin and switch off the network while the reels move. Expected: Connection Lost; Retry after reconnecting presents the round once.
+- Interrupted win: reload while a winning round is on screen. Expected: after Continue the recorded board and win are shown first, with Spin locked, and the confirmed balance follows.
+- Two windows: open the game in two tabs of the same browser. Spin in tab A. Then press Spin in tab B. Expected: **Game Updated** in B, B's balance shows A's result, and B does not show A's win. While a round is running in one tab, Spin in the other is locked until that round ends.
 
 Screenshots of each state are in `docs/milestone-2-evidence/error-states/`.
 
@@ -173,7 +179,7 @@ The verification record is in `docs/milestone-2-evidence/verification.md`. Scree
 | Desktop | Feature buy |
 | --- | --- |
 | ![Base game, desktop](milestone-2-evidence/screens/1-base-game-desktop.jpg) | ![Feature buy panel](milestone-2-evidence/screens/2-feature-buy-panel.jpg) |
-| **Coming Soon in M3** | **Landscape phone** |
+| **Bonus Buy lock (earlier M2 wording)** | **Landscape phone** |
 | ![Coming Soon in M3](milestone-2-evidence/screens/4-coming-soon-in-m3.jpg) | ![Landscape phone](milestone-2-evidence/screens/7-base-game-landscape-844x390.jpg) |
 
 ## 12. Known limits in M2

@@ -39,7 +39,7 @@ test("Tavern arms Continue after native intro and ignores force stop while await
     const response = page.waitForResponse((res) => new URL(res.url()).pathname === "/api/v1/spin");
     await page.locator("#spin").click();
     await expect(page.locator("#spin")).toBeDisabled();
-    await expect(page.locator("#spin")).toHaveAttribute("aria-label", "Spinning");
+    await expect(page.locator("#spin")).toHaveAttribute("aria-label", "Round in progress");
     await page.locator("#spin").dispatchEvent("click");
     await page.keyboard.press("Space");
     expect(paidRequests).toBe(1);

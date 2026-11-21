@@ -231,6 +231,13 @@ export interface GameTransport {
   debugFault?: "fail-request" | "drop-response" | null;
   /** Mock review only: set the synthetic wallet balance. */
   debugSetBalance?(balanceMinor: number): Promise<void>;
+  /**
+   * False while the server reports that no paid round may start (e.g. a round opened in another
+   * window is still unfinished). Undefined means the transport does not track eligibility.
+   */
+  readyForWager?: boolean;
+  /** Fetch the authoritative wallet and eligibility without presenting any round. */
+  reconcile?(): Promise<Snapshot>;
   resume?(refresh?: boolean): Promise<Outcome>;
   completePresentation?(): Promise<Snapshot>;
   nextPresentation?(): Outcome | null;

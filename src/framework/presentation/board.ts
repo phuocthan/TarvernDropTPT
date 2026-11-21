@@ -26,6 +26,9 @@ export type SymbolFactory = (cellSizePx: number, ticker: Ticker) => SymbolView;
 interface DropRound {
   exit: Promise<void>;
   skipped: boolean;
+  /** Resolves when the round is skipped (cuts the wait before the drop). */
+  skipSignal: Promise<void>;
+  signalSkip: () => void;
 }
 interface ReelStopEvents {
   symbol?: (id: string, position: Position) => void;
@@ -53,6 +56,8 @@ export class BoardView {
   private fast = false;
   private dropRound: DropRound | null = null;
   private finishDrop: (() => void) | null = null;
+  /** Speeds up the running drop animation so its remainder ends within `ms` (skip). */
+  private accelerateDrop: ((ms: number) => void) | null = null;
   private resizeObserver?: ResizeObserver;
   private factory: SymbolFactory;
   private readonly cell: number;
@@ -253,11 +258,11 @@ export class BoardView {
       for (const tile of this.tiles.flat()) {
         if (tile.view.visible) tile.effect?.("idle");
       }
-      this.dropRound = {
-        exit: !this.strip.visible ? Promise.resolve()
-          : this.game.presentation.drop.timeline ? this.animateTimeline(false) : this.animateDrop(false),
-        skipped: false,
-      };
+      let signalSkip = () => {};
+      const skipSignal = new Promise<void>((resolve) => { signalSkip = resolve; });
+      this.dropRound = { exit: Promise.resolve(), skipped: false, skipSignal, signalSkip };
+      this.dropRound.exit = !this.strip.visible ? Promise.resolve()
+        : this.game.presentation.drop.timeline ? this.animateTimeline(false) : this.animateDrop(false);
       return;
     }
     this.spinning.fill(true);
@@ -276,8 +281,14 @@ export class BoardView {
     this.skipLanding = true;
     this.resetLanding();
     if (this.dropRound) {
+      if (this.dropRound.skipped) return true;
       this.dropRound.skipped = true;
-      this.finishDrop?.();
+      this.dropRound.signalSkip();
+      const remainder = this.game.presentation.drop.timeline?.enter.skipRemainderMs;
+      // Timeline drops keep a short visible movement from the current positions (reference:
+      // remaining symbols reveal with the fast values); other motions finish at once.
+      if (remainder !== undefined && this.accelerateDrop) this.accelerateDrop(remainder);
+      else if (remainder === undefined) this.finishDrop?.();
     }
     return true;
   }
@@ -302,13 +313,16 @@ export class BoardView {
       await drop.exit;
       if (this.dropRound !== drop) return;
       const timeline = this.game.presentation.drop.timeline;
-      if (timeline && !drop.skipped) {
-        // Reference: the first reel drops in a fixed time after the result arrives.
+      const visibleSkip = !!timeline && timeline.enter.skipRemainderMs !== undefined;
+      if (timeline && (!drop.skipped || visibleSkip)) {
+        // Reference: the first reel drops in a fixed time after the result arrives. A skip cuts
+        // that wait to skipWaitMs and the drop then uses the turbo values.
         const wait = (this.fast ? timeline.enter.turboWaitMs : timeline.enter.waitMs) - (performance.now() - resultAt);
-        if (wait > 0) await delay(wait);
+        if (wait > 0) await Promise.race([delay(wait), drop.skipSignal]);
+        if (drop.skipped) await delay(timeline.enter.skipWaitMs ?? 0);
         if (this.dropRound !== drop) return;
       }
-      if (!drop.skipped) {
+      if (!drop.skipped || visibleSkip) {
         board.forEach((symbols, reel) => this.setReel(reel, symbols, "spin"));
         this.strip.visible = true;
         await (timeline
@@ -406,7 +420,9 @@ export class BoardView {
       }));
     };
     const round = this.dropRound;
-    const live = () => !!round && !round.skipped;
+    // A skipped round still lands, plays reel stops and reports its symbols (reference reveal).
+    const visibleSkip = timeline.enter.skipRemainderMs !== undefined;
+    const live = () => !!round && this.dropRound === round && (visibleSkip || !round.skipped);
     const stoppedReels = new Set<number>();
     const landedScatters: SymbolView[] = [];
     let anticipating = false;
@@ -465,22 +481,30 @@ export class BoardView {
     // The round continues at the reference reveal end; landing squash may still be settling.
     const releaseAt = enterPlan ? enterPlan.revealEndMs : duration;
     return new Promise<void>((resolve) => {
-      const start = performance.now();
+      // Virtual animation clock: runs at real speed until a skip accelerates the remainder.
+      let virtual = 0;
+      let last = performance.now();
+      let speed = 1;
       let frame = 0;
       let done = false;
       let released = false;
+      const accelerate = (ms: number) => {
+        const remaining = Math.max(0, duration - virtual);
+        speed = Math.max(speed, remaining / Math.max(1, ms));
+      };
       const finish = () => {
         if (done) return;
         done = true;
         cancelAnimationFrame(frame);
         if (this.finishDrop === finish) this.finishDrop = null;
+        if (this.accelerateDrop === accelerate) this.accelerateDrop = null;
         paint(duration);
         this.resetLanding();
         if (anticipating) {
           this.clearHighlight();
           if (!anticipationEnded) landing?.events?.anticipation?.(false);
         }
-        const remaining = releaseAt - (performance.now() - start);
+        const remaining = (releaseAt - virtual) / speed;
         if (remaining > 0 && live() && this.dropRound === round) {
           const timer = setTimeout(() => {
             if (this.finishDrop === settle) this.finishDrop = null;
@@ -491,7 +515,9 @@ export class BoardView {
         } else resolve();
       };
       const tick = (now: number) => {
-        const elapsed = now - start;
+        virtual += (now - last) * speed;
+        last = now;
+        const elapsed = virtual;
         if (elapsed >= releaseAt && !released) { released = true; resolve(); }
         if (elapsed >= duration) finish();
         else {
@@ -500,6 +526,7 @@ export class BoardView {
         }
       };
       this.finishDrop = finish;
+      this.accelerateDrop = accelerate;
       frame = requestAnimationFrame(tick);
     });
   }

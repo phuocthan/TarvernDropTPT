@@ -83,7 +83,12 @@ test("3x3 allowForceStop true offers Stop without placing another wager", async 
   await expect(page.locator("#reuse-spin")).toBeEnabled();
   let release!: () => void, requests = 0;
   const gate = new Promise<void>((resolve) => { release = resolve; });
-  await page.route("**/api/v1/spin", async (route) => { requests++; await gate; await route.continue(); });
+  // Count wagers only; the completion ACK of the same round also posts to /spin.
+  await page.route("**/api/v1/spin", async (route) => {
+    if (route.request().postDataJSON()?.isFreespin === 0) requests++;
+    await gate;
+    await route.continue();
+  });
   try {
     await page.locator("#reuse-spin").click();
     await expect(page.locator("#reuse-spin")).toHaveText("Stop");

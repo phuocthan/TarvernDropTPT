@@ -218,3 +218,87 @@ test("base completion response lost before reload restores the confirmed result"
   await reopened.completePresentation();
   assert.equal(reopened.phase, "ready");
 });
+
+test("two windows: stale click reconciles, late completion reply never regresses wallet or unlock", async () => {
+  const { win79k } = await import("./browser/fixtures/m2-rounds.ts");
+  const backend = new ProposalBackend([tavern], null, { rng: () => 0.5, baseBoard: win79k });
+  // A fetcher per window; `holdNext` commits on the server but delivers the reply later.
+  const window = () => {
+    let held: { release: () => void; promise: Promise<void> } | null = null;
+    const bodies: Record<string, unknown>[] = [];
+    const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      const headers = new Headers(init?.headers);
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      bodies.push(body);
+      let reply: Response;
+      try {
+        reply = Response.json(backend.handle("POST", url.pathname.slice(7), body, {
+          sessionId: headers.get("Session-Id") ?? "", token: (headers.get("Authorization") ?? "").slice(7), playToken: headers.get("Play-Token") ?? "",
+        }));
+      } catch (error) {
+        if (!(error instanceof ProposalError)) throw error;
+        reply = Response.json({ error: error.message, ...error.details }, { status: error.status });
+      }
+      const gate = held; held = null;
+      if (gate) await gate.promise;
+      return reply;
+    }) as typeof fetch;
+    const local = storage();
+    local.setItem(tavern.id + ".proposal-v1.user", "two-window-player");
+    const game = structuredClone(tavern);
+    const transport = new ProposalTransport(game, local, fetcher);
+    return {
+      transport, bodies, controller: new GameController(transport, local, "v1.pending"),
+      holdNext() { let release!: () => void; const promise = new Promise<void>((r) => { release = r; }); held = { release, promise }; return release; },
+    };
+  };
+  const a = window(), b = window();
+  await a.controller.boot(); await b.controller.boot();
+  assert.equal(a.controller.state!.balance, 10_000_000);
+
+  const round1 = await a.controller.execute({ action: "spin", bet: 20_000, chance: "standard" });
+  assert.equal(round1.spinWin, 79_000);
+  const wager = a.bodies.find((body) => body.isFreespin === 0)!;
+  assert.equal(typeof wager.requestId, "string");
+  // A's completion commits on the server; its reply (₩10,059,000, ready) is delayed.
+  const releaseA = a.holdNext();
+  const completingA = a.controller.completePresentation();
+
+  // B clicks Spin on the token it loaded: rejected as stale and reconciled, round 1 never shown.
+  await assert.rejects(b.controller.execute({ action: "spin", bet: 20_000, chance: "standard" }), /STALE_PLAY_TOKEN/);
+  assert.equal(b.controller.phase, "ready");
+  assert.equal(b.controller.state!.balance, 10_059_000);
+  assert.equal(b.transport.readyForWager, true);
+  const round2 = await b.controller.execute({ action: "spin", bet: 20_000, chance: "standard" });
+  assert.notEqual(round2.requestId, round1.requestId);
+  assert.equal(round2.state.balance, 10_039_000);
+
+  // A's old reply arrives while B's round is open: A shows ₩10,039,000 and stays locked.
+  releaseA();
+  await completingA;
+  assert.equal(a.controller.state!.balance, 10_039_000);
+  assert.equal(a.transport.readyForWager, false);
+  await assert.rejects(a.controller.execute({ action: "spin", bet: 20_000, chance: "standard" }), /PLAY_TOKEN_REQUIRED/);
+
+  // B completes; A reconciles to the confirmed wallet and may play again.
+  await b.controller.completePresentation();
+  await a.transport.reconcile();
+  assert.equal(a.transport.readyForWager, true);
+  assert.equal((await a.transport.reconcile()).balance, 10_118_000);
+});
+
+test("a lost wager reply is retried with the same request ID and charges once", async (t) => {
+  const f = setup(t);
+  const controller = f.create();
+  await controller.boot();
+  const before = controller.state!.balance;
+  f.loseResponse();
+  await assert.rejects(controller.execute({ action: "spin", bet: 1000, chance: "standard" }));
+  assert.equal(controller.phase, "recovery");
+  const outcome = await controller.recover(false);
+  const wagers = f.requests.filter(({ body }) => body.isFreespin === 0);
+  assert.equal(wagers.length, 2);
+  assert.equal(wagers[0].body.requestId, wagers[1].body.requestId);
+  assert.equal(outcome.state.balance, before - 1000);
+});

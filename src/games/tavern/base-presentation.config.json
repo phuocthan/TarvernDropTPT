@@ -1,9 +1,18 @@
 {
   "spaceHoldMs": 400,
-  "lineSymbolMs": { "normal": 40, "turbo": 5 },
+  "lineSymbolMs": {
+    "normal": 40,
+    "turbo": 5
+  },
   "lineGapMs": 150,
-  "lastLineHoldMs": { "normal": 700, "turbo": 500 },
-  "countMs": { "normal": 850, "turbo": 400 },
+  "lastLineHoldMs": {
+    "normal": 500,
+    "turbo": 500
+  },
+  "countMs": {
+    "normal": 500,
+    "turbo": 500
+  },
   "bonusUnavailable": {
     "title": "Bonus not available",
     "body": "Bonus Buy is currently unavailable. Your balance has not changed."

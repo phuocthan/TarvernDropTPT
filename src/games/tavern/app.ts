@@ -403,7 +403,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("bet-label").textContent = "Bet";
     $("bet").textContent = shownBet;
     $("chance-cost").hidden = !chanceActive;
-    $("chance-cost").textContent = chanceActive ? `${chanceName} · Cost ${cost}` : "";
+    // Two parts so narrow portrait HUDs can stack them instead of widening the bet field.
+    $("chance-cost").innerHTML = chanceActive
+      ? `<span class="chance-mode">${chanceName}</span><span class="chance-sep"> · </span><span class="chance-price">Cost ${cost}</span>`
+      : "";
     $("bet-picker").setAttribute("aria-label", chanceActive
       ? `Bet menu, current bet ${shownBet}, ${chanceName}, cost ${cost} per spin`
       : `Bet menu, current bet ${shownBet}`);
@@ -432,7 +435,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $<HTMLButtonElement>("bet-up").disabled = betLocked || betIndex === game.bets.length - 1;
     const skip = canSkipSpin();
     const spin = $<HTMLButtonElement>("spin");
-    spin.disabled = !autoRunning && (nextFreeSpin || (busy && !skip));
+    // Spin waits for the server to allow a paid round (e.g. none open in another window).
+    const serverBlocked = !busy && !feature && transport.readyForWager === false;
+    spin.disabled = !autoRunning && (nextFreeSpin || (busy && !skip) || serverBlocked);
     spin.classList.toggle("spinning", busy && controller.phase !== "recovery");
     const unlimited = autoRemaining === Infinity;
     spin.innerHTML = autoRunning
@@ -440,7 +445,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       : skip ? hudIcon("skip") : hudIcon("spin") + hudIcon("autoplay-ready");
     spin.setAttribute("aria-label", autoRunning
       ? (unlimited ? "Stop unlimited autoplay" : `Stop autoplay, ${autoRemaining} spins left`)
-      : skip ? "Skip" : busy || nextFreeSpin ? "Round in progress" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
+      : skip ? "Skip" : busy || nextFreeSpin ? "Round in progress"
+      : serverBlocked ? "Round open in another window" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
     $("auto-add").hidden = !autoRunning || unlimited || !controls?.autoTopUp;
     autoPicker.setSelected(autoRunning ? 0 : autoRemaining);
     $("speed").setAttribute("aria-pressed", String(turbo));
@@ -533,14 +539,54 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     epic: "td_wincap_epicwin", max: "td_wincap_maxwin",
   };
   let winSkip: (() => void) | undefined;
+  let holdSpin: () => void = () => {};
   let skipPresentationWait: (() => void) | undefined;
+  /** Ordinary round stage, for input: reels moving, pre-win wait or win lines. */
+  let presentPhase: "wait" | "lines" | null = null;
+  function setPhase(phase: typeof presentPhase) {
+    presentPhase = phase;
+    const shell = stage.parentElement!;
+    if (phase) shell.dataset.presentPhase = phase;
+    else delete shell.dataset.presentPhase;
+  }
+  /** A skip during the win lines (reel skips do not carry into the lines). */
+  let lineSkip = false;
+  let countAfterTier: number | null = null;
+  /** Ends a running HUD win count at its recorded amount. */
+  let finishWinCount: (() => void) | undefined;
+  /** Reference HUD win: counts up after the lines and win screen, 500 ms cubic-out, without
+   *  holding the round; a play-area tap or the next spin ends it. */
+  function startWinCount(amount: number) {
+    finishWinCount?.();
+    const from = performance.now();
+    const ms = basePresentation.countMs[turbo ? "turbo" : "normal"];
+    let frame = 0;
+    const finish = () => {
+      cancelAnimationFrame(frame);
+      if (finishWinCount !== finish) return;
+      finishWinCount = undefined;
+      displayWin = amount;
+      syncWin(presentingFeature);
+    };
+    const tick = () => {
+      if (finishWinCount !== finish) return;
+      const t = Math.min(1, (performance.now() - from) / ms);
+      displayWin = Math.round(amount * (1 - (1 - t) ** 3));
+      syncWin(presentingFeature);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else finish();
+    };
+    finishWinCount = finish;
+    tick();
+  }
 
   function canSkipSpin() {
     return controller.phase === "presenting" && !dialog.open &&
-      (!!winSkip || (basePresentationSkippable && !skipped && (!view.isMoving || view.allowForceStop)));
+      (!!winSkip || (basePresentationSkippable && (!view.isMoving || view.allowForceStop) &&
+        (presentPhase === "lines" ? !lineSkip : !skipped)));
   }
   function waitForWin(ms: number) {
-    if (skipped || ms <= 0) return Promise.resolve();
+    if (lineSkip || ms <= 0) return Promise.resolve();
     return new Promise<void>((resolve) => {
       const finish = () => {
         clearTimeout(timer);
@@ -751,10 +797,15 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       : (outcome.finalFeature ?? outcome.state.feature);
     const checkpoint = outcome.checkpoint;
     if (checkpoint?.staticResult && checkpoint.curStep === "base") {
+      // An interrupted ordinary round: show its recorded board and win first, with Spin locked,
+      // then confirm the completion. The confirmed balance arrives with the completion reply.
       view.setBoard(outcome.state.board);
-      await controller.completePresentation();
       displayWin = checkpoint.displayWinMinor ?? outcome.spinWin;
       showRecoveredWin = true;
+      sync();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      stage.dataset.recoveredWinShown = String(performance.now());
+      await controller.completePresentation();
       sync();
       return;
     }
@@ -801,8 +852,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         sync();
         if (!plainNoWin) {
           if (ordinary) {
+            // Reference boardWin: 500 ms (300 in Turbo or after a reel skip), not cut by input.
             const check = game.presentation.checkWinDelayMs;
-            await waitForWin((turbo ? check?.turbo : check?.normal) ?? 0);
+            setPhase("wait");
+            await delay(((turbo || skipped) ? check?.turbo : check?.normal) ?? 0);
           } else await waitAfterReels(spinTurbo);
         }
         const scatter =
@@ -822,25 +875,27 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           // Reference v13 animateBoardWins: lines accumulate (earlier lines stay lit); each
           // symbol of a line starts its win 40 ms after the previous (turbo/skip 5 ms), a line
           // ends with 150 ms (normal only) and the last line holds 500 ms.
+          // A reel skip does not skip the lines (reference resets skip before boardWin). A skip
+          // during the lines only shortens them: every line still shows its cue and amount.
           const lit: Position[] = [];
+          lineSkip = false;
+          setPhase("lines");
+          const lineFast = () => turbo || (ordinary ? lineSkip : skipped);
           for (const [index, win] of outcome.wins.entries()) {
-            const fast = () => turbo || skipped;
-            if (ordinary && skipped) break;
             sound.lineWin(win.amount / outcome.bet, turbo);
-            payline.show(win, game.lines[win.line], money(win.amount), win.amount >= outcome.bet * 20, fast());
+            payline.show(win, game.lines[win.line], money(win.amount), win.amount >= outcome.bet * 20, lineFast());
             for (const position of win.positions)
               if (!lit.some((p) => p.reel === position.reel && p.row === position.row)) lit.push(position);
             for (const position of win.positions) {
-              if (ordinary && skipped) break;
               void view.focusWins(lit, [position]);
-              const time = basePresentation.lineSymbolMs[fast() ? "turbo" : "normal"];
+              const time = basePresentation.lineSymbolMs[lineFast() ? "turbo" : "normal"];
               await (ordinary ? waitForWin(time) : delay(time));
             }
-            if (!fast()) await (ordinary ? waitForWin(basePresentation.lineGapMs) : delay(150));
+            if (!lineFast()) await (ordinary ? waitForWin(basePresentation.lineGapMs) : delay(150));
             if (index === outcome.wins.length - 1)
-              await (ordinary ? waitForWin(basePresentation.lastLineHoldMs[fast() ? "turbo" : "normal"]) : delay(500));
+              await delay(ordinary ? basePresentation.lastLineHoldMs[lineFast() ? "turbo" : "normal"] : 500);
           }
-          if (scatter.length && (outcome.entry || !skipped)) {
+          if (scatter.length && (outcome.entry || !(ordinary ? lineSkip : skipped))) {
             await view.waitForLandings(scatter);
             // Reference bonusEnter: 380 ms, then the mascot win with the Scatters.
             // bonusRetrigger: 500 ms (turbo 300). Other Scatters do not cheer.
@@ -852,11 +907,10 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
             await view.focusWins(scatter);
           }
           view.clearHighlight();
-          if (ordinary && skipped) payline.clear();
         };
         let previousFrame = performance.now();
         let countProgress = 0;
-        const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
+        const countWin = plainNoWin || ordinary ? undefined : new Promise<void>((resolve) => {
           const tick = () => {
             const now = performance.now();
             const countMs = ordinary ? basePresentation.countMs[turbo ? "turbo" : "normal"] : turbo ? 179 : 650;
@@ -871,7 +925,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           tick();
         });
         await Promise.all([animateWins(), countWin, effects?.waitForChestActivations()]);
-        basePresentationSkippable = false;
+        if (ordinary && !plainNoWin) countAfterTier = outcome.spinWin;
         countingFeatureBase = undefined;
         sync();
         if (outcome.retrigger) {
@@ -1094,6 +1148,12 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (outcome.spinWin >= outcome.bet * 50) celebrate();
       await showWinSequence(outcome.spinWin, outcome.bet);
     }
+    basePresentationSkippable = false;
+    setPhase(null);
+    if (countAfterTier !== null) {
+      startWinCount(countAfterTier);
+      countAfterTier = null;
+    }
     await controller.completePresentation();
     const next = controller.nextPresentation();
     if (next) { await present(next, spinTurbo); return; }
@@ -1121,16 +1181,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       return;
     }
     if (!recover && controller.phase !== "ready") {
-      if (!canSkipSpin()) return;
-      if (winSkip) {
-        winSkip();
-        return;
-      }
-      skipped = true;
-      skipPresentationWait?.();
-      view.skip();
-      effects?.skip();
-      sync();
+      skipRound();
       return;
     }
     clearSpinTimer();
@@ -1147,6 +1198,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       return;
     }
     showRecoveredWin = false;
+    finishWinCount = undefined;
+    setPhase(null);
+    lineSkip = false;
     displayWin = 0;
     syncWin(controller.state?.feature);
     const spinTurbo = turbo;
@@ -1187,6 +1241,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         basePresentationSkippable = false;
         sync();
       }
+      watchReadiness();
+      holdSpin();
     } catch (error) {
       stopAuto();
       if (controller.state) {
@@ -1196,6 +1252,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       const pending = controller.phase === "recovery";
       const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : "";
       if (/INSUFFICIENT/.test(code)) showInsufficientBalance();
+      else if (/STALE_PLAY_TOKEN|INVALID_PLAY_TOKEN|ROUND_IN_PROGRESS/.test(code)) showGameUpdated();
       else if (pending || (error instanceof TypeError) ||
           (error instanceof Error && /Timeout|Abort/.test(error.name)) || /NETWORK|TIMEOUT|OFFLINE/.test(code))
         showConnectionLost(pending, () => {
@@ -1208,11 +1265,59 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       sync();
     }
   }
+  /**
+   * Skip input for the active round (Spin/Skip button, a second Space tap or a play-area tap).
+   * Reels: finish the drop quickly (still visible). Lines: shorten them, keeping every cue.
+   * Win screen: jump to the next tier. Never starts a wager.
+   */
+  function skipRound() {
+    if (!canSkipSpin()) return;
+    if (winSkip) {
+      winSkip();
+      return;
+    }
+    if (presentPhase === "lines") {
+      lineSkip = true;
+      skipPresentationWait?.();
+    } else {
+      skipped = true;
+      view.skip();
+      effects?.skip();
+    }
+    sync();
+  }
+  /**
+   * The server refused a wager because this window's view was stale (another window played or
+   * holds an open round). The wallet and eligibility were reconciled; nothing is presented or bet.
+   */
+  let reconcileTimer = 0;
+  function showGameUpdated() {
+    const blocked = transport.readyForWager === false;
+    notice("updated", "Game Updated", blocked
+      ? "A round is still open in another window. Finish it there, or reload this page to continue it here."
+      : "This game was played in another window. Your balance has been updated.",
+    [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
+    watchReadiness();
+  }
+  /** While the server holds paid play (a round open elsewhere), re-check it every 3 s. */
+  function watchReadiness() {
+    window.clearInterval(reconcileTimer);
+    if (transport.readyForWager !== false || !transport.reconcile) return;
+    reconcileTimer = window.setInterval(async () => {
+      if (controller.phase !== "ready") return;
+      try {
+        controller.state = await transport.reconcile!();
+      } catch { return; }
+      if (transport.readyForWager !== false) window.clearInterval(reconcileTimer);
+      sync();
+    }, 3000);
+  }
   root.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     const button = event.target.closest<HTMLButtonElement>("button");
     if (!button || button.disabled) return;
-    if (button.id === "buy") sound.buttonClick(true);
+    // Reference: the Feature Buy opener uses the special cue; as "Disable" it is a plain click.
+    if (button.id === "buy") sound.buttonClick(chance === "standard");
     else if (button.matches("#auto, #auto-add, #speed, #menu, #menu-rules, #bet-picker, #confirm-buy, #notice-ok, .close-modal, [data-buy], [data-chance], .bet-picker-options button"))
       sound.buttonClick();
   }, { capture: true });
@@ -1441,7 +1546,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     };
   }
   $("buy").onclick = () => {
-    sound.buttonClick(true);
     if (controller.phase !== "ready" || controller.state?.feature) return;
     stopAuto();
     if (chance !== "standard") {
@@ -1548,6 +1652,29 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     moneyObserver.observe(field, { childList: true, characterData: true, subtree: true }));
   window.addEventListener("resize", () => requestAnimationFrame(refitMoney));
   let turboBeforeHold: boolean | undefined;
+  /** Space held past the hold threshold: keep placing fast wagers one at a time. */
+  let spaceHeld = false;
+  let holdTimer = 0;
+  holdSpin = () => {
+    window.clearTimeout(holdTimer);
+    if (!spaceHeld) return;
+    // Reference: while held, the next wager starts as soon as Spin is enabled again. One wager
+    // at a time, only after the round's presentation ended and the server allows a new round.
+    holdTimer = window.setTimeout(() => {
+      holdTimer = 0;
+      const spin = $<HTMLButtonElement>("spin");
+      if (!spaceHeld || autoRunning || dialog.open || controller.phase !== "ready" ||
+          controller.state?.feature || transport.readyForWager === false || spin.disabled) return;
+      void run("spin");
+    }, 0);
+  };
+  // Play-area tap: skips the active round (or ends the win count). It never places a wager.
+  stage.addEventListener("pointerdown", (event) => {
+    if (!(event.target instanceof Element) || event.button > 0 ||
+        event.target.closest("button, dialog, input, select, a, .tavern-hud, [popover]")) return;
+    if (controller.phase !== "ready") skipRound();
+    else finishWinCount?.();
+  });
   runtime.lifetime.add(bindHoldShortcut(window, {
     code: "Space",
     holdMs: basePresentation.spaceHoldMs,
@@ -1561,6 +1688,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (!spin.disabled && spin.getClientRects().length) spin.click();
     },
     hold(active) {
+      spaceHeld = active;
+      if (active) holdSpin();
+      else window.clearTimeout(holdTimer);
       if (active) {
         if ($<HTMLButtonElement>("speed").disabled || dialog.open) return;
         turboBeforeHold = turbo;
