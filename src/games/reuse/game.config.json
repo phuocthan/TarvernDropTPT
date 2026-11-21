@@ -131,8 +131,8 @@
     }
   },
   "demo": {
-    "initialBalance": 100000,
-    "capMultiplier": 50,
+    "initialBalance": 10000000,
+    "capMultiplier": 10000,
     "buyPrices": {
       "tavern": 0,
       "drop": 0

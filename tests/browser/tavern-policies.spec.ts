@@ -91,7 +91,7 @@ test("Tavern locks both bonus purchases by default and leaves the wallet unchang
     await expect(page.locator("#open-bonus-debug")).toHaveCount(0);
     await page.locator(`[data-buy="${mode}"]`).click();
     await page.locator("#confirm-buy").click();
-    await expect(page.getByRole("heading", { name: "Coming Soon in M3" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bonus not available" })).toBeVisible();
     await page.locator("#notice-ok").click();
     await expect(balanceLabel).toHaveText(balance!);
   }
@@ -105,7 +105,7 @@ test("Tavern keeps Bonus Buy and Bonus Debug locked when the preview is off", as
   await expect(page.locator("#open-bonus-debug")).toHaveCount(0);
   await page.locator('[data-buy="tavern"]').click();
   await page.locator("#confirm-buy").click();
-  await expect(page.getByRole("heading", { name: "Coming Soon in M3" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bonus not available" })).toBeVisible();
 });
 
 for (const [quality, viewport] of [

@@ -281,6 +281,9 @@ export class BoardView {
     }
     return true;
   }
+  setTurbo(turbo: boolean) {
+    if (!this.skipLanding) this.fast = turbo;
+  }
   async stop(
     board: Board,
     playLandingEffects?: (effects: SymbolLandingEffects) => void,

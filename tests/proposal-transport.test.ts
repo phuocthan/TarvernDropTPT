@@ -154,7 +154,7 @@ test("FE retries a lost paid response with the original Play-Token after reload"
   assert.equal(result.state.balance, 10000000 - 1000 + result.paidAward);
   await controller.completePresentation();
   const again = f.create(); await again.boot();
-  assert.equal(again.state!.balance, result.state.balance);
+  assert.equal(again.state!.balance, result.state.balance + result.spinWin);
   assert.equal(again.phase, "ready");
 });
 
@@ -198,4 +198,23 @@ test("lost final ACK response reconciles the settled wallet without reopening a 
   await controller.completePresentation();
   assert.equal(controller.phase, "ready");
   assert.equal(controller.state!.feature, null);
+});
+
+test("base completion response lost before reload restores the confirmed result", async (t) => {
+  const f = setup(t);
+  const initial = f.create();
+  await initial.boot();
+  const outcome = await initial.execute({ action: "spin", bet: 1000, chance: "standard" });
+  f.loseResponse();
+  await assert.rejects(initial.completePresentation(), /NETWORK_LOST/);
+  const reopened = f.create();
+  await reopened.boot();
+  assert.equal(reopened.phase, "recovery");
+  const result = await reopened.recover(false);
+  assert.equal(result.checkpoint!.staticResult, true);
+  assert.equal(result.requestId, outcome.requestId);
+  assert.equal(result.spinWin, outcome.spinWin);
+  assert.equal(result.state.balance, 10_000_000 - 1000 + outcome.spinWin);
+  await reopened.completePresentation();
+  assert.equal(reopened.phase, "ready");
 });

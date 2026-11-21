@@ -1,5 +1,7 @@
 # M2 verification record
 
+This table records the original M2 export and smoke checks. For the client review of MR !2 at `807f914` and the next verification pass, see the [M2 re-review plan](re-review-plan.md).
+
 | Check | Environment | Result |
 | --- | --- | --- |
 | Export | `node release/export-milestone-2.mjs` from the source revision in `SOURCE_REVISION` | 222 files listed in `EXPORT_MANIFEST.json` |

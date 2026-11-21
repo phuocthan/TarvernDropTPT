@@ -14,6 +14,7 @@ export interface InfoScreenContent {
   rules: string;
   /** Groups shown as separate rows, e.g. low symbols, high symbols, wild. */
   paytable: InfoPaySymbol[][];
+  paytableNote?: string;
   waysToWin: string;
   /** lines[i][reel] is the row of payline i on that reel. */
   paylines: { reels: number; rows: number; lines: number[][] };
@@ -131,7 +132,7 @@ export function openInfoScreen(content: InfoScreenContent, host: HTMLElement = d
   const wrap = element("div", "info-wrap");
   wrap.append(
     section(content.headings.rules, paragraph(content.rules)),
-    content.paytable.length ? section(content.headings.paytable, paytable(content)) : element("div"),
+    content.paytable.length ? section(content.headings.paytable, ...(content.paytableNote ? [paragraph(content.paytableNote)] : []), paytable(content)) : element("div"),
     section(content.headings.waysToWin, paragraph(content.waysToWin), paylines(content.paylines)),
     section(content.headings.features, ...features(content)),
     section(content.headings.general, paragraph(content.general)),

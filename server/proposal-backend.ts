@@ -69,7 +69,7 @@ export class ProposalError extends Error {
 }
 
 const DAY = 24 * 60 * 60 * 1000;
-const SYMBOLS = ["wild", "crown", "barrel", "coin", "ale", "A", "K", "Q", "J", "10", "bonus"];
+const LEGACY_SYMBOLS = ["wild", "crown", "barrel", "coin", "ale", "A", "K", "Q", "J", "10", "bonus"];
 function fingerprint(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(fingerprint).join(",") + "]";
   if (value && typeof value === "object")
@@ -86,23 +86,32 @@ function requireFields(body: Payload, allowed: string[]) {
 export class ProposalBackend {
   private database: Database = { schemaVersion: 1, sessions: {}, accounts: {} };
   private definitions = new Map<string, GameDefinition>();
+  private symbolMappings = new Map<GameDefinition, Map<string, number>>();
   private file: string | null;
   private now: () => number;
   private rng: () => number;
   private mockGamePolicy: MockGamePolicy;
   private enableMockBonus: boolean;
-  constructor(games: GameDefinition[], file: string | null, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy; enableMockBonus?: boolean } = {}) {
+  private baseBoard?: Board;
+  constructor(games: GameDefinition[], file: string | null, options: { now?: () => number; rng?: () => number; mockGamePolicy?: MockGamePolicy; enableMockBonus?: boolean; baseBoard?: Board } = {}) {
     this.file = file === null ? null : resolve(file);
     this.now = options.now ?? Date.now;
     this.rng = options.rng ?? Math.random;
     this.mockGamePolicy = { ...options.mockGamePolicy };
     this.enableMockBonus = options.enableMockBonus === true;
+    this.baseBoard = options.baseBoard;
     for (const source of games) {
       const game = structuredClone(source);
       // Bets, default bet and Chance/Buy prices come from the game config (Tavern: the
       // client's KRW 200-200,000 range on the reference USD step pattern, prices 1/3/6/125/300).
-      game.demo.capMultiplier = 10000;
-      game.demo.initialBalance = 10000000;
+      const mapping = new Map(game.symbols.map(({ id }) => {
+        const legacyId = LEGACY_SYMBOLS.indexOf(id) + 1;
+        // Existing receipts store numeric symbols. Preserve their IDs and give new
+        // symbols stable IDs even if the presentation config reorders its symbols.
+        return [id, legacyId || LEGACY_SYMBOLS.length + 1 + createHash("sha256").update(id).digest().readUInt32BE(0)];
+      }));
+      if (new Set(mapping.values()).size !== mapping.size) throw Error(`Duplicate wire symbol ID in "${game.id}".`);
+      this.symbolMappings.set(game, mapping);
       const code = game.routing.query === "tavern" ? "tavern-drop" : game.routing.query;
       this.definitions.set(code, game);
     }
@@ -157,17 +166,18 @@ export class ProposalBackend {
     if (!account) {
       account = {
         balance: definition.demo.initialBalance, walletVersion: 0, playToken: randomUUID(),
-        lastReels: this.reels(definition.initialBoard), latestRoundId: null,
+        lastReels: this.reels(definition, definition.initialBoard), latestRoundId: null,
         rounds: {}, wagers: {}, acknowledgments: {},
       };
       games[gameCode] = account;
     }
     return { account, definition };
   }
-  private reels(board: Board) {
+  private reels(definition: GameDefinition, board: Board) {
+    const symbols = this.symbolMappings.get(definition)!;
     return Array.from({ length: board[0].length }, (_, row) =>
       board.map((column) => {
-        const id = SYMBOLS.indexOf(column[row]) + 1;
+        const id = symbols.get(column[row]);
         if (!id) throw new ProposalError("UNSUPPORTED_SYMBOL", 500);
         return id;
       })).flat();
@@ -180,10 +190,10 @@ export class ProposalBackend {
       keyPositions: state.chests.flatMap((chest, reel) => chest.rows.map((row) => row * state.chests.length + reel + 1)).sort((a, b) => a - b),
     };
   }
-  private spinStep(outcome: Outcome, feature: Feature | null, type: string, curStep: CurStep): Step {
+  private spinStep(definition: GameDefinition, outcome: Outcome, feature: Feature | null, type: string, curStep: CurStep): Step {
     const cols = outcome.state.board.length;
     return {
-      stepId: randomUUID(), type, curStep, reels: this.reels(outcome.state.board),
+      stepId: randomUUID(), type, curStep, reels: this.reels(definition, outcome.state.board),
       winLines: outcome.wins.map((win) => ({
         type: "N", lineId: win.line + 1,
         winSym: win.positions.map(({ reel, row }) => row * cols + reel + 1),
@@ -197,9 +207,10 @@ export class ProposalBackend {
     return {
       configId: definition.id + "-" + createHash("sha256").update(fingerprint(definition)).digest("hex").slice(0, 16),
       cols: definition.reels, rows: definition.rows, lineCount: definition.lines.length,
-      currency: "KRW", currencyExponent: 0, defaultBetMinor: definition.defaultBet, allowedBetMinor: definition.bets,
-      roundCapMultiplier: 10000,
-      symbolIds: Object.fromEntries(SYMBOLS.map((symbol, index) => [index + 1, symbol])),
+      currency: definition.currency?.code ?? "KRW", currencyExponent: definition.currency?.exponent ?? 0,
+      defaultBetMinor: definition.defaultBet, allowedBetMinor: definition.bets,
+      roundCapMultiplier: definition.demo.capMultiplier,
+      symbolIds: Object.fromEntries(Array.from(this.symbolMappings.get(definition)!, ([symbol, id]) => [id, symbol])),
       paylines: definition.lines.map((line, index) => ({ lineId: index + 1, positions: line.map((row, reel) => row * definition.reels + reel + 1) })),
       chancePrices: { normal: definition.demo.chancePrices.standard, extra: definition.demo.chancePrices.extra, super: definition.demo.chancePrices.super },
       buyPrices: definition.demo.buyPrices,
@@ -253,30 +264,31 @@ export class ProposalBackend {
         finalFeature: final ? feature : null,
         completion: final ? settleFeature(accumulated, multipliers, 0, cap) : null,
       };
-      steps.push(this.spinStep(outcome, this.feature(feature, 0, "freespin"), "free_spin", "freespin"));
+      steps.push(this.spinStep(definition, outcome, this.feature(feature, 0, "freespin"), "free_spin", "freespin"));
     }
     return outcome;
   }
   private buildRound(definition: GameDefinition, bet: number, action: "spin" | "buy-tavern" | "buy-drop", chance: "standard" | "extra" | "super", scenario?: MockBonusScenario): Round {
     const mock = new MockGame(definition, this.rng, this.mockGamePolicy);
     mock.state.balance = Number.MAX_SAFE_INTEGER / 2;
-    let outcome = mock.execute({ requestId: randomUUID(), expectedVersion: 0, action, bet, chance });
+    let outcome = mock.execute({ requestId: randomUUID(), expectedVersion: 0, action, bet, chance },
+      action === "spin" ? this.baseBoard : undefined);
     const mode = outcome.entry;
     const chargedMinor = bet * (action === "spin" ? definition.demo.chancePrices[chance] : definition.demo.buyPrices[action === "buy-drop" ? "drop" : "tavern"]);
     const baseWin = outcome.spinWin;
-    const steps = [this.spinStep(outcome, null, "base_spin", "base")];
+    const steps = [this.spinStep(definition, outcome, null, "base_spin", "base")];
     let finalAward = baseWin;
     if (mode && outcome.state.feature) {
       if (scenario) outcome.state.feature.remaining = scenario.spins;
       const feature = this.feature(outcome.state.feature, baseWin, "intro");
-      steps.push(this.spinStep(outcome, feature, "bonus_enter", "intro"));
+      steps.push(this.spinStep(definition, outcome, feature, "bonus_enter", "intro"));
       if (scenario) outcome = this.mockFreeSpins(definition, outcome, scenario, steps);
       else while (mock.state.feature) {
         outcome = mock.execute({ requestId: randomUUID(), expectedVersion: mock.state.version, action: "spin", bet, chance: "standard" });
         const state = outcome.finalFeature ?? outcome.state.feature!;
         if (outcome.completion) state.remaining = 0;
         const after = this.feature(state, baseWin, "freespin");
-        steps.push(this.spinStep(outcome, after, "free_spin", "freespin"));
+        steps.push(this.spinStep(definition, outcome, after, "free_spin", "freespin"));
       }
       const completion = outcome.completion!;
       finalAward = completion.roundAward;
@@ -293,7 +305,7 @@ export class ProposalBackend {
         });
         let amount = completion.accumulated;
         for (const chest of eligible) {
-          amount = Math.min(amount * chest.multiplier!, Math.max(0, bet * 10000 - baseWin));
+          amount = Math.min(amount * chest.multiplier!, Math.max(0, bet * definition.demo.capMultiplier - baseWin));
           opened.push({ reel: chest.reel, multiplier: chest.multiplier! });
           steps.push({
             stepId: randomUUID(), type: "chest_reveal", curStep: "open-chest",
@@ -316,8 +328,8 @@ export class ProposalBackend {
     return {
       roundId: randomUUID(), configId: settings.configId as string, settings, originalBaseBetMinor: bet,
       chargedMinor, finalAwardMinor: finalAward, steps,
-      releasedThrough: mode ? 2 : 1, presentedThrough: 1,
-      presentationStatus: mode ? "pending" : "completed", lastActivityAt: now, deadlineAt: now + 30 * DAY,
+      releasedThrough: mode ? 2 : 1, presentedThrough: mode ? 1 : 0,
+      presentationStatus: "pending", lastActivityAt: now, deadlineAt: now + 30 * DAY,
       summaryId: null, settlement: { status: "pending", creditedMinor: 0, settlementId: null },
     };
   }
@@ -351,27 +363,28 @@ export class ProposalBackend {
         for (const account of Object.values(games)) this.expire(account);
     });
   }
-  private envelope(account: AccountGame, round?: Round): Payload {
+  private envelope(definition: GameDefinition, account: AccountGame, round?: Round): Payload {
     const allowed = !round || (round.presentationStatus !== "pending" && !round.summaryId && round.settlement.status !== "pending");
     return {
-      code: 0, synthetic: true, contractVersion: "v1-review-6", currency: "KRW", currencyExponent: 0,
+      code: 0, synthetic: true, contractVersion: "v1-review-6", currency: round?.settings.currency ?? (definition.currency?.code ?? "KRW"),
+      currencyExponent: round?.settings.currencyExponent ?? (definition.currency?.exponent ?? 0),
       wallet: { confirmedBalanceMinor: account.balance, walletVersion: account.walletVersion },
       canStartPaidRound: allowed,
       ...(allowed ? { playToken: account.playToken } : {}),
       ...(round ? {
         roundId: round.roundId, originalBaseBetMinor: round.originalBaseBetMinor,
-        chargedMinor: round.chargedMinor, roundCapMinor: round.originalBaseBetMinor * 10000,
+        chargedMinor: round.chargedMinor, roundCapMinor: round.originalBaseBetMinor * Number(round.settings.roundCapMultiplier),
         configId: round.configId, releasedThrough: round.releasedThrough, presentedThrough: round.presentedThrough,
         inactivityDeadlineAt: new Date(round.deadlineAt).toISOString(),
         presentationStatus: round.presentationStatus, settlement: structuredClone(round.settlement),
       } : {}),
     };
   }
-  private release(account: AccountGame, round: Round): Payload {
+  private release(definition: GameDefinition, account: AccountGame, round: Round): Payload {
     const step = round.steps[round.releasedThrough - 1];
     account.lastReels = [...step.reels];
     return {
-      ...this.envelope(account, round), step: structuredClone(step), stepId: step.stepId,
+      ...this.envelope(definition, account, round), step: structuredClone(step), stepId: step.stepId,
       freegame: structuredClone(step.freegame), reels: [...step.reels],
       winLines: step.winLines ?? [], totalwin_amt: step.totalwin_amt ?? 0,
     };
@@ -399,11 +412,11 @@ export class ProposalBackend {
             ? "show_stored_result" : "play_step",
           roundId: current.roundId, releasedThrough: current.releasedThrough, presentedThrough: current.presentedThrough,
           step: structuredClone(current.steps[current.releasedThrough - 1]),
-          snapshot: structuredClone(current.steps[(current.steps[current.releasedThrough - 1].curStep === "freespin"
+          snapshot: structuredClone(current.steps[(current.steps.length === 1 || current.steps[current.releasedThrough - 1].curStep === "freespin"
             ? current.releasedThrough : current.presentedThrough) - 1]),
         } : null;
         return {
-          ...this.envelope(account, current),
+          ...this.envelope(definition, account, current),
           settings: {
             ...(current?.presentationStatus === "pending" || current?.summaryId ? current.settings : this.settings(definition)),
             mockBonusEnabled: this.canDebugBonus(definition),
@@ -414,7 +427,7 @@ export class ProposalBackend {
       }
       if (path === "/rounds/status") {
         requireFields(body, []);
-        return this.envelope(account, current);
+        return this.envelope(definition, account, current);
       }
       if (path === "/debug/balance") {
         // Mock review only (Bonus debug): set the wallet to exercise Insufficient Balance.
@@ -427,7 +440,7 @@ export class ProposalBackend {
           throw new ProposalError("ROUND_IN_PROGRESS", 409);
         account.balance = value;
         account.walletVersion++;
-        return this.envelope(account, current);
+        return this.envelope(definition, account, current);
       }
       if (method !== "POST" || !["/spin", "/buy-feature"].includes(path)) throw new ProposalError("NOT_FOUND", 404);
       if (path === "/spin" && body.curStep === "final-summary") {
@@ -442,7 +455,7 @@ export class ProposalBackend {
         const round = Object.values(account.rounds).find((item) => item.summaryId === key);
         if (!round) throw new ProposalError("UNKNOWN_SUMMARY");
         round.summaryId = null;
-        const response = { ...this.envelope(account, current), resume: null };
+        const response = { ...this.envelope(definition, account, current), resume: null };
         account.acknowledgments[key] = { fingerprint: fingerprint(body), response };
         return response;
       }
@@ -451,9 +464,13 @@ export class ProposalBackend {
         if (typeof body.stepId !== "string" || (body.kind !== undefined && body.kind !== "shown_as_result"))
           throw new ProposalError("INVALID_CHECKPOINT", 400);
         const key = body.stepId;
+        // Showing a recorded base result and completing its live animation attest to the same step.
+        const receiptHash = body.curStep === "base"
+          ? fingerprint({ isFreespin: 1, curStep: body.curStep, stepId: key })
+          : fingerprint(body);
         const saved = account.acknowledgments[key];
         if (saved) {
-          if (saved.fingerprint !== fingerprint(body)) throw new ProposalError("REQUEST_CONFLICT");
+          if (saved.fingerprint !== receiptHash) throw new ProposalError("REQUEST_CONFLICT");
           return saved.response;
         }
         const round = Object.values(account.rounds).find((item) => item.steps.some((step) => step.stepId === key));
@@ -468,9 +485,10 @@ export class ProposalBackend {
           this.settle(account, round);
         } else round.releasedThrough++;
         const response = round.presentationStatus === "completed"
-          ? { ...this.envelope(account, round), freegame: null, resume: null }
-          : this.release(account, round);
-        account.acknowledgments[key] = { fingerprint: fingerprint(body), response };
+          ? { ...this.envelope(definition, account, round), freegame: null, resume: null,
+              ...(step.curStep === "base" ? { finalRoundAwardMinor: round.finalAwardMinor } : {}) }
+          : this.release(definition, account, round);
+        account.acknowledgments[key] = { fingerprint: receiptHash, response };
         return response;
       }
       requireFields(body, path === "/spin" ? ["isFreespin", "betMinor", "chanceMode"] : [
@@ -485,7 +503,7 @@ export class ProposalBackend {
         return saved.response;
       }
       if (auth.playToken !== account.playToken) throw new ProposalError("INVALID_PLAY_TOKEN");
-      if (!this.envelope(account, current).canStartPaidRound) throw new ProposalError("ROUND_IN_PROGRESS");
+      if (!this.envelope(definition, account, current).canStartPaidRound) throw new ProposalError("ROUND_IN_PROGRESS");
       if (!Number.isSafeInteger(body.betMinor) || !definition.bets.includes(body.betMinor as number))
         throw new ProposalError("INVALID_BET", 400);
       let action: "spin" | "buy-tavern" | "buy-drop" = "spin";
@@ -508,8 +526,7 @@ export class ProposalBackend {
       account.walletVersion++;
       account.rounds[round.roundId] = round;
       account.latestRoundId = round.roundId;
-      if (round.presentationStatus === "completed") this.settle(account, round);
-      const response = this.release(account, round);
+      const response = this.release(definition, account, round);
       account.wagers[auth.playToken] = { fingerprint: requestHash, response };
       return response;
     });

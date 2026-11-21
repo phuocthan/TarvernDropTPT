@@ -16,7 +16,7 @@ interface Step {
 }
 interface Response {
   sessionId?: string; token?: string; userId?: string;
-  playToken?: string; roundId?: string; originalBaseBetMinor?: number; roundCapMinor?: number;
+  canStartPaidRound?: boolean; playToken?: string; roundId?: string; originalBaseBetMinor?: number; roundCapMinor?: number;
   wallet: { confirmedBalanceMinor: number; walletVersion: number };
   releasedThrough?: number; presentedThrough?: number; presentationStatus?: string;
   settlement?: { status: string; creditedMinor: number };
@@ -28,7 +28,7 @@ interface Response {
     chancePrices: { normal: number; extra: number; super: number }; buyPrices: { tavern: number; drop: number }; roundCapMultiplier: number;
     mockBonusEnabled?: boolean;
   };
-  resume?: { mode: string; summaryId?: string; finalRoundAwardMinor?: number; step?: Step; snapshot?: Step } | null;
+  resume?: { mode: string; roundId?: string; summaryId?: string; finalRoundAwardMinor?: number; step?: Step; snapshot?: Step } | null;
 }
 
 /** Proposal-specific wire mapping; rendering keeps framework domain objects. */
@@ -40,6 +40,7 @@ export class ProposalTransport implements GameTransport {
   private playToken = "";
   private response!: Response;
   private active?: Step;
+  private get completionKey() { return this.key + ".base-completion"; }
   private queued?: Response;
   private staticResult = false;
   private summaryId?: string;
@@ -119,7 +120,7 @@ export class ProposalTransport implements GameTransport {
     this.mockBonusEnabled = settings.mockBonusEnabled === true;
     if (settings.cols !== this.game.reels || settings.rows !== this.game.rows) throw Error("CONFIG_GEOMETRY_MISMATCH");
     this.symbols = settings.symbolIds;
-    this.game.currency = { code: settings.currency, exponent: settings.currencyExponent, locale: "en-US" };
+    this.game.currency = { code: settings.currency, exponent: settings.currencyExponent, locale: this.game.currency?.locale ?? "en-US" };
     this.game.bets.splice(0, this.game.bets.length, ...settings.allowedBetMinor);
     this.game.defaultBet = settings.defaultBetMinor;
     this.game.lines = settings.paylines.map((line) => line.positions.map((pos) => Math.floor((pos - 1) / settings.cols)));
@@ -130,7 +131,10 @@ export class ProposalTransport implements GameTransport {
     this.active = response.resume?.step;
     this.staticResult = response.resume?.mode === "show_stored_result";
     this.summaryId = response.resume?.summaryId;
-    this.hasResume = !!response.resume && (response.presentationStatus === "pending" || !!this.summaryId);
+    const unfinishedCompletion = this.storage.getItem(this.completionKey);
+    const recoveringCompletion = !!unfinishedCompletion && response.roundId === unfinishedCompletion && this.active?.curStep === "base";
+    if (unfinishedCompletion && !recoveringCompletion) this.storage.removeItem(this.completionKey);
+    this.hasResume = !!response.resume && (response.presentationStatus === "pending" || !!this.summaryId || recoveringCompletion);
     this.queued = undefined;
     this.snapshot = this.state(response, this.hasResume ? (this.staticResult ? this.active : response.resume?.snapshot ?? this.active) : undefined);
     if (this.hasResume) this.snapshot.resume = {
@@ -186,7 +190,7 @@ export class ProposalTransport implements GameTransport {
       const next = this.queued; this.queued = undefined; this.staticResult = false;
       return this.outcome(next, next.step!);
     }
-    if (this.hasResume) return this.resume();
+    if (this.hasResume && !this.staticResult) return this.resume();
     const key = this.key + ".wager";
     const saved = this.storage.getItem(key);
     const pending = saved ? JSON.parse(saved) as { requestId: string; token: string } : null;
@@ -199,17 +203,26 @@ export class ProposalTransport implements GameTransport {
         betMinor: command.bet, featureMode: command.action === "buy-drop" ? "drop" : "tavern",
         ...(command.mockBonus ? { mockBonus: command.mockBonus } : {}),
       }, token);
-    this.staticResult = false;
+    this.staticResult = pending?.requestId === command.requestId &&
+      this.staticResult && this.response.resume?.roundId === response.roundId;
     // Retain the token receipt until the next wager; a lost response retries the same entitlement.
     return this.outcome(response, response.step!);
   }
   async completePresentation(): Promise<Snapshot> {
     if (!this.active) return this.snapshot;
-    if (this.response.presentationStatus !== "pending" && !this.summaryId) return this.snapshot;
+    if (this.response.presentationStatus !== "pending" && !this.summaryId) {
+      if (this.active.curStep === "base") this.storage.removeItem(this.completionKey);
+      return this.snapshot;
+    }
+    const base = this.active.curStep === "base";
+    if (base && this.response.roundId) this.storage.setItem(this.completionKey, this.response.roundId);
     const response = this.summaryId
       ? await this.request("/spin", { isFreespin: 0, curStep: "final-summary", summaryId: this.summaryId })
       : await this.request("/spin", { isFreespin: 1, curStep: this.active.curStep, stepId: this.active.stepId,
         ...(this.staticResult ? { kind: "shown_as_result" } : {}) });
+    if (base && (response.canStartPaidRound === false || response.presentationStatus === "pending"))
+      throw Error("BASE_SETTLEMENT_UNCONFIRMED");
+    if (base) this.storage.removeItem(this.completionKey);
     this.snapshot.balance = response.wallet.confirmedBalanceMinor;
     this.playToken = response.playToken ?? "";
     this.hasResume = false; this.summaryId = undefined;

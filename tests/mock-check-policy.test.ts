@@ -50,7 +50,8 @@ test("v1 served policy settles a many-Scatter base spin without feature and reta
  assert.ok(board.every(reel => reel.filter(id => id === 11).length <= 1));
  assert.equal(result.freegame, null);
  assert.equal(result.step.curStep, "base");
- assert.equal(result.presentationStatus, "completed");
- assert.equal(result.canStartPaidRound, true);
+ assert.equal(result.presentationStatus, "pending");
+ assert.equal(result.canStartPaidRound, false);
  assert.deepEqual(call("/spin", request), result);
+ assert.equal(call("/spin", { isFreespin: 1, curStep: "base", stepId: result.stepId }).canStartPaidRound, true);
 });

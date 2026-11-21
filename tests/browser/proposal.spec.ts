@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { ProposalBackend, ProposalError } from "../../server/proposal-backend.ts";
 import { tavern } from "../../src/games/tavern/definition.ts";
 
+const won = (amount: number) => "₩" + new Intl.NumberFormat("en-US").format(amount);
+
 async function enter(page: import("@playwright/test").Page, params = "") {
   await page.goto("/?game=tarvern" + params);
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 45000 });
@@ -29,7 +31,7 @@ test("v1 real localhost API boots mobile KRW and accepts a paid spin", async ({ 
   page.on("pageerror", (error) => errors.push(error.message));
   await enter(page);
   await expect(page.locator("#balance")).toHaveText("₩10,000,000");
-  await expect(page.locator("#bet")).toHaveText("₩1,000");
+  await expect(page.locator("#bet")).toHaveText(won(tavern.defaultBet));
   await page.reload();
   await expect(page.locator(".opening-continue")).toBeVisible({ timeout: 45000 });
   await expect(page.locator(".brand-loading")).toHaveCount(0, { timeout: 45000 });
@@ -52,7 +54,7 @@ test("v1 real localhost API boots mobile KRW and accepts a paid spin", async ({ 
   expect(spinResponse.request().postDataJSON().gameCode).toBe("tavern-drop");
   const spin = await spinResponse.json();
   expect(spin.currency).toBe("KRW");
-  expect(spin.chargedMinor).toBe(1000);
+  expect(spin.chargedMinor).toBe(tavern.defaultBet);
   expect(spin.reels).toHaveLength(25);
   expect(apiRequests.every((request) => request.method === "POST" && request.search === "" && request.gameCode === "tavern-drop")).toBeTruthy();
   expect(errors).toEqual([]);
@@ -136,7 +138,7 @@ test("v1 UI resumes intro, opens each chest and ACKs Total Win only after Contin
     await expect(page.locator('dialog[data-look="total-win"]')).toBeVisible({ timeout: 90000 });
     expect(requests.filter((req) => req.curStep === "open-chest")).toHaveLength(5);
     expect(requests.filter((req) => req.curStep === "free-end")).toHaveLength(0);
-    await expect(page.locator("#balance")).toHaveText("₩9,900,000");
+    await expect(page.locator("#balance")).toHaveText(won(config.demo.initialBalance - config.defaultBet * config.demo.buyPrices.drop));
     await page.screenshot({ path: ".runtime/v1-total-win.png" });
     // Wait for the Total Win intro before clicking the dialog outside the button.
     await expect(page.locator("#continue")).toBeVisible();
@@ -155,20 +157,64 @@ test("v1 audio menu loads one Howler pack for sprite aliases", async ({ page }) 
   await page.emulateMedia({ reducedMotion: "reduce" });
   const errors: string[] = [];
   const audioRequests: string[] = [];
+  await page.addInitScript(() => {
+    const diagnostics = { sources: 0, htmlPlays: 0 };
+    Object.assign(window, { m2AudioDiagnostics: diagnostics });
+    const sources: { context: BaseAudioContext; time: number }[] = [];
+    let mediaPlayback = 0;
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (when, offset, duration) {
+      diagnostics.sources++;
+      const channel = this.buffer?.getChannelData(0);
+      const sampleRate = this.buffer?.sampleRate ?? 0;
+      const from = Math.floor((offset ?? 0) * sampleRate);
+      if (channel?.subarray(from, from + sampleRate / 4).some((sample) => Math.abs(sample) > 0.0001))
+        sources.push({ context: this.context, time: Math.max(when ?? 0, this.context.currentTime) });
+      return Reflect.apply(start, this, [when, offset, duration].filter((value) => value !== undefined));
+    };
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      // Howler may create a detached Audio element. Its events never reach window.
+      diagnostics.htmlPlays++;
+      const initialTime = this.currentTime;
+      const advanced = () => {
+        if (this.currentTime <= initialTime + 0.01) return;
+        mediaPlayback++;
+        this.removeEventListener("timeupdate", advanced);
+      };
+      this.addEventListener("timeupdate", advanced);
+      const playback = play.call(this);
+      void playback?.catch(() => this.removeEventListener("timeupdate", advanced));
+      return playback;
+    };
+    Object.assign(window, { m2AudioPlaybackCount: () =>
+      sources.filter(({ context, time }) => context.state === "running" && context.currentTime > time + 0.02).length +
+      mediaPlayback,
+    });
+  });
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => {
     if (/td_sounds\.(ogg|mp3)$/.test(new URL(request.url()).pathname)) audioRequests.push(request.url());
   });
+  const response = page.waitForResponse((res) => /td_sounds\.(ogg|mp3)$/.test(new URL(res.url()).pathname));
   await enter(page);
   await page.locator("#menu").click();
-  const response = page.waitForResponse((res) => /td_sounds\.(ogg|mp3)$/.test(new URL(res.url()).pathname));
   await page.locator("#music-volume").focus();
   await page.locator("#music-volume").press("ArrowRight");
   expect((await response).status()).toBe(200);
+  const playbackCount = () => page.evaluate(() => (window as Window & { m2AudioPlaybackCount: () => number }).m2AudioPlaybackCount());
+
   await page.locator("#effects-volume").focus();
-  await page.locator("#effects-volume").press("ArrowRight");
+  await page.locator("#effects-volume").press("End");
   await page.locator("#menu").click();
+  const beforeClick = await playbackCount();
   await page.locator("#bet-up").click();
+  try {
+    await expect.poll(playbackCount, { timeout: 30000 }).toBeGreaterThan(beforeClick);
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => (window as Window & { m2AudioDiagnostics: object }).m2AudioDiagnostics);
+    throw Error(JSON.stringify(diagnostics), { cause: error });
+  }
   expect(audioRequests).toHaveLength(1);
   expect(errors).toEqual([]);
 });

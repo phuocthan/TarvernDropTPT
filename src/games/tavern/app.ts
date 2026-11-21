@@ -1,3 +1,5 @@
+import basePresentation from "./base-presentation.config.json";
+import { bindHoldShortcut } from "../../framework/ui/hold-shortcut.ts";
 import { ApiError } from "../../framework/network/json-client.ts";
 import "./theme.css";
 import { createSlotSession } from "../../framework/slot-core/index.ts";
@@ -85,7 +87,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     <div class="hud-money" id="feature-total" hidden><span>Total win</span><strong id="feature-total-amount">0.00</strong></div>
     <div id="free-spins" hidden><span>Free spins</span> <strong id="feature-progress">0</strong></div>
     <div class="hud-bet">
-     <button id="bet-picker" type="button" class="hud-money hud-bet-amount" aria-label="Bet menu" aria-controls="bet-panel" aria-expanded="false" popovertarget="bet-panel" disabled><span id="bet-label">Bet</span><strong id="bet">1.00</strong><span id="bet-track" role="meter" aria-label="Bet level" aria-valuemin="0"></span></button>
+     <button id="bet-picker" type="button" class="hud-money hud-bet-amount" aria-label="Bet menu" aria-controls="bet-panel" aria-expanded="false" popovertarget="bet-panel" disabled><span id="bet-label">Bet</span><strong id="bet">1.00</strong><span id="chance-cost" hidden></span><span id="bet-track" role="meter" aria-label="Bet level" aria-valuemin="0"></span></button>
      <div class="bet-arrows"><button id="bet-up" aria-label="Increase bet">${hudIcon("bet-up")}</button><button id="bet-down" aria-label="Decrease bet">${hudIcon("bet-down")}</button></div>
     </div>
     <div class="hud-spin-control">
@@ -302,7 +304,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   ]);
   let presentingFeature: FeatureState | null = null;
   /** A winning result is being presented: Spin (and its Skip role) waits until it ends. */
-  let winPresentation = false;
+  let basePresentationSkippable = false;
+  let showRecoveredWin = false;
   let presentingBet = game.bets[betIndex];
   const dialog = $<HTMLDialogElement>("dialog");
   const closeModal = dialog.querySelector<HTMLButtonElement>(".close-modal")!;
@@ -374,7 +377,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     }
   }
   function syncWin(feature?: FeatureState | null) {
-    $("win-value").hidden = displayWin === 0;
+    $("win-value").hidden = displayWin === 0 && !showRecoveredWin;
     $("spin-win-amount").textContent = money(displayWin);
     $("feature-total").hidden = !feature;
     if (feature) {
@@ -393,15 +396,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $("balance").textContent = state ? money(state.balance) : "—";
     const bet = game.bets[betIndex];
     updateBetTrack($("bet-track"), betIndex, game.bets.length);
-    $("bet-label").textContent =
-      feature || chance === "standard" ? "Bet" : chance + " chance";
-    const shownBet = money(
-      feature
-        ? (state?.round?.bet ?? presentingBet)
-        : bet * game.demo.chancePrices[chance],
-    );
+    const chanceActive = !feature && chance !== "standard";
+    const shownBet = money(feature ? (state?.round?.bet ?? presentingBet) : bet);
+    const chanceName = chance === "extra" ? "Extra Chance" : "Super Chance";
+    const cost = money(bet * game.demo.chancePrices[chance]);
+    $("bet-label").textContent = "Bet";
     $("bet").textContent = shownBet;
-    $("bet-picker").setAttribute("aria-label", `Bet menu, current bet ${shownBet}`);
+    $("chance-cost").hidden = !chanceActive;
+    $("chance-cost").textContent = chanceActive ? `${chanceName} · Cost ${cost}` : "";
+    $("bet-picker").setAttribute("aria-label", chanceActive
+      ? `Bet menu, current bet ${shownBet}, ${chanceName}, cost ${cost} per spin`
+      : `Bet menu, current bet ${shownBet}`);
     const mode = feature?.mode || "base";
     const shell = stage.parentElement!;
     shell.dataset.mode = mode;
@@ -425,26 +430,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     $<HTMLButtonElement>("buy").disabled = betLocked;
     $<HTMLButtonElement>("bet-down").disabled = betLocked || betIndex === 0;
     $<HTMLButtonElement>("bet-up").disabled = betLocked || betIndex === game.bets.length - 1;
-    $<HTMLButtonElement>("spin").disabled =
-      nextFreeSpin ||
-      (winPresentation && !autoRunning) ||
-      (busy && view.isMoving && !view.allowForceStop && !autoRunning) ||
-      controller.phase === "loading" ||
-      controller.phase === "recovery";
-    $("spin").classList.toggle(
-      "spinning",
-      busy && controller.phase !== "recovery",
-    );
-    const blockedStop = busy && view.isMoving && !view.allowForceStop;
-    const skip = !blockedStop && ((busy && shell.dataset.totalWin !== "returning") || nextFreeSpin);
-    const spin = $("spin");
+    const skip = canSkipSpin();
+    const spin = $<HTMLButtonElement>("spin");
+    spin.disabled = !autoRunning && (nextFreeSpin || (busy && !skip));
+    spin.classList.toggle("spinning", busy && controller.phase !== "recovery");
     const unlimited = autoRemaining === Infinity;
     spin.innerHTML = autoRunning
       ? `<span class="auto-count">${unlimited ? "∞" : autoRemaining}</span>`
-      : skip ? hudIcon("spin") : hudIcon("spin") + hudIcon("autoplay-ready");
+      : skip ? hudIcon("skip") : hudIcon("spin") + hudIcon("autoplay-ready");
     spin.setAttribute("aria-label", autoRunning
       ? (unlimited ? "Stop unlimited autoplay" : `Stop autoplay, ${autoRemaining} spins left`)
-      : blockedStop ? "Spinning" : skip ? "Skip" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
+      : skip ? "Skip" : busy || nextFreeSpin ? "Round in progress" : autoPicker.isOpen() && autoRemaining > 0 ? "Start autoplay" : "Spin");
     $("auto-add").hidden = !autoRunning || unlimited || !controls?.autoTopUp;
     autoPicker.setSelected(autoRunning ? 0 : autoRemaining);
     $("speed").setAttribute("aria-pressed", String(turbo));
@@ -537,6 +533,24 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     epic: "td_wincap_epicwin", max: "td_wincap_maxwin",
   };
   let winSkip: (() => void) | undefined;
+  let skipPresentationWait: (() => void) | undefined;
+
+  function canSkipSpin() {
+    return controller.phase === "presenting" && !dialog.open &&
+      (!!winSkip || (basePresentationSkippable && !skipped && (!view.isMoving || view.allowForceStop)));
+  }
+  function waitForWin(ms: number) {
+    if (skipped || ms <= 0) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        skipPresentationWait = undefined;
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      skipPresentationWait = finish;
+    });
+  }
   const winAnimation = (label: string) =>
     label === "NICE WIN" ? "smallwin" : label.toLowerCase().replace(/\s/g, "");
   const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -556,6 +570,8 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     // The Spine screen replaces the DOM text; hide it before the renderer is ready (no flash).
     if (effects) art.dataset.spinePending = "";
     overlay.append(title, art, value);
+    overlay.style.pointerEvents = "auto";
+    overlay.addEventListener("click", () => winSkip?.());
     root.append(overlay);
     const update = (amount: number) => {
       const formatted = money(amount);
@@ -665,6 +681,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       if (effects) effects.seekScreen(next.time);
       else skippedSeconds += next.time - now;
     };
+    sync();
     audio.cue("td_wincap_start");
     audio.cue("count", true);
     const screen = (effects?.showScreen(art, finalClip, { amount: money(0) }) ?? delay(duration * 1000))
@@ -688,6 +705,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       await Promise.all([screen, counting]);
     } finally {
       winSkip = undefined;
+      sync();
       unsubscribe?.();
       if (flush) cancelAnimationFrame(flush);
       finishCount();
@@ -732,6 +750,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       ? null
       : (outcome.finalFeature ?? outcome.state.feature);
     const checkpoint = outcome.checkpoint;
+    if (checkpoint?.staticResult && checkpoint.curStep === "base") {
+      view.setBoard(outcome.state.board);
+      await controller.completePresentation();
+      displayWin = checkpoint.displayWinMinor ?? outcome.spinWin;
+      showRecoveredWin = true;
+      sync();
+      return;
+    }
     const isSpinStep = !checkpoint || ["base", "intro", "freespin"].includes(checkpoint.curStep);
     let noWinReelsStoppedAt: number | undefined;
     const tier = winTier(outcome.spinWin, outcome.bet);
@@ -750,6 +776,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         }
         view.clearHighlight();
       } else {
+        const ordinary = !presentingFeature && !outcome.entry && checkpoint?.curStep !== "intro";
+        basePresentationSkippable = ordinary;
+        sync();
         let anticipating = false;
         sound.reveal();
         if (checkpoint?.staticResult) view.setBoard(outcome.state.board);
@@ -768,8 +797,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         const plainNoWin = outcome.spinWin === 0 && outcome.wins.length === 0 &&
           !outcome.entry && !outcome.retrigger && !outcome.completion && !outcome.capped;
         noWinReelsStoppedAt = plainNoWin ? performance.now() : undefined;
-        winPresentation = !plainNoWin;
-        if (!plainNoWin) await waitAfterReels(spinTurbo);
+        basePresentationSkippable = ordinary && !plainNoWin;
+        sync();
+        if (!plainNoWin) {
+          if (ordinary) {
+            const check = game.presentation.checkWinDelayMs;
+            await waitForWin((turbo ? check?.turbo : check?.normal) ?? 0);
+          } else await waitAfterReels(spinTurbo);
+        }
         const scatter =
           outcome.entry || outcome.retrigger
             ? outcome.state.board.flatMap((column, reel) =>
@@ -790,16 +825,20 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           const lit: Position[] = [];
           for (const [index, win] of outcome.wins.entries()) {
             const fast = () => turbo || skipped;
+            if (ordinary && skipped) break;
             sound.lineWin(win.amount / outcome.bet, turbo);
             payline.show(win, game.lines[win.line], money(win.amount), win.amount >= outcome.bet * 20, fast());
             for (const position of win.positions)
               if (!lit.some((p) => p.reel === position.reel && p.row === position.row)) lit.push(position);
             for (const position of win.positions) {
+              if (ordinary && skipped) break;
               void view.focusWins(lit, [position]);
-              await delay(fast() ? 5 : 40);
+              const time = basePresentation.lineSymbolMs[fast() ? "turbo" : "normal"];
+              await (ordinary ? waitForWin(time) : delay(time));
             }
-            if (!fast()) await delay(150);
-            if (index === outcome.wins.length - 1) await delay(500);
+            if (!fast()) await (ordinary ? waitForWin(basePresentation.lineGapMs) : delay(150));
+            if (index === outcome.wins.length - 1)
+              await (ordinary ? waitForWin(basePresentation.lastLineHoldMs[fast() ? "turbo" : "normal"]) : delay(500));
           }
           if (scatter.length && (outcome.entry || !skipped)) {
             await view.waitForLandings(scatter);
@@ -813,13 +852,17 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
             await view.focusWins(scatter);
           }
           view.clearHighlight();
+          if (ordinary && skipped) payline.clear();
         };
-        const from = performance.now();
+        let previousFrame = performance.now();
+        let countProgress = 0;
         const countWin = plainNoWin ? undefined : new Promise<void>((resolve) => {
           const tick = () => {
-            const t = skipped
-              ? 1
-              : Math.min(1, (performance.now() - from) / (turbo ? 179 : 650));
+            const now = performance.now();
+            const countMs = ordinary ? basePresentation.countMs[turbo ? "turbo" : "normal"] : turbo ? 179 : 650;
+            countProgress += (now - previousFrame) / countMs;
+            previousFrame = now;
+            const t = skipped ? 1 : Math.min(1, countProgress);
             displayWin = Math.round(outcome.spinWin * (1 - (1 - t) ** 3));
             syncWin(presentingFeature);
             if (t < 1) requestAnimationFrame(tick);
@@ -828,8 +871,9 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
           tick();
         });
         await Promise.all([animateWins(), countWin, effects?.waitForChestActivations()]);
+        basePresentationSkippable = false;
         countingFeatureBase = undefined;
-        syncWin(presentingFeature);
+        sync();
         if (outcome.retrigger) {
           effects?.shake();
           await showWinCelebration("Retrigger", `+${outcome.retrigger} Free Spins`, "addfs");
@@ -1043,7 +1087,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       delete shell.dataset.totalWin;
     } else if (outcome.capped) {
       stopAuto();
-      await showWinSequence(outcome.paidAward, outcome.bet, true);
+      await showWinSequence(outcome.spinWin, outcome.bet, true);
     } else if (tier && !outcome.entry && outcome.spinWin >= outcome.bet * 10) {
       // Reference boardWin: the win screen from a nice win (10x); 5x wins only count up.
       // Reference boardWin: the mascot cheers from a super win (50x) up, below the max win.
@@ -1071,22 +1115,22 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     mockBonus?: MockBonusScenario,
   ) {
     if (!recover && action !== "spin" && !bonusPreview) {
-      notice("coming-soon", "Coming Soon in M3",
-        "The Tavern and Drop bonus games arrive in Milestone 3. You have not been charged.",
+      notice("coming-soon", basePresentation.bonusUnavailable.title,
+        basePresentation.bonusUnavailable.body,
         [{ id: "notice-ok", label: "OK", onClick: () => dialog.close() }]);
       return;
     }
     if (!recover && controller.phase !== "ready") {
-      // A win (including its free spins) plays out in full before the next spin.
-      if (winPresentation) return;
+      if (!canSkipSpin()) return;
       if (winSkip) {
         winSkip();
         return;
       }
-      if (view.isMoving && !view.allowForceStop) return;
       skipped = true;
+      skipPresentationWait?.();
       view.skip();
       effects?.skip();
+      sync();
       return;
     }
     clearSpinTimer();
@@ -1102,6 +1146,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       showReconnecting(() => undefined);
       return;
     }
+    showRecoveredWin = false;
     displayWin = 0;
     syncWin(controller.state?.feature);
     const spinTurbo = turbo;
@@ -1133,16 +1178,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
         if (!outcome.entry && outcome.state.feature) {
           presentingFeature = outcome.state.feature;
           effects?.restoreFeature(outcome.state.feature);
-        } else if (!outcome.entry) view.hideSymbols();
+        } else if (!outcome.entry && outcome.checkpoint?.curStep !== "base") view.hideSymbols();
         shell.querySelector<HTMLElement>(".tavern-hud")!.inert = false;
       }
       try {
         await present(outcome, spinTurbo);
       } finally {
-        if (winPresentation) {
-          winPresentation = false;
-          sync();
-        }
+        basePresentationSkippable = false;
+        sync();
       }
     } catch (error) {
       stopAuto();
@@ -1165,6 +1208,14 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       sync();
     }
   }
+  root.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest<HTMLButtonElement>("button");
+    if (!button || button.disabled) return;
+    if (button.id === "buy") sound.buttonClick(true);
+    else if (button.matches("#auto, #auto-add, #speed, #menu, #menu-rules, #bet-picker, #confirm-buy, #notice-ok, .close-modal, [data-buy], [data-chance], .bet-picker-options button"))
+      sound.buttonClick();
+  }, { capture: true });
   $("spin").onclick = () => {
     if (autoRunning) {
       stopAuto();
@@ -1177,7 +1228,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   };
   $("auto-add").onclick = () => {
     if (!autoRunning || autoRemaining === Infinity || !controls?.autoTopUp) return;
-    audio.cue("click");
     autoRemaining += controls.autoTopUp;
     sync();
   };
@@ -1194,7 +1244,6 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     sync();
   };
   $("auto").onclick = () => {
-    audio.cue("click");
     if (controls?.autoUnlimited && !autoRemaining) {
       autoRemaining = Infinity;
       sync();
@@ -1419,6 +1468,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
     void openInfoScreen({
       headings: info.headings,
       rules: fillInfo(info.rules, { ...values, rtpLine: rtp ? fillInfo(info.rtpLine, values) : "" }),
+      paytableNote: info.paytableNote,
       paytable: info.paytable.map((group) => group.flatMap((id) => {
         const symbol = game.symbols.find((item) => item.id === id);
         if (!symbol) return [];
@@ -1497,38 +1547,33 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
   moneyFields.forEach((field) =>
     moneyObserver.observe(field, { childList: true, characterData: true, subtree: true }));
   window.addEventListener("resize", () => requestAnimationFrame(refitMoney));
-  // Reference Space key: one press acts like the Spin button (spin, skip, stop autoplay);
-  // holding it for 400 ms turns Turbo on until the key is released. Key repeat is ignored.
-  let spaceTurboTimer = 0;
-  let spaceTurbo = false;
-  window.addEventListener("keydown", (event) => {
-    if (
-      event.code !== "Space" ||
-      document.querySelector("dialog[open]") ||
-      $("spin").closest("[inert]") ||
-      event.target instanceof HTMLButtonElement ||
-      event.target instanceof HTMLInputElement
-    ) return;
-    event.preventDefault();
-    if (event.repeat) return;
-    const spin = $<HTMLButtonElement>("spin");
-    if (!spin.disabled && spin.offsetParent) spin.click();
-    else if (controller.phase !== "ready") void run("spin");
-    window.clearTimeout(spaceTurboTimer);
-    spaceTurboTimer = window.setTimeout(() => {
-      if (turbo || $<HTMLButtonElement>("speed").disabled) return;
-      spaceTurbo = turbo = true;
+  let turboBeforeHold: boolean | undefined;
+  runtime.lifetime.add(bindHoldShortcut(window, {
+    code: "Space",
+    holdMs: basePresentation.spaceHoldMs,
+    enabled(event) {
+      return !document.querySelector("dialog[open]") && !$("spin").closest("[inert]") &&
+        !(event.target instanceof HTMLElement &&
+          event.target.closest("input, select, textarea, [contenteditable], button:not(#spin)"));
+    },
+    press() {
+      const spin = $<HTMLButtonElement>("spin");
+      if (!spin.disabled && spin.getClientRects().length) spin.click();
+    },
+    hold(active) {
+      if (active) {
+        if ($<HTMLButtonElement>("speed").disabled || dialog.open) return;
+        turboBeforeHold = turbo;
+        turbo = true;
+      } else {
+        if (turboBeforeHold === undefined) return;
+        turbo = turboBeforeHold;
+        turboBeforeHold = undefined;
+      }
+      view.setTurbo(turbo);
       sync();
-    }, 400);
-  });
-  window.addEventListener("keyup", (event) => {
-    if (event.code !== "Space") return;
-    window.clearTimeout(spaceTurboTimer);
-    if (spaceTurbo) {
-      spaceTurbo = turbo = false;
-      sync();
-    }
-  });
+    },
+  }));
   try {
     await mount($("board"), {
       autoStart: false,
@@ -1656,7 +1701,7 @@ export async function mountTavern(root: HTMLElement, game: GameDefinition, loade
       hud.inert = false;
     }
     sync();
-    if (entry.resumeStep === "intro" && controller.phase === "recovery") {
+    if ((entry.resumeStep === "intro" || entry.resumeStep === "base") && controller.phase === "recovery") {
       void run("spin", true, true);
     } else if (controller.phase === "recovery" || controller.state?.feature) {
       modal(
