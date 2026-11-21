@@ -108,12 +108,7 @@
           "type": "string",
           "pattern": "^/api(?:/[a-z][a-z0-9-]*)?$"
         },
-        "skin": {
-          "enum": [
-            "basic",
-            "tavern"
-          ]
-        }
+        "skin": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
       },
       "additionalProperties": false
     },

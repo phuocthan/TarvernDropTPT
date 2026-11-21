@@ -1,0 +1,26 @@
+.gem-demo {
+  min-height: 100dvh;
+  background: #0d1522;
+  color: #e4edf9;
+}
+.gem-demo .reuse-example {
+  max-width: 500px;
+}
+.gem-demo .reuse-motion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.gem-demo .reuse-motion select,
+.gem-demo .reuse-controls button {
+  padding: 8px 12px;
+  border: 1px solid #536c8c;
+  border-radius: 6px;
+  background: #192b40;
+  color: inherit;
+  font: inherit;
+}
+.gem-demo .reuse-controls {
+  flex-wrap: wrap;
+}

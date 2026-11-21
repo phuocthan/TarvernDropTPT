@@ -70,3 +70,5 @@ See the [Tavern asset inventory](docs/tavern-asset-inventory.md) for CDN verific
 See the [Tavern performance notes](docs/tavern-performance.md) for the local profiling results and hardware checks.
 
 The fake server owns all demo outcomes and balances. It is not certified math; no real money. The v1 backend persists rounds, receipts and synthetic wallets across restart. A browser test identity is retained in local storage; clearing that identity starts another test account. The reference asset integration is local. Approved math, final client assets and the production API are pending.
+
+For a standalone, asset-free 4×3 example, see the [fw-pixi starter](docs/fw-pixi-starter.md). Run `npm run starter:export` to generate a separate source directory under `.runtime/`.

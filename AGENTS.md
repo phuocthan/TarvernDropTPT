@@ -42,7 +42,7 @@ M3 covers the full Tavern and Drop bonus flows, including free spins, retriggers
 
 # Working flow reaffirmed 20 November 2026
 
-1. Develop and verify changes in the main `TarvernDropTPT` repository.
+1. Develop, verify and publish changes on the `main` branch of the `TarvernDropTPT` repository. Keep all development work for this repository on `main`.
 2. Export/integrate only the requested milestone scope into `DropTarvernRelease`.
 3. Submit that reviewed client scope through the client's feature branch and Draft GitLab MR, preserving the approved base and protected main.
 

@@ -3,21 +3,31 @@ import { Container, Graphics, Sprite, Text, type Texture } from "pixi.js";
 import { createSlotSession } from "../session.ts";
 import { createGameTransport } from "../transport/proposal.ts";
 import { formatMoney } from "./money.ts";
-import type { GameDefinition } from "../domain/contracts.ts";
+import type { GameDefinition, GameTransport, ReelMotion } from "../domain/contracts.ts";
 import type { BrandLoader } from "./brand-loading.ts";
 import { loadTextures } from "./assets.ts";
 import { gameRuntime } from "../app/game-runtime.ts";
+import type { SymbolFactory } from "./board.ts";
+
+interface BasicGameOptions {
+  symbolFactory?: SymbolFactory;
+  transport?: GameTransport;
+  motionPicker?: boolean;
+}
 
 export async function mountBasicGame(
   root: HTMLElement,
   game: GameDefinition,
   loader?: BrandLoader,
   navigation?: { href: string; label: string },
+  options: BasicGameOptions = {},
 ) {
   root.innerHTML = `
     <main class="reuse-example">
       <h1></h1>
       <p class="board-details"></p>
+      ${options.motionPicker ? `<label class="reuse-motion">Reel motion
+        <select id="reuse-motion" disabled><option value="normal">Normal</option><option value="drop">Drop</option></select></label>` : ""}
       <div class="reel-host" id="reuse-board"></div>
       <div class="reuse-controls"><button type="button" id="reuse-spin" disabled>Spin</button>
       <span id="reuse-balance"></span></div>
@@ -30,16 +40,30 @@ export async function mountBasicGame(
     root.querySelector("main")!.prepend(link);
   }
   root.querySelector("h1")!.textContent = game.title;
-  root.querySelector(".board-details")!.textContent =
-    `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines · ${game.presentation.spinType} spin`;
+  const motionPicker = root.querySelector<HTMLSelectElement>("#reuse-motion");
+  const requestedMotion = new URLSearchParams(location.search).get("motion");
+  let motion: ReelMotion = options.motionPicker && (requestedMotion === "normal" || requestedMotion === "drop")
+    ? requestedMotion : game.presentation.spinType;
+  const updateDetails = () => {
+    root.querySelector(".board-details")!.textContent =
+      `${game.reels} × ${game.rows} reels · ${game.lines.length} paylines · ${motion} spin`;
+  };
+  if (motionPicker) {
+    motionPicker.value = motion;
+    motionPicker.onchange = () => {
+      motion = motionPicker.value as ReelMotion;
+      updateDetails();
+    };
+  }
+  updateDetails();
   const symbols = new Map(game.symbols.map((symbol) => [symbol.id, symbol]));
   const images = Object.fromEntries(game.symbols.flatMap(({ id, image }) => image ? [[id, image]] : []));
   let textures = new Map<string, Texture>();
 
   const { controller, board, mount, waitAfterReels } = createSlotSession(
     game,
-    createGameTransport(game, localStorage),
-    (cellSizePx) => {
+    options.transport ?? createGameTransport(game, localStorage),
+    options.symbolFactory ?? ((cellSizePx) => {
       const view = new Container();
       const scale = cellSizePx / 102;
       const text = new Text({
@@ -78,7 +102,7 @@ export async function mountBasicGame(
           }
         },
       };
-    },
+    }),
     localStorage,
   );
 
@@ -90,6 +114,7 @@ export async function mountBasicGame(
     button.textContent =
       controller.phase === "recovery" ? "Recover result" : "Spin";
     button.disabled = false;
+    if (motionPicker) motionPicker.disabled = false;
   }
   try {
     const host = root.querySelector<HTMLElement>("#reuse-board")!;
@@ -112,22 +137,30 @@ export async function mountBasicGame(
       board.skip();
       return;
     }
-    button.disabled = !board.allowForceStop;
-    button.textContent = board.allowForceStop ? "Stop" : "Spinning";
-    board.start(false);
+    const recovering = controller.phase === "recovery";
+    if (motionPicker) motionPicker.disabled = true;
+    button.disabled = recovering || !board.allowForceStop;
+    button.textContent = recovering ? "Recovering…" : board.allowForceStop ? "Stop" : "Spinning";
+    if (!recovering) board.start(false, motion);
     try {
-      const outcome = await (controller.phase === "recovery"
+      const outcome = await (recovering
         ? controller.recover()
         : controller.execute({
             action: "spin",
             bet: game.defaultBet,
             chance: "standard",
           }));
-      await board.stop(outcome.state.board);
-      await waitAfterReels(false);
-      board.highlight(outcome.wins);
+      if (recovering) {
+        board.setBoard(outcome.state.board);
+      } else {
+        await board.stop(outcome.state.board);
+        await waitAfterReels(false);
+        board.highlight(outcome.wins);
+      }
       await controller.completePresentation();
-      status.textContent = outcome.wins.length
+      status.textContent = recovering
+        ? `Round restored · Win ${formatMoney(game, outcome.checkpoint?.displayWinMinor ?? outcome.spinWin)}`
+        : outcome.wins.length
         ? `Win ${formatMoney(game, outcome.spinWin)}`
         : "No line win";
     } catch {

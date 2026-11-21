@@ -8,6 +8,7 @@
     "start": "node --experimental-strip-types server.js",
     "start:debug": "npm run build && node --experimental-strip-types server.js --bonus-debug",
     "build": "tsc --noEmit && vite build",
+    "starter:export": "node tools/export-starter.mjs",
     "game:new": "node --experimental-strip-types tools/game.mjs new",
     "game:build": "node --experimental-strip-types tools/game.mjs build",
     "game:start": "node --experimental-strip-types tools/game.mjs start",

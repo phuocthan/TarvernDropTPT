@@ -201,7 +201,7 @@ export interface GameDefinition {
   schemaVersion: 1;
   id: string;
   title: string;
-  routing: { query: string; apiBase: string; skin: "basic" | "tavern"; contract?: "proposal-v1" };
+  routing: { query: string; apiBase: string; skin: string; contract?: "proposal-v1" };
   currency?: { code: string; exponent: number; locale?: string };
   presentation: ReelPresentation;
   reels: number;

@@ -2,6 +2,9 @@ import { existsSync, statSync } from "node:fs";
 import { cp, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { defineConfig, normalizePath, type Plugin } from "vite";
+import { resolveResourceUrl } from "./src/framework/remote/asset-resolver.ts";
+import type { AssetQuality } from "./src/framework/resources/asset-quality.ts";
+import { gamePresentation } from "./src/games/catalog.ts";
 import { gamePaths, readGameConfig } from "./tools/game-profile.ts";
 
 const target = process.env.GAME_TARGET;
@@ -10,28 +13,44 @@ const paths = target ? gamePaths(target) : undefined;
 function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
   const game = readGameConfig(output.config);
   const main = normalizePath(resolve("src/main.ts"));
-  const tavern = game.routing.skin === "tavern";
-  const assets = [`games/${slug}`, ...(tavern ? ["tavern-assets"] : [])];
+  const presentation = gamePresentation(game.routing.skin);
+  const assets = [`games/${slug}`, ...presentation.assets];
   const loading = game.presentation.loadingScreen;
   const assetReferences = [
     ...game.symbols.flatMap((symbol) => symbol.image ? [symbol.image] : []),
     ...(loading ? [loading.background, loading.brandLogo, loading.gameLogo] : []),
     ...(loading?.brandIntro ? [loading.brandIntro.src] : []),
   ];
-  for (const asset of assetReferences) {
+  const checkLocalAsset = (asset: string, label: string) => {
     if (
       !assets.some((folder) => asset.startsWith(folder + "/")) ||
       asset.includes("\\") ||
       asset.split("/").some((part) => !part || part === "." || part === "..")
     ) {
-      throw Error(`Asset "${asset}" for ${slug} must be under public/${assets.join(" or public/")}.`);
+      throw Error(`${label} "${asset}" for ${slug} must be under public/${assets.join(" or public/")}.`);
     }
     if (!statSync(resolve("public", asset), { throwIfNoEntry: false })?.isFile())
-      throw Error(`Asset "public/${asset}" for ${slug} is missing.`);
+      throw Error(`${label} "public/${asset}" for ${slug} is missing.`);
+  };
+  for (const asset of assetReferences) checkLocalAsset(asset, "Asset");
+  const manifest = game.resources;
+  if (manifest) {
+    const baseUrl = "https://standalone-build.invalid/";
+    const qualities: AssetQuality[] = ["hd", "sd"];
+    for (const [id, asset] of Object.entries(manifest.assets)) {
+      if (asset.optional) continue;
+      const bundles = Object.entries(manifest.bundles).filter(([, bundle]) => bundle.assets.includes(id)).map(([name]) => name);
+      if (!bundles.length) continue;
+      const urls = new Set(qualities.map((quality) => resolveResourceUrl(asset.src, manifest.base ?? "", {
+        baseUrl, quality, brand: manifest.brand, version: manifest.version, locale: game.currency?.locale,
+      })));
+      for (const href of urls) {
+        const url = new URL(href);
+        if (url.origin === new URL(baseUrl).origin)
+          checkLocalAsset(decodeURIComponent(url.pathname.slice(1)), `Resource ${id} (${bundles.join(", ")})`);
+      }
+    }
   }
-  const skin = tavern
-    ? ["/src/games/tavern/app.ts", "mountTavern"]
-    : ["/src/framework/presentation/basic-game.ts", "mountBasicGame"];
 
   return {
     name: "standalone-game",
@@ -49,7 +68,7 @@ function standalone(slug: string, output: NonNullable<typeof paths>): Plugin {
         const game = ${JSON.stringify(game)};
         const root = document.querySelector("#app");
         await launchGame(root, game, async (loader) => {
-          const { ${skin[1]}: mount } = await import(${JSON.stringify(skin[0])});
+          const { mount } = await import(${JSON.stringify(presentation.mount)});
           await mount(root, game, loader);
         });
       `;

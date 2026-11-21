@@ -1,0 +1,207 @@
+{
+  "$schema": "../../framework/game-config.schema.json",
+  "schemaVersion": 1,
+  "id": "gem-reels",
+  "title": "Gem Reels",
+  "resources": {
+    "assets": {},
+    "bundles": {
+      "core": {
+        "assets": []
+      }
+    },
+    "startup": [
+      "core"
+    ],
+    "concurrency": 4,
+    "retries": 1
+  },
+  "reels": 4,
+  "rows": 3,
+  "lines": [
+    [
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      2,
+      2,
+      2,
+      2
+    ],
+    [
+      0,
+      1,
+      2,
+      1
+    ],
+    [
+      2,
+      1,
+      0,
+      1
+    ]
+  ],
+  "symbols": [
+    {
+      "id": "ruby",
+      "label": "Ruby",
+      "kind": "royal",
+      "color": "#fb7c89",
+      "glyph": "R",
+      "pays": {
+        "3": 300,
+        "4": 600
+      }
+    },
+    {
+      "id": "emerald",
+      "label": "Emerald",
+      "kind": "royal",
+      "color": "#69e6b5",
+      "glyph": "E",
+      "pays": {
+        "3": 220,
+        "4": 440
+      }
+    },
+    {
+      "id": "sapphire",
+      "label": "Sapphire",
+      "kind": "royal",
+      "color": "#94b9ff",
+      "glyph": "S",
+      "pays": {
+        "3": 160,
+        "4": 320
+      }
+    },
+    {
+      "id": "amber",
+      "label": "Amber",
+      "kind": "royal",
+      "color": "#ffcb77",
+      "glyph": "A",
+      "pays": {
+        "3": 110,
+        "4": 220
+      }
+    }
+  ],
+  "bets": [
+    100
+  ],
+  "initialBoard": [
+    [
+      "ruby",
+      "emerald",
+      "sapphire"
+    ],
+    [
+      "emerald",
+      "sapphire",
+      "amber"
+    ],
+    [
+      "sapphire",
+      "amber",
+      "ruby"
+    ],
+    [
+      "amber",
+      "ruby",
+      "emerald"
+    ]
+  ],
+  "routing": {
+    "query": "gem",
+    "apiBase": "/api/gem",
+    "skin": "gem",
+    "contract": "proposal-v1"
+  },
+  "presentation": {
+    "allowForceStop": false,
+    "landing": {
+      "compressMs": 70,
+      "stretchMs": 90,
+      "settleMs": 120,
+      "leadMs": 80,
+      "squashX": 1.1,
+      "squashY": 0.88,
+      "stretchX": 0.94,
+      "stretchY": 1.06
+    },
+    "reelMaskPaddingPx": 10,
+    "spinType": "normal",
+    "cellSizePx": 86,
+    "gapPx": 6,
+    "normal": {
+      "speedPxPerSecond": 1700,
+      "turboSpeedPxPerSecond": 2800,
+      "stopDelayMs": 130,
+      "turboStopDelayMs": 20,
+      "bounceMs": 170,
+      "bouncePx": 14
+    },
+    "drop": {
+      "exit": {
+        "fallMs": 250,
+        "reelStaggerMs": 18,
+        "rowStaggerMs": 24,
+        "holdMs": 140
+      },
+      "enter": {
+        "fallMs": 390,
+        "reelStaggerMs": 76,
+        "rowStaggerMs": 52,
+        "holdMs": 0
+      },
+      "bounceMs": 200,
+      "bouncePx": 8,
+      "turboMultiplier": 4
+    }
+  },
+  "demo": {
+    "initialBalance": 100000,
+    "capMultiplier": 50,
+    "buyPrices": {
+      "tavern": 0,
+      "drop": 0
+    },
+    "chancePrices": {
+      "standard": 1,
+      "extra": 0,
+      "super": 0
+    },
+    "featureSpins": {
+      "tavern": 0,
+      "drop": 0
+    },
+    "retriggerSpins": 0,
+    "maxFeatureSpins": 0,
+    "chestMultipliers": {
+      "tavern": [],
+      "drop": []
+    },
+    "winTiers": [],
+    "scatterRates": {
+      "standard": 0,
+      "extra": 0,
+      "super": 0
+    }
+  },
+  "defaultBet": 100,
+  "currency": {
+    "code": "USD",
+    "exponent": 2,
+    "locale": "en-US"
+  }
+}

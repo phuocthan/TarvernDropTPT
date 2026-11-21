@@ -31,7 +31,7 @@ export function loadGameConfig(raw: unknown): GameDefinition {
     !key.test(route.query) ||
     !nonEmpty(route.apiBase) ||
     !/^\/api(?:\/[a-z][a-z0-9-]*)?$/.test(route.apiBase) ||
-    !["basic", "tavern"].includes(route.skin)
+    !nonEmpty(route.skin) || !key.test(route.skin)
   )
     invalid("routing");
   if (!positiveInt(game.reels) || !positiveInt(game.rows))
