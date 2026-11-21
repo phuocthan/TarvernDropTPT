@@ -166,7 +166,17 @@ npm run build         # type check and production build
 npm run test:browser  # Playwright browser tests (needs Chromium)
 ```
 
-## 11. Known limits in M2
+## 11. Evidence
+
+The verification record is in `docs/milestone-2-evidence/verification.md`. Screens from a clean production build are in `docs/milestone-2-evidence/screens/`; error states are in `docs/milestone-2-evidence/error-states/`.
+
+| Desktop | Feature buy |
+| --- | --- |
+| ![Base game, desktop](milestone-2-evidence/screens/1-base-game-desktop.jpg) | ![Feature buy panel](milestone-2-evidence/screens/2-feature-buy-panel.jpg) |
+| **Coming Soon in M3** | **Landscape phone** |
+| ![Coming Soon in M3](milestone-2-evidence/screens/4-coming-soon-in-m3.jpg) | ![Landscape phone](milestone-2-evidence/screens/7-base-game-landscape-844x390.jpg) |
+
+## 12. Known limits in M2
 
 - The bonus games (free spins, keys, chests, Total Win) are Milestone 3. They can still appear after a natural Bonus trigger in the demo and are not part of the M2 review.
 - Results, balances and Max Win come from the included mock API with demo credits. The real backend adapter and approved math are separate integration work.
