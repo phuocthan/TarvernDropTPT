@@ -7,6 +7,12 @@ import { MockGame } from "../server/mock-game.ts";
 import { ProposalBackend } from "../server/proposal-backend.ts";
 import { tavern } from "../src/games/tavern/definition.ts";
 import policy from "../server/demo-check.config.json" with { type: "json" };
+/** Replayed receipts are history: unchanged, marked, with the current projection beside them. */
+function history({ replayed, current, ...receipt }: any) {
+  assert.equal(replayed, true);
+  assert.ok(current && typeof current.stateVersion === "number");
+  return receipt;
+}
 const singleScatter = (board: string[][]) => {
  for (const reel of board) assert.ok(reel.filter(id => id === "bonus").length <= 1);
 };
@@ -52,6 +58,6 @@ test("v1 served policy settles a many-Scatter base spin without feature and reta
  assert.equal(result.step.curStep, "base");
  assert.equal(result.presentationStatus, "pending");
  assert.equal(result.canStartPaidRound, false);
- assert.deepEqual(call("/spin", request), result);
+ assert.deepEqual(history(call("/spin", request)), result);
  assert.equal(call("/spin", { isFreespin: 1, curStep: "base", stepId: result.stepId }).canStartPaidRound, true);
 });

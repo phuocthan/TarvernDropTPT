@@ -44,10 +44,15 @@ interface Round {
 interface Receipt {
   fingerprint: string;
   response: Payload;
+  /** Client-generated wager request ID. A retry repeats it; a fresh click has a new one. */
+  requestId?: string;
 }
 interface AccountGame {
   balance: number;
+  /** Changes only when money moves (debit, credit, debug balance). */
   walletVersion: number;
+  /** Changes on every accepted state change: wallet, round status, step release or close. */
+  stateVersion?: number;
   playToken: string;
   lastReels: number[];
   latestRoundId: string | null;
@@ -62,9 +67,12 @@ interface Database {
 }
 export class ProposalError extends Error {
   status: number;
-  constructor(code: string, status = 409) {
+  /** Extra response fields, e.g. the `current` projection used to reconcile a stale wager. */
+  details?: Payload;
+  constructor(code: string, status = 409, details?: Payload) {
     super(code);
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -81,6 +89,7 @@ function requireFields(body: Payload, allowed: string[]) {
   if (Object.keys(body).some((key) => !allowed.includes(key)))
     throw new ProposalError("INVALID_FIELDS", 400);
 }
+const REQUEST_ID = /^[A-Za-z0-9_-]{8,80}$/;
 
 /** Local synthetic implementation of FE-BE-Proposal. Null storage is for isolated fixtures. */
 export class ProposalBackend {
@@ -335,8 +344,11 @@ export class ProposalBackend {
   }
   private settle(account: AccountGame, round: Round) {
     if (round.settlement.status !== "pending") return;
-    account.balance += round.finalAwardMinor;
-    account.walletVersion++;
+    // A ₩0 award closes the round without moving money: the post-debit wallet version stays.
+    if (round.finalAwardMinor > 0) {
+      account.balance += round.finalAwardMinor;
+      account.walletVersion++;
+    }
     round.settlement = {
       status: round.finalAwardMinor ? "paid" : "no_payout",
       creditedMinor: round.finalAwardMinor, settlementId: "award-" + round.roundId,
@@ -349,6 +361,7 @@ export class ProposalBackend {
       round.presentationStatus = "auto_closed";
       round.summaryId = randomUUID();
       this.settle(account, round);
+      this.touch(account);
     }
   }
   sweepExpired() {
@@ -369,6 +382,7 @@ export class ProposalBackend {
       code: 0, synthetic: true, contractVersion: "v1-review-6", currency: round?.settings.currency ?? (definition.currency?.code ?? "KRW"),
       currencyExponent: round?.settings.currencyExponent ?? (definition.currency?.exponent ?? 0),
       wallet: { confirmedBalanceMinor: account.balance, walletVersion: account.walletVersion },
+      stateVersion: account.stateVersion ?? 0,
       canStartPaidRound: allowed,
       ...(allowed ? { playToken: account.playToken } : {}),
       ...(round ? {
@@ -379,6 +393,21 @@ export class ProposalBackend {
         presentationStatus: round.presentationStatus, settlement: structuredClone(round.settlement),
       } : {}),
     };
+  }
+  private touch(account: AccountGame) {
+    account.stateVersion = (account.stateVersion ?? 0) + 1;
+  }
+  /** Authoritative state now: wallet, latest round and eligibility (same shape as /rounds/status). */
+  private current(definition: GameDefinition, account: AccountGame): Payload {
+    const latest = account.latestRoundId ? account.rounds[account.latestRoundId] : undefined;
+    return this.envelope(definition, account, latest);
+  }
+  /**
+   * A stored receipt is history: it records what one request did and may be superseded. It is
+   * returned unchanged, marked `replayed`, with the current projection kept separately.
+   */
+  private replay(definition: GameDefinition, account: AccountGame, saved: Receipt): Payload {
+    return { ...structuredClone(saved.response), replayed: true, current: this.current(definition, account) };
   }
   private release(definition: GameDefinition, account: AccountGame, round: Round): Payload {
     const step = round.steps[round.releasedThrough - 1];
@@ -440,6 +469,7 @@ export class ProposalBackend {
           throw new ProposalError("ROUND_IN_PROGRESS", 409);
         account.balance = value;
         account.walletVersion++;
+        this.touch(account);
         return this.envelope(definition, account, current);
       }
       if (method !== "POST" || !["/spin", "/buy-feature"].includes(path)) throw new ProposalError("NOT_FOUND", 404);
@@ -450,11 +480,12 @@ export class ProposalBackend {
         const saved = account.acknowledgments[key];
         if (saved) {
           if (saved.fingerprint !== fingerprint(body)) throw new ProposalError("REQUEST_CONFLICT");
-          return saved.response;
+          return this.replay(definition, account, saved);
         }
         const round = Object.values(account.rounds).find((item) => item.summaryId === key);
         if (!round) throw new ProposalError("UNKNOWN_SUMMARY");
         round.summaryId = null;
+        this.touch(account);
         const response = { ...this.envelope(definition, account, current), resume: null };
         account.acknowledgments[key] = { fingerprint: fingerprint(body), response };
         return response;
@@ -471,13 +502,14 @@ export class ProposalBackend {
         const saved = account.acknowledgments[key];
         if (saved) {
           if (saved.fingerprint !== receiptHash) throw new ProposalError("REQUEST_CONFLICT");
-          return saved.response;
+          return this.replay(definition, account, saved);
         }
         const round = Object.values(account.rounds).find((item) => item.steps.some((step) => step.stepId === key));
         if (!round || round !== current || round.presentationStatus !== "pending") throw new ProposalError("STALE_STEP");
         const step = round.steps[round.releasedThrough - 1];
         if (step.stepId !== key || step.curStep !== body.curStep) throw new ProposalError("INVALID_CHECKPOINT");
         round.presentedThrough = round.releasedThrough;
+        this.touch(account);
         round.lastActivityAt = this.now();
         round.deadlineAt = this.now() + 30 * DAY;
         if (round.presentedThrough === round.steps.length) {
@@ -491,19 +523,29 @@ export class ProposalBackend {
         account.acknowledgments[key] = { fingerprint: receiptHash, response };
         return response;
       }
-      requireFields(body, path === "/spin" ? ["isFreespin", "betMinor", "chanceMode"] : [
-        "betMinor", "featureMode", ...(this.canDebugBonus(definition) ? ["mockBonus"] : []),
+      requireFields(body, path === "/spin" ? ["isFreespin", "betMinor", "chanceMode", "requestId"] : [
+        "betMinor", "featureMode", "requestId", ...(this.canDebugBonus(definition) ? ["mockBonus"] : []),
       ]);
+      const requestId = body.requestId;
+      if (requestId !== undefined && (typeof requestId !== "string" || !REQUEST_ID.test(requestId)))
+        throw new ProposalError("INVALID_REQUEST_ID", 400);
       const scenario = body.mockBonus === undefined ? undefined : this.mockBonusScenario(definition, body.mockBonus);
       if (!auth.playToken) throw new ProposalError("PLAY_TOKEN_REQUIRED", 400);
       const requestHash = fingerprint({ path, body });
       const saved = account.wagers[auth.playToken];
       if (saved) {
+        // A retry repeats the accepted request ID and payload. Any other request on a used token
+        // is a fresh click from a stale view (e.g. a second tab): it must reconcile, never
+        // receive the earlier round as if it were its own wager.
+        if (requestId !== saved.requestId)
+          throw new ProposalError("STALE_PLAY_TOKEN", 409, { current: this.current(definition, account) });
         if (saved.fingerprint !== requestHash) throw new ProposalError("REQUEST_CONFLICT");
-        return saved.response;
+        return this.replay(definition, account, saved);
       }
-      if (auth.playToken !== account.playToken) throw new ProposalError("INVALID_PLAY_TOKEN");
-      if (!this.envelope(definition, account, current).canStartPaidRound) throw new ProposalError("ROUND_IN_PROGRESS");
+      if (auth.playToken !== account.playToken)
+        throw new ProposalError("INVALID_PLAY_TOKEN", 409, { current: this.current(definition, account) });
+      if (!this.envelope(definition, account, current).canStartPaidRound)
+        throw new ProposalError("ROUND_IN_PROGRESS", 409, { current: this.current(definition, account) });
       if (!Number.isSafeInteger(body.betMinor) || !definition.bets.includes(body.betMinor as number))
         throw new ProposalError("INVALID_BET", 400);
       let action: "spin" | "buy-tavern" | "buy-drop" = "spin";
@@ -524,10 +566,11 @@ export class ProposalBackend {
       const round = this.buildRound(definition, body.betMinor as number, action, chance, scenario);
       account.balance -= round.chargedMinor;
       account.walletVersion++;
+      this.touch(account);
       account.rounds[round.roundId] = round;
       account.latestRoundId = round.roundId;
-      const response = this.release(definition, account, round);
-      account.wagers[auth.playToken] = { fingerprint: requestHash, response };
+      const response = { ...this.release(definition, account, round), ...(requestId ? { requestId } : {}) };
+      account.wagers[auth.playToken] = { fingerprint: requestHash, response, ...(requestId ? { requestId: requestId as string } : {}) };
       return response;
     });
   }

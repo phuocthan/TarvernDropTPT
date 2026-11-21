@@ -93,7 +93,7 @@ createServer(async (req, res) => {
         });
         return json(res, 200, result);
       } catch (error) {
-        if (error instanceof ProposalError) return json(res, error.status, { error: error.message, synthetic: true });
+        if (error instanceof ProposalError) return json(res, error.status, { error: error.message, synthetic: true, ...error.details });
         console.error("Proposal API failed", error);
         return json(res, 500, { error: "INTERNAL_ERROR" });
       }

@@ -7,6 +7,12 @@ import { ProposalBackend } from "../server/proposal-backend.ts";
 import { win79k, zeroWin } from "./browser/fixtures/m2-rounds.ts";
 import type { Board } from "../src/framework/domain/contracts.ts";
 import { tavern } from "../src/games/tavern/definition.ts";
+/** Replayed receipts are history: unchanged, marked, with the current projection beside them. */
+function history({ replayed, current, ...receipt }: any) {
+  assert.equal(replayed, true);
+  assert.ok(current && typeof current.stateVersion === "number");
+  return receipt;
+}
 
 function fixture(t: { after: (fn: () => void) => void }, baseBoard?: Board) {
   const dir = mkdtempSync(join(tmpdir(), "tavern-proposal-"));
@@ -42,7 +48,7 @@ test("proposal KRW wager is durable and duplicate token never creates another de
   assert.equal(result.wallet.confirmedBalanceMinor, info.wallet.confirmedBalanceMinor - 1000);
   assert.ok(result.winLines.every((line: any) => line.lineId >= 1 && line.winSym.every((pos: number) => pos >= 1 && pos <= 25)));
   f.restart();
-  assert.deepEqual(f.call("POST", "/spin", { chanceMode: "normal", betMinor: 1000, isFreespin: 0 }), result);
+  assert.deepEqual(history(f.call("POST", "/spin", { chanceMode: "normal", betMinor: 1000, isFreespin: 0 })), result);
   assert.throws(() => f.call("POST", "/spin", { ...body, betMinor: 500 }), /REQUEST_CONFLICT/);
   assert.equal(f.call("POST", "/rounds/status").wallet.walletVersion, result.wallet.walletVersion);
   assert.throws(() => f.call("POST", "/spin", { ...body, wallet: 10000 }), /INVALID_FIELDS/);
@@ -64,7 +70,7 @@ test("local bonus QA plays only selected chests and settles the requested win ti
     assert.throws(() => call("/buy-feature", { ...buy, mockBonus: { ...buy.mockBonus, spins: 0 } }), /INVALID_MOCK_BONUS/);
     let result = call("/buy-feature", buy);
     const balanceAfterBuy = result.wallet.confirmedBalanceMinor;
-    assert.deepEqual(call("/buy-feature", buy), result);
+    assert.deepEqual(history(call("/buy-feature", buy)), result);
     assert.equal(result.freegame.remainSpin, spins);
     const reveals: number[] = [];
     let count = 0;
@@ -77,7 +83,7 @@ test("local bonus QA plays only selected chests and settles the requested win ti
       assert.equal(result.wallet.confirmedBalanceMinor, balanceAfterBuy);
       const ack = { isFreespin: 1, curStep: step.curStep, stepId: step.stepId };
       result = call("/spin", ack);
-      assert.deepEqual(call("/spin", ack), result);
+      assert.deepEqual(history(call("/spin", ack)), result);
     }
     assert.deepEqual(reveals, opened);
     assert.equal(count, spins);
@@ -124,7 +130,7 @@ test("proposal bonus releases one step, resumes after-result state, and settles 
     previousAmount = step.displayWinMinor;
     lastRequest = { isFreespin: 1, curStep: step.curStep, stepId: step.stepId };
     result = f.call("POST", "/spin", lastRequest);
-    assert.deepEqual(f.call("POST", "/spin", lastRequest), result);
+    assert.deepEqual(history(f.call("POST", "/spin", lastRequest)), result);
   }
   assert.ok(chestCount > 0);
   assert.equal(result.freegame, null);
@@ -133,7 +139,7 @@ test("proposal bonus releases one step, resumes after-result state, and settles 
   assert.ok(result.settlement.creditedMinor <= 1000 * 10000);
   assert.equal(f.call("POST", "/game-info").resume, null);
   f.restart();
-  assert.deepEqual(f.call("POST", "/spin", lastRequest), result);
+  assert.deepEqual(history(f.call("POST", "/spin", lastRequest)), result);
 });
 test("proposal inactive rounds settle without browser ACK and require summary dismissal", (t) => {
   const f = fixture(t);
@@ -142,7 +148,7 @@ test("proposal inactive rounds settle without browser ACK and require summary di
   const initial = f.call("POST", "/buy-feature", body);
   f.advanceDays(29);
   f.call("POST", "/game-info");
-  assert.deepEqual(f.call("POST", "/buy-feature", body), initial);
+  assert.deepEqual(history(f.call("POST", "/buy-feature", body)), initial);
   f.advanceDays(2);
   f.sweep();
   f.restart();
@@ -155,7 +161,7 @@ test("proposal inactive rounds settle without browser ACK and require summary di
   const ack = { isFreespin: 0, curStep: "final-summary", summaryId: resumed.resume.summaryId };
   const completed = f.call("POST", "/spin", ack);
   assert.equal(completed.canStartPaidRound, true);
-  assert.deepEqual(f.call("POST", "/spin", ack), completed);
+  assert.deepEqual(history(f.call("POST", "/spin", ack)), completed);
   f.sweep();
   assert.deepEqual(f.call("POST", "/rounds/status").wallet, completed.wallet);
 });
@@ -200,7 +206,7 @@ for (const [expected, board] of [[79_000, win79k], [0, zeroWin]] as const) {
     assert.equal(paid.canStartPaidRound, false);
     f.restart();
     f.relogin();
-    assert.deepEqual(f.call("POST", "/spin", body), paid);
+    assert.deepEqual(history(f.call("POST", "/spin", body)), paid);
     const resumed = f.call("POST", "/game-info");
     assert.equal(resumed.resume.mode, "show_stored_result");
     assert.equal(resumed.resume.roundId, paid.roundId);
@@ -212,7 +218,125 @@ for (const [expected, board] of [[79_000, win79k], [0, zeroWin]] as const) {
     assert.equal(final.settlement.status, expected ? "paid" : "no_payout");
     assert.equal(final.canStartPaidRound, true);
     assert.ok(final.playToken);
-    assert.deepEqual(f.call("POST", "/spin", { ...ack, kind: "shown_as_result" }), final);
+    assert.deepEqual(history(f.call("POST", "/spin", { ...ack, kind: "shown_as_result" })), final);
     assert.equal(f.call("POST", "/rounds/status").wallet.walletVersion, final.wallet.walletVersion);
   });
 }
+
+/** Two sessions (tabs) of one mock account on a deterministic board. */
+function twoTabs(board: Board) {
+  const backend = new ProposalBackend([tavern], null, { now: () => 1_000_000, rng: () => 0.5, baseBoard: board });
+  const tab = () => {
+    const login = backend.login({ userId: "two-tab-player" });
+    const auth = { sessionId: login.sessionId, token: login.token, playToken: "" };
+    return { auth, call: (path: string, body = {}): any => backend.handle("POST", path, body, auth) };
+  };
+  return { a: tab(), b: tab() };
+}
+function rejected(run: () => unknown, code: string) {
+  let details: any;
+  assert.throws(run, (error: any) => {
+    assert.equal(error.message, code);
+    details = error.details;
+    return true;
+  });
+  return details;
+}
+const wager = (requestId?: string) =>
+  ({ isFreespin: 0, betMinor: 20_000, chanceMode: "normal", ...(requestId ? { requestId } : {}) });
+
+test("a fresh click with a stale token never receives another tab's round; a same-ID retry does", () => {
+  const { a, b } = twoTabs(win79k);
+  const info = a.call("/game-info");
+  assert.equal(info.wallet.confirmedBalanceMinor, 10_000_000);
+  assert.equal(b.call("/game-info").playToken, info.playToken);
+  a.auth.playToken = b.auth.playToken = info.playToken;
+
+  const paid = a.call("/spin", wager("tab-a-request-1"));
+  assert.equal(paid.requestId, "tab-a-request-1");
+  assert.equal(paid.totalwin_amt, 79_000);
+  assert.equal(paid.wallet.confirmedBalanceMinor, 9_980_000);
+  assert.equal(paid.canStartPaidRound, false);
+
+  // Lost response in tab A: the retry repeats token, request ID and payload.
+  const retry = a.call("/spin", wager("tab-a-request-1"));
+  assert.deepEqual(history(retry), paid);
+  assert.equal(retry.current.roundId, paid.roundId);
+  assert.equal(retry.current.canStartPaidRound, false);
+
+  // Tab B clicks Spin with the same parameters on the token it last saw: a new request.
+  for (const fresh of [wager("tab-b-request-1"), wager()]) {
+    const current = rejected(() => b.call("/spin", fresh), "STALE_PLAY_TOKEN").current;
+    assert.equal(current.roundId, paid.roundId);
+    assert.equal(current.canStartPaidRound, false);
+    assert.equal(current.playToken, undefined);
+    assert.equal(current.wallet.confirmedBalanceMinor, 9_980_000);
+  }
+  assert.throws(() => a.call("/spin", { ...wager("tab-a-request-1"), betMinor: 30_000 }), /REQUEST_CONFLICT/);
+  assert.equal(a.call("/rounds/status").wallet.confirmedBalanceMinor, 9_980_000);
+
+  // Tab A completes. Tab B reconciles, takes the new token and starts its own round.
+  const ack = { isFreespin: 1, curStep: "base", stepId: paid.stepId };
+  const completed = a.call("/spin", ack);
+  assert.equal(completed.wallet.confirmedBalanceMinor, 10_059_000);
+  assert.equal(completed.canStartPaidRound, true);
+  const reconciled = b.call("/rounds/status");
+  assert.equal(reconciled.playToken, completed.playToken);
+  b.auth.playToken = reconciled.playToken;
+  const next = b.call("/spin", wager("tab-b-request-2"));
+  assert.notEqual(next.roundId, paid.roundId);
+  assert.equal(next.wallet.confirmedBalanceMinor, 10_039_000);
+
+  // A delayed or repeated completion is history. Its wallet and unlock are superseded.
+  const late = a.call("/spin", ack);
+  assert.deepEqual(history(late), completed);
+  assert.equal(late.wallet.confirmedBalanceMinor, 10_059_000);
+  assert.equal(late.current.wallet.confirmedBalanceMinor, 10_039_000);
+  assert.equal(late.current.canStartPaidRound, false);
+  assert.equal(late.current.playToken, undefined);
+  assert.equal(late.current.roundId, next.roundId);
+  assert.ok(late.current.stateVersion > completed.stateVersion);
+  assert.ok(late.current.wallet.walletVersion > completed.wallet.walletVersion);
+
+  // A late retry of tab A's first wager replays round 1 only, with the current state beside it.
+  a.auth.playToken = info.playToken;
+  const lateRetry = a.call("/spin", wager("tab-a-request-1"));
+  assert.deepEqual(history(lateRetry), paid);
+  assert.equal(lateRetry.current.roundId, next.roundId);
+  // Tab A's fresh click on the token tab B already used must reconcile too.
+  a.auth.playToken = completed.playToken;
+  assert.equal(rejected(() => a.call("/spin", wager("tab-a-request-2")), "STALE_PLAY_TOKEN").current.roundId, next.roundId);
+  assert.equal(a.call("/rounds/status").wallet.confirmedBalanceMinor, 10_039_000);
+  assert.throws(() => a.call("/spin", wager("bad id!")), /INVALID_REQUEST_ID/);
+});
+
+test("closing a ₩0 round keeps the post-debit wallet version; a win credits exactly once", () => {
+  for (const [board, award] of [[zeroWin, 0], [win79k, 79_000]] as const) {
+    const { a, b } = twoTabs(board);
+    const info = a.call("/game-info");
+    a.auth.playToken = info.playToken;
+    const paid = a.call("/spin", wager("close-request-1"));
+    assert.equal(paid.wallet.walletVersion, info.wallet.walletVersion + 1);
+    const ack = { isFreespin: 1, curStep: "base", stepId: paid.stepId };
+    const closed = a.call("/spin", ack);
+    assert.equal(closed.finalRoundAwardMinor, award);
+    assert.equal(closed.settlement.status, award ? "paid" : "no_payout");
+    assert.equal(closed.settlement.settlementId, "award-" + paid.roundId);
+    assert.equal(closed.wallet.confirmedBalanceMinor, 9_980_000 + award);
+    assert.equal(closed.wallet.walletVersion, paid.wallet.walletVersion + (award ? 1 : 0));
+    assert.ok(closed.stateVersion > paid.stateVersion);
+    assert.equal(closed.canStartPaidRound, true);
+    assert.ok(closed.playToken && closed.playToken !== info.playToken);
+    // Duplicate completion from either tab: same settlement and wallet version, nothing moves.
+    for (const tab of [a, b]) {
+      const again = tab.call("/spin", ack);
+      assert.deepEqual(history(again), closed);
+      assert.equal(again.current.wallet.walletVersion, closed.wallet.walletVersion);
+      assert.equal(again.current.stateVersion, closed.stateVersion);
+    }
+    const status = b.call("/rounds/status");
+    assert.equal(status.wallet.confirmedBalanceMinor, 9_980_000 + award);
+    assert.equal(status.wallet.walletVersion, closed.wallet.walletVersion);
+    assert.equal(status.settlement.creditedMinor, award);
+  }
+});
