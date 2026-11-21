@@ -26,3 +26,13 @@ The development checkout retains the original reference art, fonts, audio, Spine
 4. Commit the resulting files to the client repository. For future exports, use that repository's existing history. Push its delivery branch and a new versioned milestone tag after verification. Never rewrite the original `milestone-1` tag. Record the exact reviewed tag in the acceptance checklist.
 
 For later milestones, record each milestone's deliverables and prepare its own explicit export list. Verify client-approved assets and destination before adding them. The GitLab acceptance copy remains a separate destination until the client supplies its URL and access.
+
+## Milestone 2 package
+
+The explicit file list is in [export-milestone-2.mjs](../release/export-milestone-2.mjs) (Node, cross-platform). It exports the full Tavern Drop base game: shared `fw-pixi` source, the Tavern skin and the 3×3 example, the original v13 runtime assets in `public/tavern-assets/` (the user approved shipping them directly), the asset viewer, the mock server, unit and browser tests, and the English client documents: upgrade/deploy guide, features and test guide (MD + PDF), asset and sound checklist (MD + PDF), error-state evidence and the M1 documents. Development-only material stays here: AI handoff and parity notes, research and reference captures, internal communication, Vietnamese drafts (`FE-BE-Proposal.md`, `backend-localhost-v1.md`), QA tooling and temporary specs.
+
+```sh
+node release/export-milestone-2.mjs --destination <empty folder> --revision <development-commit>
+```
+
+The README comes from `release/milestone-2/README.md`. The exporter writes `SOURCE_REVISION` and `EXPORT_MANIFEST.json`. The destination agreed on 21 November 2026 is `DropTarvernRelease` `main` with the new tag `milestone-2`; earlier tags stay unchanged and `korRelease/` (the M1 client-layout copy) is not modified.
